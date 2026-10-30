@@ -76,6 +76,7 @@ func open() -> void:
 	show()
 	_close.grab_focus()
 	print("[Forgery] Canvas open at stroke %d of %d" % [traced.size() + 1, ghosts.size()])
+	_log_ghosts.call_deferred()
 
 
 ## Leaves the canvas, keeping the finished strokes (a stroke half traced is dropped).
@@ -87,6 +88,18 @@ func close() -> void:
 	_painting = false
 	hide()
 	print("[Forgery] Canvas closed at stroke %d of %d" % [traced.size() + 1, ghosts.size()])
+
+
+## The ghost strokes in base units (where the pad landed), for the web smoke test's drags.
+func _log_ghosts() -> void:
+	var origin := _pad.get_global_rect().position
+	var strokes: Array[Array] = []
+	for ghost in ghosts:
+		var points: Array[Array] = []
+		for point in ghost:
+			points.append([roundf(origin.x + point.x), roundf(origin.y + point.y)])
+		strokes.append(points)
+	print("[Forgery] Ghosts in base units %s" % JSON.stringify(strokes))
 
 
 func is_finished() -> bool:

@@ -6,8 +6,13 @@
 // touch/selection CSS is not applied, or a screenshot with nothing drawn. Then it plays the
 // slice with the mouse (desktop) or CDP touches with id 7 (phone; iOS Safari's touch ids are
 // never 0): tap the title's play button where it logs itself ("[Title] Play button at ..."),
-// require "[Game] Arrived at ROOM", then play like a player who watches the guard: wait
-// until it reaches the room's bottom-right corner ("[Guard] Guard reaches waypoint 2", from
+// require "[Game] Arrived at ROOM", then play like a player who watches the guard: paint
+// the fake first (wait until the guard reaches the bottom-left corner, "[Guard] Guard
+// reaches waypoint 3", from where it walks away from the easel; tap the easel where the
+// room logs it ("[Room] Easel at ..."), then drag along every ghost stroke the canvas logs
+// ("[Forgery] Ghosts in base units ...") from the stroke it resumes at until "[Room] Fake
+// ready"; a catch is waited out and the painting resumed), then wait
+// until the guard reaches the room's bottom-right corner ("[Guard] Guard reaches waypoint 2", from
 // where it walks the bottom leg facing away from the painting), tap the masterpiece where
 // the room logs it ("[Room] Masterpiece at ..., exit at ...") until "[Room] Swapped" (a
 // catch, "[Room] Caught", is
@@ -44,11 +49,20 @@ const BASE = { width: 960, height: 540 };
 const RECT = '\\[P: \\(([\\d.-]+), ([\\d.-]+)\\), S: \\(([\\d.-]+), ([\\d.-]+)\\)\\]';
 const PLAY_RECT = new RegExp(`^\\[Title\\] Play button at ${RECT}`);
 const ROOM_LAYOUT = new RegExp(`^\\[Room\\] Masterpiece at ${RECT}, exit at \\(([\\d.-]+), ([\\d.-]+)\\)`);
+const EASEL_RECT = new RegExp(`^\\[Room\\] Easel at ${RECT}`);
+const CANVAS_OPEN = /^\[Forgery\] Canvas open at stroke (\d+) of (\d+)/;
+const GHOSTS = /^\[Forgery\] Ghosts in base units (.+)$/;
+// A pause between a drag's points, so the engine's input accumulation (one merged drag a
+// frame) keeps the stroke's shape.
+const DRAG_STEP_MS = 20;
 // How many times a tap is repeated after a catch tossed the mime back to the entrance.
 const ATTEMPTS = 5;
 // The guard at the slice room's bottom-right corner: it then walks the bottom leg facing
 // away from the painting, the window a watching player takes.
 const GUARD_SAFE = /^\[Guard\] Guard reaches waypoint 2 /;
+// The guard at the bottom-left corner: it then walks up and along the top, away from the
+// easel, for most of its loop.
+const GUARD_PAINT_SAFE = /^\[Guard\] Guard reaches waypoint 3 /;
 // Long enough for the guard's whole patrol loop (about 19 s).
 const GUARD_WAIT_MS = 30000;
 
@@ -68,7 +82,20 @@ async function waitForLog(page, logs, pattern, what, from = 0, timeoutMs = STEP_
 
 // Pointer input for one run: real touches (CDP touch events) on a phone, the mouse on desktop.
 async function pointerFor(page, context, run) {
-  if (!run.context.hasTouch) return { tap: (p) => page.mouse.click(p.x, p.y) };
+  if (!run.context.hasTouch) {
+    return {
+      tap: (p) => page.mouse.click(p.x, p.y),
+      drag: async (points) => {
+        await page.mouse.move(points[0].x, points[0].y);
+        await page.mouse.down();
+        for (const p of points.slice(1)) {
+          await page.waitForTimeout(DRAG_STEP_MS);
+          await page.mouse.move(p.x, p.y);
+        }
+        await page.mouse.up();
+      },
+    };
+  }
   const cdp = await context.newCDPSession(page);
   // id 7: iOS Safari gives touches large identifiers, never 0, and Godot web uses them as the index.
   const touch = (type, points) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points });
@@ -77,15 +104,52 @@ async function pointerFor(page, context, run) {
       await touch('touchStart', [{ x: p.x, y: p.y, id: 7 }]);
       await touch('touchEnd', []);
     },
+    drag: async (points) => {
+      await touch('touchStart', [{ x: points[0].x, y: points[0].y, id: 7 }]);
+      for (const p of points.slice(1)) {
+        await page.waitForTimeout(DRAG_STEP_MS);
+        await touch('touchMove', [{ x: p.x, y: p.y, id: 7 }]);
+      }
+      await touch('touchEnd', []);
+    },
   };
 }
 
 // A base-unit point in page coordinates. Godot fits the 960x540 base by the smaller ratio
 // and expands the other axis from the top-left; the web reports no safe-area insets.
 async function pagePoint(page, x, y) {
+  return (await pagePoints(page, [[x, y]]))[0];
+}
+
+// pagePoint for a list of [x, y] base-unit points with one canvas lookup (each lookup is
+// slow on a busy page: a stroke mapped point by point gives the guard time to come round).
+async function pagePoints(page, points) {
   const box = await page.locator('canvas').boundingBox();
   const scale = Math.min(box.width / BASE.width, box.height / BASE.height);
-  return { x: box.x + x * scale, y: box.y + y * scale };
+  return points.map(([x, y]) => ({ x: box.x + x * scale, y: box.y + y * scale }));
+}
+
+// Paints the fake: in the guard's safe window, taps the easel (base units), then drags
+// along every ghost from the one the canvas resumes at, until "[Room] Fake ready"; a
+// catch is waited out until the mime is back at the entrance, then it paints on.
+async function paintFake(page, logs, pointer, easel) {
+  for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+    await waitForLog(page, logs, GUARD_PAINT_SAFE, 'the guard\'s safe window before painting', logs.length, GUARD_WAIT_MS);
+    const from = logs.length;
+    await pointer.tap(await pagePoint(page, easel.x, easel.y));
+    const open = await waitForLog(page, logs, new RegExp(`${CANVAS_OPEN.source}|^\\[Room\\] Caught`), 'the canvas at the easel', from);
+    if (open[1] !== undefined) {
+      const ghosts = JSON.parse((await waitForLog(page, logs, GHOSTS, 'the ghost strokes', open.index))[1]);
+      for (let i = Number(open[1]) - 1; i < ghosts.length; i++) {
+        if (logs.slice(from).some((line) => line.startsWith('[Room] Caught'))) break;
+        await pointer.drag(await pagePoints(page, ghosts[i]));
+      }
+    }
+    const outcome = await waitForLog(page, logs, /^\[Room\] Fake ready|^\[Room\] Caught/, 'the painted fake', from);
+    if (outcome[0].startsWith('[Room] Fake ready')) return attempt;
+    await waitForLog(page, logs, /^\[Room\] The mime is back at the entrance/, 'the end of the toss', outcome.index);
+  }
+  throw new Error(`painting: caught on every one of ${ATTEMPTS} attempts`);
 }
 
 // Taps `point` (base units) until the room logs `goal` (a RegExp); a catch in between is
@@ -103,7 +167,7 @@ async function tapUntil(page, logs, pointer, point, goal, what, window = null) {
   throw new Error(`${what}: caught on every one of ${ATTEMPTS} attempts`);
 }
 
-// The slice end to end: play, swap the masterpiece, escape, the results.
+// The slice end to end: play, paint the fake, swap the masterpiece, escape, the results.
 async function playSlice(page, logs, pointer, run) {
   const play = await waitForLog(page, logs, PLAY_RECT, 'the play button\'s rect');
   const [px, py, pw, ph] = play.slice(1).map(Number);
@@ -112,10 +176,14 @@ async function playSlice(page, logs, pointer, run) {
   await waitForLog(page, logs, /^\[Game\] Arrived at ROOM/, 'the room after tapping play', from);
   const layout = await waitForLog(page, logs, ROOM_LAYOUT, 'the room layout', from);
   const [rx, ry, rw, rh, ex, ey] = layout.slice(1).map(Number);
+  const easel = await waitForLog(page, logs, EASEL_RECT, 'the easel', from);
+  const [ax, ay, aw, ah] = easel.slice(1).map(Number);
+  const paints = await paintFake(page, logs, pointer, { x: ax + aw / 2, y: ay + ah / 2 });
+  const fake = logs.find((line) => line.startsWith('[Room] Fake ready'));
   const swaps = await tapUntil(page, logs, pointer, { x: rx + rw / 2, y: ry + rh / 2 }, /^\[Room\] Swapped/, 'the swap', GUARD_SAFE);
   const exits = await tapUntil(page, logs, pointer, { x: ex, y: ey }, /^\[Room\] Escaped/, 'the escape');
   const stars = await waitForLog(page, logs, /^\[Results\] Stars/, 'the results');
-  console.log(`[${run.name}] slice: swap on attempt ${swaps}, escape on attempt ${exits}; ${stars.input}`);
+  console.log(`[${run.name}] slice: painted on attempt ${paints} (${fake}), swap on attempt ${swaps}, escape on attempt ${exits}; ${stars.input}`);
 }
 
 async function smoke(browser, url, run) {

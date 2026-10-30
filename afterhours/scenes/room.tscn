@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://scripts/room.gd" id="1_room"]
 [ext_resource type="PackedScene" path="res://scenes/mime.tscn" id="2_mime"]
@@ -6,6 +6,8 @@
 [ext_resource type="PackedScene" path="res://scenes/guard.tscn" id="4_guard"]
 [ext_resource type="Texture2D" path="res://art/svg/masterpiece.svg" id="5_painting"]
 [ext_resource type="PackedScene" path="res://scenes/results.tscn" id="6_results"]
+[ext_resource type="PackedScene" path="res://scenes/forgery_canvas.tscn" id="7_canvas"]
+[ext_resource type="Texture2D" path="res://art/svg/easel.svg" id="8_easel"]
 
 [sub_resource type="NavigationPolygon" id="NavigationPolygon_floor"]
 vertices = PackedVector2Array(40, 180, 920, 180, 920, 500, 40, 500, 392, 292, 568, 292, 568, 368, 392, 368)
@@ -44,6 +46,11 @@ visible = false
 z_index = -9
 color = Color(0.95, 0.85, 0.4, 0.55)
 polygon = PackedVector2Array(930, 284, 960, 284, 960, 376, 930, 376)
+
+[node name="EaselGlow" type="Polygon2D" parent="."]
+z_index = -9
+color = Color(0.95, 0.85, 0.4, 0.55)
+polygon = PackedVector2Array(232, 368, 228.2, 374.9, 217.4, 380.7, 201.1, 384.6, 182, 386, 162.9, 384.6, 146.6, 380.7, 135.8, 374.9, 132, 368, 135.8, 361.1, 146.6, 355.3, 162.9, 351.4, 182, 350, 201.1, 351.4, 217.4, 355.3, 228.2, 361.1)
 
 [node name="Masterpiece" type="Sprite2D" parent="."]
 z_index = -9
@@ -84,6 +91,11 @@ polygon = PackedVector2Array(-80, -150, 80, -150, 80, -90, -80, -90)
 color = Color(0.7, 0.66, 0.58, 1)
 polygon = PackedVector2Array(-80, -90, 80, -90, 80, 0, -80, 0)
 
+[node name="Easel" type="Sprite2D" parent="Actors"]
+position = Vector2(182, 370)
+texture = ExtResource("8_easel")
+offset = Vector2(0, -55)
+
 [node name="Mime" parent="Actors" instance=ExtResource("2_mime")]
 
 [node name="Guard" parent="Actors" instance=ExtResource("4_guard")]
@@ -95,6 +107,12 @@ anchors_preset = 0
 offset_right = 960.0
 offset_bottom = 540.0
 script = ExtResource("3_floor")
+
+[node name="EaselLayer" type="CanvasLayer" parent="."]
+layer = 5
+
+[node name="ForgeryCanvas" parent="EaselLayer" instance=ExtResource("7_canvas")]
+ghosts = Array[PackedVector2Array]([PackedVector2Array(33.3, 206.7, 44.4, 200.5, 55.6, 195.4, 66.7, 191.2, 77.8, 188.1, 88.9, 186.1, 100, 185, 111.1, 185, 122.2, 185.9, 133.3, 187.9, 144.4, 190.9, 155.6, 195, 166.7, 200, 177.8, 205, 188.9, 208.9, 200, 211.7, 211.1, 213.3, 222.2, 213.9, 233.3, 213.3, 244.4, 211.7, 255.6, 208.9, 266.7, 205, 277.8, 200, 288.9, 193.9, 300, 186.7, 310.6, 179.4, 320.4, 173.3, 329.2, 168.3, 337, 164.4, 344, 161.7, 350, 160, 355.1, 159.4, 359.3, 160, 362.5, 161.7, 364.8, 164.4, 366.2, 168.3, 366.7, 173.3), PackedVector2Array(60, 100, 64.4, 95.9, 68.9, 92.6, 73.3, 90, 77.8, 88.1, 82.2, 87, 86.7, 86.7, 91.1, 87, 95.6, 88.1, 100, 90, 104.4, 92.6, 108.9, 95.9, 113.3, 100, 117.8, 104.1, 122.2, 107.4, 126.7, 110, 131.1, 111.9, 135.6, 113, 140, 113.3, 144.4, 113, 148.9, 111.9, 153.3, 110, 157.8, 107.4, 162.2, 104.1, 166.7, 100), PackedVector2Array(100, 146.7, 104.4, 142.6, 108.9, 139.3, 113.3, 136.7, 117.8, 134.8, 122.2, 133.7, 126.7, 133.3, 131.1, 133.7, 135.6, 134.8, 140, 136.7, 144.4, 139.3, 148.9, 142.6, 153.3, 146.7, 157.8, 150.7, 162.2, 154.1, 166.7, 156.7, 171.1, 158.5, 175.6, 159.6, 180, 160, 184.4, 159.6, 188.9, 158.5, 193.3, 156.7, 197.8, 154.1, 202.2, 150.7, 206.7, 146.7), PackedVector2Array(280, 76.7, 281.4, 76.3, 282.8, 76.2, 284.3, 76.3, 285.8, 76.6, 287.4, 77.1, 288.8, 77.8, 290.2, 78.8, 291.5, 80, 292.7, 81.4, 293.7, 83, 294.5, 84.8, 295, 86.7, 295.3, 88.7, 295.3, 90.8, 295, 92.9, 294.4, 95, 293.6, 97.1, 292.4, 99, 290.9, 100.9, 289.2, 102.5, 287.2, 104, 285, 105.2, 282.6, 106.1, 280, 106.7, 277.3, 106.9, 274.6, 106.8, 271.9, 106.3, 269.2, 105.4, 266.6, 104.2, 264.1, 102.6, 261.8, 100.6, 259.8, 98.3, 258.1, 95.8, 256.7, 92.9, 255.6, 89.9, 255, 86.7, 254.8, 83.3, 255, 80, 255.7, 76.6, 256.9, 73.3, 258.5, 70.2, 260.6, 67.2, 263, 64.5, 265.8, 62.1, 269, 60.1, 272.5, 58.5, 276.1, 57.3, 280, 56.7, 284, 56.5, 288, 56.9, 292, 57.8, 295.8, 59.2, 299.5, 61.2, 303, 63.7, 306.1, 66.6, 308.9, 70, 311.2, 73.8, 313, 77.8, 314.3, 82.2, 315, 86.7, 315.1, 91.3, 314.6, 95.9, 313.5, 100.5, 311.8, 105, 309.4, 109.2, 306.5, 113.2, 303.1, 116.7, 299.2, 119.9, 294.8, 122.5, 290.1, 124.5, 285.2, 125.9, 280, 126.7), PackedVector2Array(73.3, 60), PackedVector2Array(200, 66.7), PackedVector2Array(333.3, 146.7)])
 
 [node name="ResultsLayer" type="CanvasLayer" parent="."]
 layer = 10

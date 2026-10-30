@@ -90,6 +90,8 @@ func _tests() -> Array[Callable]:
 		_test_goto_missing_scene_reports,
 		_test_room_swap_and_escape,
 		_test_room_swap_cancel_and_locked_exit,
+		_test_room_easel_paints_fake,
+		_test_room_catch_while_painting,
 		_test_results_buttons,
 		_test_guard_bad_route_reports,
 		_test_room_timer_waits_for_fade,
@@ -555,6 +557,7 @@ func _test_catches_during_swap_and_while_carrying() -> void:
 	if room == null:
 		return
 	room.guard.active = false
+	room._on_painted(Forgery.ASSIST_QUALITY)
 	await _tap_at(Room.PAINTING_RECT.get_center())
 	await _wait_until(func() -> bool: return room.mime.swap_progress > 0.3, 900)
 	await _tap_at(Room.PAINTING_RECT.get_center())
@@ -566,6 +569,7 @@ func _test_catches_during_swap_and_while_carrying() -> void:
 	await _wait_until(func() -> bool: return not room.tossing, 180)
 	room.guard.active = false
 	room.mime.place_at(Room.SWAP_SPOT)
+	room._on_painted(Forgery.ASSIST_QUALITY)
 	room.swap_intent = true
 	await _wait_until(func() -> bool: return room.mime.carrying, 180)
 	room.guard.active = true
@@ -643,6 +647,7 @@ func _test_room_swap_and_escape() -> void:
 	if room == null:
 		return
 	room.guard.active = false
+	room._on_painted(Forgery.ASSIST_QUALITY)
 	await _tap_at(Room.PAINTING_RECT.get_center())
 	_check(room.swap_intent, name, "a tap on the masterpiece did not mean swap")
 	var swapped := await _wait_until(func() -> bool: return room.mime.carrying, 900)
@@ -673,6 +678,7 @@ func _test_room_swap_cancel_and_locked_exit() -> void:
 	if room == null:
 		return
 	room.guard.active = false
+	room._on_painted(Forgery.ASSIST_QUALITY)
 	await _tap_at(Room.PAINTING_RECT.get_center())
 	var swapping := await _wait_until(func() -> bool: return room.mime.swap_progress > 0.3, 900)
 	_check(swapping, name, "the swap never got going")
@@ -683,6 +689,70 @@ func _test_room_swap_cancel_and_locked_exit() -> void:
 	for i in 10:
 		await physics_frame
 	_check(not room.finished and not room.mime.carrying, name, "the exit ended the wing without the original")
+
+
+## Taps the easel and waits (at most 600 frames) for the canvas to open; returns it.
+func _open_easel(room: Room) -> ForgeryCanvas:
+	var canvas := room.get_node("EaselLayer/ForgeryCanvas") as ForgeryCanvas
+	await _tap_at(Room.EASEL_RECT.get_center())
+	await _wait_until(func() -> bool: return canvas.visible, 600)
+	return canvas
+
+
+## Traces the canvas's ghosts exactly, from its next stroke to the last.
+func _trace_rest(canvas: ForgeryCanvas) -> void:
+	for i in range(canvas.traced.size(), canvas.ghosts.size()):
+		await _drag_along(_on_pad(canvas, Forgery.resample(canvas.ghosts[i])))
+
+
+## Without a fake the masterpiece is only floor; the glowing easel opens the canvas, which
+## takes the room's taps; a painted fake puts the glow out and enables the swap; once
+## carrying the original, the easel is only floor too.
+func _test_room_easel_paints_fake() -> void:
+	var name := "room_easel_paints_fake"
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.active = false
+	var glow := room.get_node("EaselGlow") as Polygon2D
+	_check(glow.visible and not room.mime.has_fake, name, "the easel does not glow at the start, or the mime starts with a fake")
+	await _tap_at(Room.PAINTING_RECT.get_center())
+	_check(not room.swap_intent, name, "a tap on the masterpiece without a fake meant swap")
+	var canvas := await _open_easel(room)
+	_check(canvas.visible and room.mime.position.distance_to(Room.EASEL_SPOT) <= Room.SWAP_REACH, name, "tapping the easel did not open the canvas with the mime at the easel (at %s)" % room.mime.position)
+	await _tap_at(Vector2(100, 480))
+	_check(not room.mime.walking, name, "a tap beside the open canvas walked the mime")
+	await _trace_rest(canvas)
+	_check(await _wait_until(func() -> bool: return room.mime.has_fake, 120), name, "tracing every ghost gave the mime no fake")
+	_check(not glow.visible and not canvas.visible, name, "after painting the easel still glows or the canvas stays open")
+	_check(Forgery.grade(room.fake_quality) == Forgery.Grade.PERFECT, name, "an exact trace of the room's painting graded %s (%.2f)" % [Forgery.Grade.keys()[Forgery.grade(room.fake_quality)], room.fake_quality])
+	var carried := room.mime.get_node("Carried") as Sprite2D
+	_check(carried.visible and carried.modulate == Mime.FAKE_TINT, name, "the carried fake does not show, tinted")
+	await _tap_at(Room.PAINTING_RECT.get_center())
+	_check(await _wait_until(func() -> bool: return room.mime.carrying, 900), name, "the fake never swapped for the original")
+	_check(not room.mime.has_fake and carried.modulate == Color.WHITE, name, "after the swap the mime still has the fake, or the original shows tinted")
+	await _tap_at(Room.EASEL_RECT.get_center())
+	_check(not room.paint_intent, name, "carrying the original, a tap on the easel meant paint")
+
+
+## A catch while painting closes the canvas and keeps its finished strokes; after the toss
+## the easel resumes at the next stroke.
+func _test_room_catch_while_painting() -> void:
+	var name := "room_catch_while_painting"
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.active = false
+	var canvas := await _open_easel(room)
+	await _drag_along(_on_pad(canvas, Forgery.resample(canvas.ghosts[0])))
+	room.guard.active = true
+	_stage_guard(room, room.mime.position + Vector2(80, 0), Vector2.LEFT, room.mime.position)
+	await _wait_until(func() -> bool: return room.tossing, 120)
+	_check(room.tossing and not canvas.visible and canvas.traced.size() == 1, name, "a catch while painting: tossing %s, canvas visible %s, %d traced (expected 1)" % [room.tossing, canvas.visible, canvas.traced.size()])
+	await _wait_until(func() -> bool: return not room.tossing, 180)
+	room.guard.active = false
+	canvas = await _open_easel(room)
+	_check(canvas.visible and canvas.traced.size() == 1, name, "after the toss the easel does not resume at stroke 2")
 
 
 ## After an escape, replay starts the room afresh and home returns to the title.
