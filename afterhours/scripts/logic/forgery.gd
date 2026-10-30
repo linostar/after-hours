@@ -4,7 +4,8 @@ extends RefCounted
 ## (a ghost of one point is a dab, tapped; longer ghosts are dragged); each traced stroke
 ## scores accuracy (how close it runs to its ghost, both ways: ghost left unpainted and
 ## paint off the ghost count) and smoothness (how steadily it turns: a swirl turns a lot
-## but evenly, a shaky hand does not). The fake's quality (0..1) is the mean over its
+## but evenly, a shaky hand does not); a dragged stroke also has to cover its ghost's
+## length (a tap or a half trace scores in proportion). The fake's quality (0..1) is the mean over its
 ## strokes and maps to a Grade, which sets how many guard inspections it survives.
 
 enum Grade { SLOPPY, GOOD, PERFECT }
@@ -32,7 +33,17 @@ static func stroke_quality(ghost: PackedVector2Array, traced: PackedVector2Array
 	var distance := (_mean_distance(resample(ghost), traced) + _mean_distance(path, ghost)) / 2.0
 	var accuracy := 1.0 - clampf(distance / TOLERANCE, 0.0, 1.0)
 	var smoothness := 1.0 - clampf(_jitter(path) / JITTER_TOLERANCE, 0.0, 1.0)
-	return ACCURACY_WEIGHT * accuracy + (1.0 - ACCURACY_WEIGHT) * smoothness
+	var stroke := ACCURACY_WEIGHT * accuracy + (1.0 - ACCURACY_WEIGHT) * smoothness
+	if ghost.size() == 1:
+		return stroke
+	return stroke * minf(_length(traced) / _length(ghost), 1.0)
+
+
+static func _length(stroke: PackedVector2Array) -> float:
+	var total := 0.0
+	for i in range(1, stroke.size()):
+		total += stroke[i - 1].distance_to(stroke[i])
+	return total
 
 
 ## The fake's quality: the mean stroke quality, `traced[i]` against `ghosts[i]` (a ghost

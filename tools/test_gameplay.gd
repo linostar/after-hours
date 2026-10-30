@@ -282,6 +282,9 @@ func _test_forgery_scoring() -> void:
 	_check(is_equal_approx(Forgery.stroke_quality(dab, dab), 1.0), name, "an exact dab does not score 1")
 	_check(is_equal_approx(Forgery.stroke_quality(dab, PackedVector2Array([Vector2(70, 50)])), 0.625), name, "a dab 20 off does not score half accuracy (0.625)")
 	_check(Forgery.stroke_quality(swirl, PackedVector2Array()) == 0.0, name, "an untraced stroke does not score 0")
+	_check(Forgery.stroke_quality(swirl, PackedVector2Array([swirl[0]])) == 0.0, name, "a tap on a swirl's start scores %.3f, not 0" % Forgery.stroke_quality(swirl, PackedVector2Array([swirl[0]])))
+	var half := curve.slice(0, 25)
+	_check(Forgery.stroke_quality(curve, half) <= 0.5 * Forgery.stroke_quality(curve, curve) + 0.01, name, "half a curve scores %.3f, more than half a full trace" % Forgery.stroke_quality(curve, half))
 	var ghosts: Array[PackedVector2Array] = [swirl, dab]
 	var traced: Array[PackedVector2Array] = [swirl]
 	_check(is_equal_approx(Forgery.quality(ghosts, traced), Forgery.stroke_quality(swirl, swirl) / 2.0), name, "a fake missing its second stroke does not score half the first")
