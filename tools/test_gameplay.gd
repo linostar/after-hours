@@ -73,6 +73,8 @@ func _tests() -> Array[Callable]:
 		_test_detection_cone,
 		_test_detection_suspicion,
 		_test_stars,
+		_test_forgery_scoring,
+		_test_forgery_grades,
 		_test_room_tap_walks_around_partition,
 		_test_room_tap_on_wall_stops_at_floor,
 		_test_guard_patrols,
@@ -228,6 +230,63 @@ func _test_stars() -> void:
 	_check(Stars.earned(false, 60.0, 60.0)[Stars.Star.PAR], name, "an escape exactly at par misses the par star")
 	_check(not Stars.earned(false, 60.1, 60.0)[Stars.Star.PAR], name, "an escape over par earns the par star")
 	_check(Stars.count(Stars.earned(true, 99.0, 60.0)) == 1, name, "a seen, slow escape does not earn exactly the swap star")
+
+
+## A swirl ghost: an outward spiral of `turns` turns around `center`, 48 points a turn.
+func _spiral(center: Vector2, turns: float) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	for i in int(turns * 48.0) + 1:
+		var angle := TAU * i / 48.0
+		points.append(center + Vector2.from_angle(angle) * (20.0 + 8.0 * angle))
+	return points
+
+
+## A sweeping-curve ghost: the upper half circle of `radius` around `center`, 48 points.
+func _arc(center: Vector2, radius: float) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	for i in 49:
+		points.append(center + Vector2.from_angle(PI + PI * i / 48.0) * radius)
+	return points
+
+
+func _test_forgery_scoring() -> void:
+	var name := "forgery_scoring"
+	var line := PackedVector2Array([Vector2(0, 0), Vector2(100, 0)])
+	var resampled := Forgery.resample(line)
+	_check(resampled.size() == 14 and resampled[1].is_equal_approx(Vector2(8, 0)) and resampled[13] == Vector2(100, 0), name, "a 100-long line does not resample to 14 points 8 apart ending on its end: %s" % resampled)
+	var swirl := _spiral(Vector2(200, 150), 2.0)
+	var exact := Forgery.stroke_quality(swirl, swirl)
+	_check(exact > 0.98, name, "tracing the swirl exactly scores %.3f, not about 1" % exact)
+	var shaky := PackedVector2Array()
+	for point in Forgery.resample(swirl):
+		shaky.append(point + Vector2(0, 6.0 if shaky.size() % 2 == 0 else -6.0))
+	# A sweeping curve, and traces running 10 and 30 outside it (radially, so truly that far).
+	var curve := _arc(Vector2(200, 200), 120.0)
+	var near := Forgery.stroke_quality(curve, _arc(Vector2(200, 200), 130.0))
+	_check(Forgery.grade(near) == Forgery.Grade.GOOD, name, "a trace 10 off the curve grades %s (%.3f), not Good" % [Forgery.Grade.keys()[Forgery.grade(near)], near])
+	var off := Forgery.stroke_quality(curve, _arc(Vector2(200, 200), 150.0))
+	_check(Forgery.grade(off) == Forgery.Grade.SLOPPY, name, "a trace 30 off the curve grades %s (%.3f), not Sloppy" % [Forgery.Grade.keys()[Forgery.grade(off)], off])
+	var wobbly := Forgery.stroke_quality(swirl, shaky)
+	_check(wobbly < exact and Forgery.grade(wobbly) != Forgery.Grade.PERFECT, name, "a shaky trace hugging the swirl (%.3f) is not below an exact one (%.3f) or grades Perfect" % [wobbly, exact])
+	var dab := PackedVector2Array([Vector2(50, 50)])
+	_check(is_equal_approx(Forgery.stroke_quality(dab, dab), 1.0), name, "an exact dab does not score 1")
+	_check(is_equal_approx(Forgery.stroke_quality(dab, PackedVector2Array([Vector2(70, 50)])), 0.625), name, "a dab 20 off does not score half accuracy (0.625)")
+	_check(Forgery.stroke_quality(swirl, PackedVector2Array()) == 0.0, name, "an untraced stroke does not score 0")
+	var ghosts: Array[PackedVector2Array] = [swirl, dab]
+	var traced: Array[PackedVector2Array] = [swirl]
+	_check(is_equal_approx(Forgery.quality(ghosts, traced), Forgery.stroke_quality(swirl, swirl) / 2.0), name, "a fake missing its second stroke does not score half the first")
+	_check(Forgery.quality([] as Array[PackedVector2Array], traced) == 0.0, name, "a fake of no ghosts does not score 0")
+
+
+func _test_forgery_grades() -> void:
+	var name := "forgery_grades"
+	var cases := {0.0: Forgery.Grade.SLOPPY, 0.549: Forgery.Grade.SLOPPY, 0.55: Forgery.Grade.GOOD, 0.849: Forgery.Grade.GOOD, 0.85: Forgery.Grade.PERFECT, 1.0: Forgery.Grade.PERFECT}
+	for fake_quality: float in cases:
+		_check(Forgery.grade(fake_quality) == cases[fake_quality], name, "quality %.3f does not grade %s" % [fake_quality, Forgery.Grade.keys()[cases[fake_quality]]])
+	_check(Forgery.grade(Forgery.ASSIST_QUALITY) == Forgery.Grade.GOOD, name, "Assist's quality does not grade Good")
+	_check(Forgery.is_noticed(Forgery.Grade.SLOPPY, 1), name, "a Sloppy fake survives its first inspection")
+	_check(not Forgery.is_noticed(Forgery.Grade.GOOD, 1) and Forgery.is_noticed(Forgery.Grade.GOOD, 2), name, "a Good fake does not survive exactly one inspection")
+	_check(not Forgery.is_noticed(Forgery.Grade.PERFECT, 99), name, "a Perfect fake is noticed")
 
 
 ## Loads the slice room and waits until the navigation map has synced its navmesh.
