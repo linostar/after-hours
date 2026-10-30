@@ -30,6 +30,9 @@ var errors: Array[String] = []
 ## While true, report_error logs with print instead of push_error, so a test that
 ## provokes an error on purpose does not fail validate.sh's ERROR scan.
 var quiet_errors := false
+## Assist mode (a setting, off by default): the forgery canvas offers one press that paints
+## the fake at exactly Good quality (Forgery.ASSIST_QUALITY), never Perfect.
+var assist := false
 var _transitioning := false
 
 @onready var _error_badge: TextureRect = $ErrorLayer/ErrorBadge

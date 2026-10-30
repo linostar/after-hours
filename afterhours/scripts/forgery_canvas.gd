@@ -7,7 +7,9 @@ extends Control
 ## with painted(quality). The museum keeps running meanwhile: the watching guard's
 ## suspicion eye shows beside the canvas, and the put-down-brush button (or a catch,
 ## through close) leaves with the finished strokes kept; open resumes them, or starts a
-## fresh canvas once a fake is done. While shown it takes every touch.
+## fresh canvas once a fake is done. With Assist mode on (Game.assist) the assist button
+## shows and takes the focus: one press (or ui_accept) paints every stroke at exactly
+## Forgery.ASSIST_QUALITY, Good and never Perfect. While shown it takes every touch.
 
 ## Emitted when the last stroke is graded and the canvas has closed.
 signal painted(quality: float)
@@ -49,6 +51,8 @@ var _pulse := 0.0
 @onready var _eye: Node2D = $Eye
 @onready var _grade: TextureRect = $Grade
 @onready var _close: Button = $CloseButton
+@onready var _assist: Button = $AssistButton
+@onready var _game := get_node(GameState.AUTOLOAD_PATH) as GameState
 
 
 func _ready() -> void:
@@ -56,6 +60,7 @@ func _ready() -> void:
 	_pad.stroke_moved.connect(_on_stroke_moved)
 	_pad.stroke_ended.connect(_on_stroke_ended)
 	_close.pressed.connect(close)
+	_assist.pressed.connect(_paint_assisted)
 	_ink.draw.connect(_draw_ink)
 	_eye.draw.connect(_draw_eye)
 	hide()
@@ -65,7 +70,7 @@ func _ready() -> void:
 ## No ghosts to trace is reported (log and error badge) and the canvas stays shut.
 func open() -> void:
 	if ghosts.is_empty():
-		(get_node(GameState.AUTOLOAD_PATH) as GameState).report_error("Forgery canvas '%s' has no ghost strokes to trace" % get_path())
+		_game.report_error("Forgery canvas '%s' has no ghost strokes to trace" % get_path())
 		return
 	if is_finished():
 		traced.clear()
@@ -73,8 +78,12 @@ func open() -> void:
 	_current.clear()
 	_painting = false
 	_grade.hide()
+	_assist.visible = _game.assist
 	show()
-	_close.grab_focus()
+	if _game.assist:
+		_assist.grab_focus()
+	else:
+		_close.grab_focus()
 	print("[Forgery] Canvas open at stroke %d of %d" % [traced.size() + 1, ghosts.size()])
 	_log_ghosts.call_deferred()
 
@@ -139,6 +148,18 @@ func _on_stroke_ended(at: Vector2) -> void:
 		_finish(Forgery.quality(ghosts, traced))
 
 
+## Assist mode's one press: every ghost painted as traced, graded at ASSIST_QUALITY.
+func _paint_assisted() -> void:
+	if is_finished():
+		return
+	_pad.reset()
+	_painting = false
+	_current.clear()
+	traced = ghosts.duplicate()
+	print("[Forgery] Assist painted the remaining strokes")
+	_finish(Forgery.ASSIST_QUALITY)
+
+
 ## Grades `fake_quality`, pops its icon in, holds it, then closes with painted.
 func _finish(fake_quality: float) -> void:
 	var fake_grade := Forgery.grade(fake_quality)
@@ -146,6 +167,7 @@ func _finish(fake_quality: float) -> void:
 	_grade.texture = GRADE_ICONS[fake_grade]
 	_grade.scale = Vector2.ZERO
 	_grade.show()
+	_assist.hide()
 	var pop := create_tween()
 	pop.tween_property(_grade, "scale", Vector2.ONE, GRADE_POP).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	pop.tween_interval(GRADE_HOLD)

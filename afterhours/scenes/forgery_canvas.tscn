@@ -1,9 +1,10 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/forgery_canvas.gd" id="1_canvas"]
 [ext_resource type="Script" path="res://scripts/ui/stroke_pad.gd" id="2_pad"]
 [ext_resource type="Texture2D" path="res://art/svg/masterpiece.svg" id="3_painting"]
 [ext_resource type="Texture2D" path="res://art/svg/icon_brush_down.svg" id="4_close"]
+[ext_resource type="Texture2D" path="res://art/svg/icon_assist.svg" id="5_assist"]
 
 [node name="ForgeryCanvas" type="Control"]
 layout_mode = 3
@@ -85,6 +86,19 @@ offset_right = 740.0
 offset_bottom = 270.0
 pivot_offset = Vector2(60, 60)
 mouse_filter = 2
+
+[node name="AssistButton" type="Button" parent="."]
+visible = false
+layout_mode = 0
+offset_left = 480.0
+offset_top = 392.0
+offset_right = 552.0
+offset_bottom = 464.0
+accessibility_name = "Paint it for me"
+icon = ExtResource("5_assist")
+flat = true
+icon_alignment = 1
+expand_icon = true
 
 [node name="CloseButton" type="Button" parent="."]
 layout_mode = 0

@@ -78,6 +78,7 @@ func _tests() -> Array[Callable]:
 		_test_forgery_grades,
 		_test_canvas_traces_and_grades,
 		_test_canvas_close_keeps_strokes,
+		_test_canvas_assist_paints_good,
 		_test_room_tap_walks_around_partition,
 		_test_room_tap_on_wall_stops_at_floor,
 		_test_guard_patrols,
@@ -391,6 +392,37 @@ func _test_canvas_close_keeps_strokes() -> void:
 	_check(not canvas.visible, name, "a canvas without ghosts opens")
 	_game.errors.resize(errors_before)
 	(_game.get_node("ErrorLayer/ErrorBadge") as TextureRect).visible = false
+	canvas.queue_free()
+	await process_frame
+
+
+## Assist mode: the assist button is hidden by default; on, it shows with the visible
+## focus, and one keyboard ui_accept paints the remaining strokes at exactly Good.
+func _test_canvas_assist_paints_good() -> void:
+	var name := "canvas_assist_paints_good"
+	var result: Array[float] = []
+	var canvas := _make_canvas(result)
+	await process_frame
+	var assist := canvas.get_node("AssistButton") as Button
+	canvas.open()
+	_check(not assist.visible, name, "the assist button shows with Assist mode off")
+	canvas.close()
+	_game.assist = true
+	canvas.open()
+	await process_frame
+	_check(assist.visible and assist.has_focus(true), name, "with Assist mode on, the assist button is hidden or lacks the visible focus")
+	_check(assist.accessibility_name != "" and assist.get_global_rect().size.x >= 44.0, name, "the assist button has no accessibility name or is under 44 wide")
+	await _drag_along(_on_pad(canvas, Forgery.resample(canvas.ghosts[0])))
+	for pressed: bool in [true, false]:
+		var accept := InputEventAction.new()
+		accept.action = "ui_accept"
+		accept.pressed = pressed
+		Input.parse_input_event(accept)
+		await process_frame
+	_game.assist = false
+	_check(await _wait_until(func() -> bool: return not result.is_empty(), 120), name, "ui_accept on the assist button never painted")
+	_check(not result.is_empty() and result[0] == Forgery.ASSIST_QUALITY and Forgery.grade(result[0]) == Forgery.Grade.GOOD, name, "Assist painted %s, not exactly ASSIST_QUALITY (Good)" % [result])
+	_check(canvas.traced == canvas.ghosts, name, "Assist did not paint every stroke")
 	canvas.queue_free()
 	await process_frame
 
