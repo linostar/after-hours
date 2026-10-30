@@ -93,6 +93,7 @@ func _tests() -> Array[Callable]:
 		_test_room_swap_cancel_and_locked_exit,
 		_test_room_easel_paints_fake,
 		_test_room_catch_while_painting,
+		_test_canvas_leaves_approach_visible,
 		_test_sloppy_fake_raises_alarm,
 		_test_good_and_perfect_fakes_pass,
 		_test_catch_cuts_inspection_short,
@@ -324,7 +325,7 @@ func _drag_along(points: PackedVector2Array) -> void:
 ## A forgery canvas on its own, tracing a sweep then a dab; `painted` lands in `result`.
 func _make_canvas(result: Array[float]) -> ForgeryCanvas:
 	var canvas := (load(CANVAS_PATH) as PackedScene).instantiate() as ForgeryCanvas
-	canvas.ghosts = [_arc(Vector2(200, 260), 140.0), PackedVector2Array([Vector2(330, 60)])]
+	canvas.ghosts = [_arc(Vector2(160, 200), 110.0), PackedVector2Array([Vector2(260, 50)])]
 	canvas.painted.connect(func(fake_quality: float) -> void: result.append(fake_quality))
 	root.add_child(canvas)
 	return canvas
@@ -889,6 +890,33 @@ func _test_catch_cuts_inspection_short() -> void:
 	await _wait_until(func() -> bool: return room.tossing, 120)
 	_check(room.tossing and room.inspections == 0 and not (room.get_node("FakeIcon") as Sprite2D).visible, name, "a catch mid-inspection: tossing %s, %d inspections, icon shown %s" % [room.tossing, room.inspections, (room.get_node("FakeIcon") as Sprite2D).visible])
 	_check(not room.guard.alarmed, name, "a cut-short inspection raised the alarm")
+
+
+## The open canvas covers nothing the painter must watch: the easel, the mime painting at
+## it, and the guard's legs that lead to it (its left and bottom legs, with the guard's
+## height above its feet); it sits over the back wall and the far top-right corner.
+func _test_canvas_leaves_approach_visible() -> void:
+	var name := "canvas_leaves_approach_visible"
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.active = false
+	var canvas := await _open_easel(room)
+	await process_frame
+	var route := room.guard.route
+	var guard_height := 110.0
+	var watched: Dictionary[String, Rect2] = {
+		"the easel": Room.EASEL_RECT,
+		"the painting mime": Rect2(Room.EASEL_SPOT - Vector2(30, 100), Vector2(60, 104)),
+		"the guard's left leg": Rect2(route[0].x - 24, route[0].y - guard_height, 48, route[3].y - route[0].y + guard_height),
+		"the guard's bottom leg": Rect2(route[3].x - 24, route[3].y - guard_height, route[2].x - route[3].x + 48, guard_height),
+	}
+	for child in canvas.get_children():
+		var control := child as Control
+		if control == null or not control.visible or control == canvas.get_node("Pad"):
+			continue
+		for what: String in watched:
+			_check(not control.get_global_rect().intersects(watched[what]), name, "the canvas's %s %s covers %s %s" % [control.name, control.get_global_rect(), what, watched[what]])
 
 
 ## After an escape, replay starts the room afresh and home returns to the title.
