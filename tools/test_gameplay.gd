@@ -62,6 +62,9 @@ func _tests() -> Array[Callable]:
 		_test_web_export_preset,
 		_test_title_arrives,
 		_test_report_error_shows_badge,
+		_test_detection_cone,
+		_test_detection_suspicion,
+		_test_stars,
 	]
 
 
@@ -155,6 +158,52 @@ func _test_report_error_shows_badge() -> void:
 	_check(badge.mouse_filter == Control.MOUSE_FILTER_IGNORE, name, "the badge blocks touches")
 	_game.errors.resize(errors_before)
 	badge.visible = false
+
+
+func _test_detection_cone() -> void:
+	var name := "detection_cone"
+	var origin := Vector2(100, 100)
+	var right := Vector2.RIGHT
+	var half := deg_to_rad(30.0)
+	_check(Detection.in_cone(origin, right, Vector2(200, 100), 150.0, half), name, "a point straight ahead within range is outside the cone")
+	_check(Detection.in_cone(origin, right, origin, 150.0, half), name, "the guard's own position is outside the cone")
+	_check(not Detection.in_cone(origin, right, Vector2(260, 100), 150.0, half), name, "a point beyond the range is inside the cone")
+	_check(not Detection.in_cone(origin, right, Vector2(0, 100), 150.0, half), name, "a point behind the guard is inside the cone")
+	# 29 degrees off the facing is inside a 30-degree half angle, 31 degrees is not.
+	_check(Detection.in_cone(origin, right, origin + Vector2.from_angle(deg_to_rad(29.0)) * 100.0, 150.0, half), name, "29 degrees off is outside a 30-degree cone")
+	_check(not Detection.in_cone(origin, right, origin + Vector2.from_angle(deg_to_rad(-31.0)) * 100.0, 150.0, half), name, "31 degrees off is inside a 30-degree cone")
+	# The facing need not be normalised.
+	_check(Detection.in_cone(origin, Vector2(0, 5), Vector2(100, 200), 150.0, half), name, "an unnormalised facing changes the cone")
+
+
+func _test_detection_suspicion() -> void:
+	var name := "detection_suspicion"
+	var far := Detection.suspicion_after(0.0, true, 150.0, 150.0, 0.1)
+	var near := Detection.suspicion_after(0.0, true, 0.0, 150.0, 0.1)
+	_check(is_equal_approx(far, Detection.FILL_FAR * 0.1), name, "at the cone's edge suspicion rose to %f, expected %f" % [far, Detection.FILL_FAR * 0.1])
+	_check(is_equal_approx(near, (Detection.FILL_FAR + Detection.FILL_NEAR) * 0.1), name, "at the guard's feet suspicion rose to %f" % near)
+	_check(near > far, name, "suspicion does not fill faster up close")
+	_check(is_equal_approx(Detection.suspicion_after(0.5, false, 0.0, 150.0, 0.1), 0.5 - Detection.DRAIN * 0.1), name, "suspicion does not drain while unseen")
+	_check(Detection.suspicion_after(0.01, false, 0.0, 150.0, 1.0) == 0.0, name, "suspicion drains below 0")
+	_check(Detection.suspicion_after(0.99, true, 0.0, 150.0, 1.0) == 1.0, name, "suspicion fills above 1")
+	_check(Detection.is_caught(1.0) and not Detection.is_caught(0.999), name, "a catch is not exactly full suspicion")
+	# Seen point-blank from nothing, a catch takes 1 / (FILL_FAR + FILL_NEAR) seconds at 60 ticks per second.
+	var suspicion := 0.0
+	var ticks := 0
+	while not Detection.is_caught(suspicion) and ticks < 600:
+		suspicion = Detection.suspicion_after(suspicion, true, 0.0, 150.0, 1.0 / 60.0)
+		ticks += 1
+	var expected := ceili(60.0 / (Detection.FILL_FAR + Detection.FILL_NEAR))
+	_check(absi(ticks - expected) <= 1, name, "a point-blank catch took %d ticks, expected about %d" % [ticks, expected])
+
+
+func _test_stars() -> void:
+	var name := "stars"
+	_check(Stars.earned(false, 50.0, 60.0) == [true, true, true], name, "an unseen escape under par does not earn all three stars")
+	_check(Stars.earned(true, 50.0, 60.0) == [true, false, true], name, "a seen escape still earns the unseen star")
+	_check(Stars.earned(false, 60.0, 60.0)[Stars.Star.PAR], name, "an escape exactly at par misses the par star")
+	_check(not Stars.earned(false, 60.1, 60.0)[Stars.Star.PAR], name, "an escape over par earns the par star")
+	_check(Stars.count(Stars.earned(true, 99.0, 60.0)) == 1, name, "a seen, slow escape does not earn exactly the swap star")
 
 
 func _check(condition: bool, test_name: String, detail: String) -> void:
