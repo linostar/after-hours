@@ -79,6 +79,11 @@ func _tests() -> Array[Callable]:
 		_test_guard_sees_and_tosses,
 		_test_guard_partition_blocks_sight,
 		_test_guard_ignores_behind,
+		_test_title_play_starts_room,
+		_test_goto_missing_scene_reports,
+		_test_room_swap_and_escape,
+		_test_room_swap_cancel_and_locked_exit,
+		_test_results_buttons,
 	]
 
 
@@ -366,6 +371,125 @@ func _test_guard_ignores_behind() -> void:
 	for i in 60:
 		await physics_frame
 	_check(room.guard.suspicion == 0.0 and not room.ever_seen, name, "the guard saw the mime behind it (suspicion %.2f)" % room.guard.suspicion)
+
+
+## Taps the centre of `control`, as a finger would.
+func _tap_control(control: Control) -> void:
+	await _tap_at(control.get_global_rect().get_center())
+
+
+## Waits (at most `max_frames` frames) until `done` returns true; returns whether it did.
+func _wait_until(done: Callable, max_frames: int) -> bool:
+	for i in max_frames:
+		if done.call():
+			return true
+		await physics_frame
+	return done.call()
+
+
+## The title's play button fades to the room; a second goto during the fade is ignored.
+func _test_title_play_starts_room() -> void:
+	var name := "title_play_starts_room"
+	change_scene_to_file(TITLE_PATH)
+	await process_frame
+	await process_frame
+	var play := current_scene.get_node("PlayButton") as Button
+	_check(play.has_focus(), name, "the play button does not have keyboard focus")
+	await _tap_control(play)
+	_check(_game.is_transitioning(), name, "tapping play did not start a screen change")
+	_game.goto(GameState.Flow.TITLE)
+	var arrived := await _wait_until(func() -> bool: return not _game.is_transitioning(), 120)
+	_check(arrived and current_scene != null and current_scene.scene_file_path == ROOM_PATH, name, "the room is not running after the fade (a goto during it was not ignored?)")
+	_check(_game.state == GameState.Flow.ROOM, name, "Game.state is %s, expected ROOM" % GameState.Flow.keys()[_game.state])
+
+
+func _test_goto_missing_scene_reports() -> void:
+	var name := "goto_missing_scene_reports"
+	var saved := _game.scene_paths[GameState.Flow.TITLE]
+	var errors_before := _game.errors.size()
+	_game.scene_paths[GameState.Flow.TITLE] = "res://scenes/no_such_scene.tscn"
+	_game.quiet_errors = true
+	_game.goto(GameState.Flow.TITLE)
+	_game.quiet_errors = false
+	_game.scene_paths[GameState.Flow.TITLE] = saved
+	_check(_game.errors.size() == errors_before + 1 and "no_such_scene" in _game.errors[-1], name, "a missing scene was not reported")
+	_check(_game.error_badge_visible(), name, "the error badge is hidden after a missing scene")
+	_check(not _game.is_transitioning(), name, "a missing scene started a transition")
+	_game.errors.resize(errors_before)
+	(_game.get_node("ErrorLayer/ErrorBadge") as TextureRect).visible = false
+
+
+## Tap the masterpiece, stand through the swap, then leave by the exit: all three stars.
+func _test_room_swap_and_escape() -> void:
+	var name := "room_swap_and_escape"
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.active = false
+	await _tap_at(Room.PAINTING_RECT.get_center())
+	_check(room.swap_intent, name, "a tap on the masterpiece did not mean swap")
+	var swapped := await _wait_until(func() -> bool: return room.mime.carrying, 900)
+	_check(swapped, name, "the mime never swapped the painting (at %s, progress %.2f)" % [room.mime.position, room.mime.swap_progress])
+	_check((room.get_node("ExitGlow") as Polygon2D).visible, name, "the exit door does not glow while carrying the original")
+	await _tap_at(Vector2(950, 330))
+	var escaped := await _wait_until(func() -> bool: return room.finished, 900)
+	_check(escaped, name, "the mime never escaped (at %s)" % room.mime.position)
+	_check(room.stars == [true, true, true], name, "an unseen escape at %.1f s earned %s" % [room.elapsed, room.stars])
+	var results := room.get_node("ResultsLayer/Results") as Results
+	_check(results.visible, name, "the results overlay is hidden after the escape")
+	# Every star has popped in by 3 x (STAR_GAP + POP_TIME), each gold as earned.
+	for i in ceili(3.0 * (Results.STAR_GAP + Results.POP_TIME) * 60.0) + 6:
+		await physics_frame
+	for i in 3:
+		var star := results.get_node("Panel/Star%d" % i) as TextureRect
+		_check(star.scale.is_equal_approx(Vector2.ONE) and star.texture == Results.STAR_EARNED, name, "star %d did not pop in gold (scale %s)" % [i, star.scale])
+	var finished_at := room.elapsed
+	for i in 30:
+		await physics_frame
+	_check(room.elapsed == finished_at, name, "the timer kept running after the escape")
+
+
+## Tapping away mid-swap cancels it; the exit does nothing without the original.
+func _test_room_swap_cancel_and_locked_exit() -> void:
+	var name := "room_swap_cancel_and_locked_exit"
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.active = false
+	await _tap_at(Room.PAINTING_RECT.get_center())
+	var swapping := await _wait_until(func() -> bool: return room.mime.swap_progress > 0.3, 900)
+	_check(swapping, name, "the swap never got going")
+	await _tap_at(Vector2(950, 330))
+	_check(room.mime.swap_progress == 0.0 and not room.swap_intent, name, "tapping away did not cancel the swap")
+	await _walk_trace(room.mime, 900)
+	_check(room.mime.position.distance_to(Room.EXIT) <= Room.EXIT_REACH, name, "the mime did not reach the exit (at %s)" % room.mime.position)
+	for i in 10:
+		await physics_frame
+	_check(not room.finished and not room.mime.carrying, name, "the exit ended the wing without the original")
+
+
+## After an escape, replay starts the room afresh and home returns to the title.
+func _test_results_buttons() -> void:
+	var name := "results_buttons"
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.active = false
+	var results := room.get_node("ResultsLayer/Results") as Results
+	results.present(Stars.earned(true, 99.0, 45.0))
+	await process_frame
+	await _tap_control(results.get_node("Panel/ReplayButton") as Button)
+	await _wait_until(func() -> bool: return not _game.is_transitioning(), 120)
+	var again := current_scene as Room
+	_check(again != null and again != room and again.elapsed < 1.0 and not again.finished, name, "replay did not start the room afresh")
+	if again == null:
+		return
+	results = again.get_node("ResultsLayer/Results") as Results
+	results.present(Stars.earned(true, 99.0, 45.0))
+	await process_frame
+	await _tap_control(results.get_node("Panel/HomeButton") as Button)
+	await _wait_until(func() -> bool: return not _game.is_transitioning(), 120)
+	_check(current_scene != null and current_scene.scene_file_path == TITLE_PATH and _game.state == GameState.Flow.TITLE, name, "home did not return to the title")
 
 
 func _check(condition: bool, test_name: String, detail: String) -> void:

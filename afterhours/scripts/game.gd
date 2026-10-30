@@ -1,6 +1,7 @@
 class_name GameState
 extends Node
-## The one autoload (Game): the flow state and wordless error reporting.
+## The one autoload (Game): the flow state, screen changes (goto: a fade to the museum's
+## dark that blocks touches while it runs) and wordless error reporting.
 ## Every error goes to the log (push_error) and shows the cracked-frame ErrorBadge,
 ## never text (CLAUDE.md, "Errors are visible without words").
 
@@ -9,6 +10,11 @@ enum Flow { TITLE, ROOM }
 ## Scripts reach the autoload through this path (get_node(GameState.AUTOLOAD_PATH)), never
 ## the bare Game name, which tool runs (--script) cannot compile against.
 const AUTOLOAD_PATH := ^"/root/Game"
+## Seconds to fade out, and again to fade in, on a screen change.
+const FADE_TIME := 0.25
+
+## Emitted when a goto's fade-in has finished.
+signal transition_finished(flow: Flow)
 
 ## The scene each flow state runs (run_main.gd checks the running scene against it).
 var scene_paths: Dictionary[Flow, String] = {
@@ -21,8 +27,48 @@ var errors: Array[String] = []
 ## While true, report_error logs with print instead of push_error, so a test that
 ## provokes an error on purpose does not fail validate.sh's ERROR scan.
 var quiet_errors := false
+var _transitioning := false
 
 @onready var _error_badge: TextureRect = $ErrorLayer/ErrorBadge
+@onready var _cover: ColorRect = $CoverLayer/Cover
+
+
+## Changes to `flow`'s scene behind a fade (touches are blocked until it has faded in).
+## Ignored while another change runs; a missing scene is reported and nothing changes.
+func goto(flow: Flow) -> void:
+	var to_name: String = Flow.keys()[flow]
+	var path := scene_paths[flow]
+	if _transitioning:
+		print("[Game] Ignored goto %s while a transition is running" % to_name)
+		return
+	if not ResourceLoader.exists(path):
+		report_error("Cannot go to %s: scene '%s' does not exist" % [to_name, path])
+		return
+	_transitioning = true
+	print("[Game] %s -> %s (%s)" % [Flow.keys()[state], to_name, path])
+	_cover.mouse_filter = Control.MOUSE_FILTER_STOP
+	await _fade(1.0)
+	var error := get_tree().change_scene_to_file(path)
+	if error == OK:
+		# The new scene enters the tree (and runs its _ready) at the end of this frame.
+		await get_tree().scene_changed
+	else:
+		report_error("Failed to load scene '%s' for %s: %s" % [path, to_name, error_string(error)])
+	await _fade(0.0)
+	_cover.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_transitioning = false
+	if error == OK:
+		transition_finished.emit(flow)
+
+
+func is_transitioning() -> bool:
+	return _transitioning
+
+
+func _fade(alpha: float) -> void:
+	var tween := create_tween()
+	tween.tween_property(_cover, "color:a", alpha, FADE_TIME)
+	await tween.finished
 
 
 ## Called by each flow state's scene once it is ready.

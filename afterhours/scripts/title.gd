@@ -1,7 +1,12 @@
 extends Control
-## The title screen (the main scene): an empty gilded frame on the gallery wall,
-## where the logo will hang.
+## The title screen (the main scene): a gilded frame on the gallery wall (where the logo
+## will hang) holding the play button, which starts the room.
+
+@onready var _play: Button = $PlayButton
 
 
 func _ready() -> void:
-	(get_node(GameState.AUTOLOAD_PATH) as GameState).arrive(GameState.Flow.TITLE)
+	var game := get_node(GameState.AUTOLOAD_PATH) as GameState
+	_play.pressed.connect(game.goto.bind(GameState.Flow.ROOM))
+	_play.grab_focus(true)
+	game.arrive(GameState.Flow.TITLE)
