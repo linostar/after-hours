@@ -12,6 +12,9 @@ enum Flow { TITLE, ROOM }
 const AUTOLOAD_PATH := ^"/root/Game"
 ## Seconds to fade out, and again to fade in, on a screen change.
 const FADE_TIME := 0.25
+## A desktop window opens at this share of the usable screen, kept 16:9 (the 960x540 base
+## is tiny on a high-DPI screen, where window sizes count physical pixels).
+const WINDOW_SCREEN_SHARE := 0.85
 
 ## Emitted when a goto's fade-in has finished.
 signal transition_finished(flow: Flow)
@@ -31,6 +34,24 @@ var _transitioning := false
 
 @onready var _error_badge: TextureRect = $ErrorLayer/ErrorBadge
 @onready var _cover: ColorRect = $CoverLayer/Cover
+
+
+func _ready() -> void:
+	_fit_window()
+
+
+## Grows the desktop window to WINDOW_SCREEN_SHARE of the usable screen at 16:9 and centres
+## it. The web canvas fills its page and headless runs have no screen, so both are skipped.
+func _fit_window() -> void:
+	if OS.has_feature("web") or DisplayServer.get_name() == "headless":
+		return
+	var window := get_window()
+	var usable := DisplayServer.screen_get_usable_rect(window.current_screen)
+	var base := Vector2(window.content_scale_size)
+	var scale := minf(usable.size.x / base.x, usable.size.y / base.y) * WINDOW_SCREEN_SHARE
+	window.size = Vector2i(base * scale)
+	window.position = usable.position + Vector2i(Vector2(usable.size - window.size) / 2.0)
+	print("[Game] Window %s on a usable screen of %s" % [window.size, usable.size])
 
 
 ## Changes to `flow`'s scene behind a fade (touches are blocked until it has faded in).
