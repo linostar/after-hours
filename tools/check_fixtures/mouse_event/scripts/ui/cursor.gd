@@ -6,5 +6,9 @@ func is_click(event: InputEvent) -> bool:
 	return event is InputEventMouseButton
 
 
+func watch_hover(control: Control) -> void:
+	control.mouse_entered.connect(aim)
+
+
 func aim() -> Vector2:
 	return get_global_mouse_position()

@@ -4,4 +4,6 @@ res://art/scans/SOURCES.json: entry 0 ('late') source_url 'http://example.org/la
 res://art/scans/SOURCES.json: entry 0 ('late') sha256 is not 64 lowercase hex digits
 res://art/scans/SOURCES.json: entry 1 ('gone') file 'gone.webp' does not exist
 res://art/scans/SOURCES.json: entry 2 is not an object
+res://art/scans/SOURCES.json: entry 3 ('edge') year 1923 is not a number before 1923
+res://art/scans/SOURCES.json: entry 4 ('vague') year c. 1500 is not a number before 1923
 res://art/scans/uncredited.webp: scan has no entry in res://art/scans/SOURCES.json

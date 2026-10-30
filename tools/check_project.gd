@@ -5,7 +5,8 @@ extends SceneTree
 ##   fonts, text meshes and lines) or a text call or property (TEXT_TOKENS: draw_string
 ##   and its kin, tooltips, placeholders, theme fonts, OS.alert); no script sets a
 ##   Control's text (`.text = ...`, `set_text(`); no Button in a saved scene shows text;
-##   the project holds no font file (FONT_EXTENSIONS). The logo and key labels are art.
+##   the project holds no font file (FONT_EXTENSIONS) and no binary scene or resource
+##   (BINARY_EXTENSIONS, unreadable to these scans). The logo and key labels are art.
 ## - public domain scans: every image in SCANS_DIR has a complete SOURCES.json entry
 ##   (SCAN_FIELDS, a year before PUBLIC_DOMAIN_BEFORE, an https source_url, a sha256),
 ##   and every entry's file exists,
@@ -41,7 +42,7 @@ extends SceneTree
 ## A custom action named ui_something is indistinguishable from a built-in one here.
 ## The No Text scan matches names anywhere in a file, comments included (write "text
 ## node" rather than a class name in a comment); it cannot see words drawn into an
-## image, text set through indirection (`set("text", ...)`, `text = ...` on self inside
+## image, or text set through indirection (`set("text", ...)`, `text = ...` on self inside
 ## a Button script) or a scan stored outside SCANS_DIR.
 
 const UI_INPUT_PATH := "res://scripts/ui/"
@@ -77,7 +78,9 @@ const TEXT_TOKENS: Array[String] = [
 	"fallback_font", "get_theme_font", "get_theme_default_font", "theme_override_fonts", "OS.alert",
 ]
 ## A script that sets a Control's text.
-const TEXT_SET_PATTERN := "\\.text\\s*=[^=]|\\bset_text\\s*\\("
+const TEXT_SET_PATTERN := "\\.text\\s*\\+?=(?!=)|\\bset_text\\s*\\("
+## Binary scenes and resources: the text scans cannot read them.
+const BINARY_EXTENSIONS: Array[String] = ["scn", "res"]
 const FONT_EXTENSIONS: Array[String] = ["ttf", "otf", "ttc", "woff", "woff2", "fnt", "pfb", "pfm"]
 const SCANS_DIR := "res://art/scans/"
 const SOURCES_PATH := "res://art/scans/SOURCES.json"
@@ -118,6 +121,8 @@ func _run() -> void:
 			_check_source(path)
 		if path.get_extension().to_lower() in FONT_EXTENSIONS:
 			_violations.append("%s: is a font file (No Text: the game ships no fonts; draw the logo and key labels as art)" % path)
+		if path.get_extension() in BINARY_EXTENSIONS:
+			_violations.append("%s: is a binary scene or resource (save it as .tscn/.tres so the gates can read it)" % path)
 	_check_scans(files)
 	for path in files:
 		if path.ends_with(".tscn"):

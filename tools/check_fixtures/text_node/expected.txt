@@ -1,5 +1,9 @@
 res://scenes/screen.tscn: uses 'RichTextLabel'
 res://scenes/screen.tscn: uses 'ConfirmationDialog'
+res://scenes/screen.tscn: uses 'AcceptDialog'
+res://scenes/screen.tscn: uses 'TextEdit'
+res://scenes/screen.tscn: uses 'theme_override_fonts'
+res://data/level.res: is a binary scene or resource
 res://scripts/banner.gd: uses 'Label'
 res://scripts/banner.gd: uses 'LabelSettings'
 res://scripts/banner.gd: uses 'Font'

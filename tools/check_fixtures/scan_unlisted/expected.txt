@@ -1,0 +1,1 @@
+res://art/scans/wave.jpg: scan has no entry in res://art/scans/SOURCES.json (the file does not exist)

@@ -4,5 +4,9 @@
   {"id": "gone", "file": "gone.webp", "artist": "Johannes Vermeer", "title": "Girl with a Pearl Earring",
    "year": 1665, "source_url": "https://example.org/gone.jpg", "licence": "Public domain",
    "sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
-  "not an entry"
+  "not an entry",
+  {"id": "edge", "file": "late.png", "artist": "A", "title": "B", "year": 1923, "source_url": "https://example.org/e",
+   "licence": "PD", "sha256": "2222222222222222222222222222222222222222222222222222222222222222"},
+  {"id": "vague", "file": "late.png", "artist": "A", "title": "B", "year": "c. 1500", "source_url": "https://example.org/v",
+   "licence": "PD", "sha256": "3333333333333333333333333333333333333333333333333333333333333333"}
 ]

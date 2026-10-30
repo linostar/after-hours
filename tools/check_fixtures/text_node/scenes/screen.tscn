@@ -11,3 +11,18 @@ offset_right = 200.0
 offset_bottom = 40.0
 
 [node name="Quit" type="ConfirmationDialog" parent="."]
+
+[node name="Notice" type="AcceptDialog" parent="."]
+
+[node name="Name" type="TextEdit" parent="."]
+layout_mode = 0
+offset_top = 50.0
+offset_right = 200.0
+offset_bottom = 100.0
+
+[node name="Panel" type="Panel" parent="."]
+layout_mode = 0
+offset_top = 110.0
+offset_right = 100.0
+offset_bottom = 160.0
+theme_override_fonts/font = null
