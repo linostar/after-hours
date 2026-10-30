@@ -48,11 +48,14 @@ var _pause := 0.0
 @onready var _cone: Polygon2D = $Cone
 
 
-## Back to the start of the route, calm, facing its first leg.
+## Back to the start of the route, calm, facing its first leg. A route of fewer than 2
+## points cannot be patrolled: reported (log and error badge), and the guard stands still.
 func reset() -> void:
 	suspicion = 0.0
 	_pause = 0.0
 	active = true
+	if route.size() < 2:
+		(get_node(GameState.AUTOLOAD_PATH) as GameState).report_error("Guard '%s' has a route of %d point(s) (%s); it needs at least 2 to patrol" % [get_path(), route.size(), route])
 	if route.is_empty():
 		return
 	position = route[0]

@@ -10,8 +10,9 @@ extends Node2D
 ## results overlay. A guard that catches the mime shakes it and tosses it back
 ## through the entrance (TOSS_SHAKE, then TOSS_FLIGHT along an arc TOSS_HEIGHT high); taps
 ## are ignored meanwhile, then the guard starts its route again (a mime carrying the
-## original keeps it: only the guard resets). The timer (elapsed) keeps
-## running through it all; ever_seen records whether any guard ever spotted the mime.
+## original keeps it: only the guard resets). The timer (elapsed) keeps running through
+## it all, but not while a screen change fades (the player cannot act then); ever_seen
+## records whether any guard ever spotted the mime.
 
 ## Where the mime enters the room (the door in the left wall), in room coordinates.
 const ENTRANCE := Vector2(70, 330)
@@ -48,6 +49,7 @@ var stars: Array[bool] = []
 @onready var _floor: FloorInput = $FloorInput
 @onready var _exit_glow: Polygon2D = $ExitGlow
 @onready var _results: Results = $ResultsLayer/Results
+@onready var _game := get_node(GameState.AUTOLOAD_PATH) as GameState
 
 
 func _ready() -> void:
@@ -57,12 +59,12 @@ func _ready() -> void:
 	guard.spotted.connect(_on_spotted)
 	guard.caught.connect(_on_caught)
 	_floor.tapped.connect(_on_floor_tapped)
-	(get_node(GameState.AUTOLOAD_PATH) as GameState).arrive(GameState.Flow.ROOM)
+	_game.arrive(GameState.Flow.ROOM)
 	print("[Room] Masterpiece at %s, exit at %s" % [PAINTING_RECT, EXIT])
 
 
 func _physics_process(delta: float) -> void:
-	if finished:
+	if finished or _game.is_transitioning():
 		return
 	elapsed += delta
 	if swap_intent and not tossing and not mime.walking and mime.position.distance_to(SWAP_SPOT) <= SWAP_REACH:

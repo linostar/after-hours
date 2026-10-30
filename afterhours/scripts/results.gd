@@ -25,7 +25,7 @@ func _ready() -> void:
 ## Shows the overlay and pops in `stars` (Stars.Star order).
 func present(stars: Array[bool]) -> void:
 	show()
-	_replay.grab_focus(true)
+	_replay.grab_focus()
 	var pops := create_tween()
 	for i in _stars.size():
 		var star := _stars[i]

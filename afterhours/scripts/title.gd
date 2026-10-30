@@ -8,7 +8,7 @@ extends Control
 func _ready() -> void:
 	var game := get_node(GameState.AUTOLOAD_PATH) as GameState
 	_play.pressed.connect(game.goto.bind(GameState.Flow.ROOM))
-	_play.grab_focus(true)
+	_play.grab_focus()
 	game.arrive(GameState.Flow.TITLE)
 	_log_layout.call_deferred()
 

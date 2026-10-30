@@ -86,6 +86,9 @@ func _tests() -> Array[Callable]:
 		_test_room_swap_and_escape,
 		_test_room_swap_cancel_and_locked_exit,
 		_test_results_buttons,
+		_test_guard_bad_route_reports,
+		_test_room_timer_waits_for_fade,
+		_test_mime_carrying_before_ready,
 	]
 
 
@@ -448,7 +451,7 @@ func _test_title_play_starts_room() -> void:
 	await process_frame
 	await process_frame
 	var play := current_scene.get_node("PlayButton") as Button
-	_check(play.has_focus(), name, "the play button does not have keyboard focus")
+	_check(play.has_focus(true), name, "the play button does not have visible keyboard focus (hidden focus shows no ring)")
 	await _tap_control(play)
 	_check(_game.is_transitioning(), name, "tapping play did not start a screen change")
 	_game.goto(GameState.Flow.TITLE)
@@ -532,6 +535,7 @@ func _test_results_buttons() -> void:
 	var results := room.get_node("ResultsLayer/Results") as Results
 	results.present(Stars.earned(true, 99.0, 45.0))
 	await process_frame
+	_check((results.get_node("Panel/ReplayButton") as Button).has_focus(true), name, "replay does not have visible keyboard focus after the results show")
 	await _tap_control(results.get_node("Panel/ReplayButton") as Button)
 	await _wait_until(func() -> bool: return not _game.is_transitioning(), 120)
 	var again := current_scene as Room
@@ -544,6 +548,59 @@ func _test_results_buttons() -> void:
 	await _tap_control(results.get_node("Panel/HomeButton") as Button)
 	await _wait_until(func() -> bool: return not _game.is_transitioning(), 120)
 	_check(current_scene != null and current_scene.scene_file_path == TITLE_PATH and _game.state == GameState.Flow.TITLE, name, "home did not return to the title")
+
+
+## A route the guard cannot patrol (under 2 points) is reported through the error badge.
+func _test_guard_bad_route_reports() -> void:
+	var name := "guard_bad_route_reports"
+	var guard := (load("res://scenes/guard.tscn") as PackedScene).instantiate() as Guard
+	guard.route = PackedVector2Array([Vector2(100, 100)])
+	root.add_child(guard)
+	var errors_before := _game.errors.size()
+	_game.quiet_errors = true
+	guard.reset()
+	_game.quiet_errors = false
+	_check(_game.errors.size() == errors_before + 1 and "1 point(s)" in _game.errors[-1], name, "a one-point route was not reported (errors: %s)" % [_game.errors.slice(errors_before)])
+	_check(_game.error_badge_visible(), name, "the error badge is hidden after a bad route")
+	_check(guard.position == Vector2(100, 100), name, "the guard does not stand at its one point")
+	_game.errors.resize(errors_before)
+	(_game.get_node("ErrorLayer/ErrorBadge") as TextureRect).visible = false
+	guard.queue_free()
+	await process_frame
+
+
+## The wing timer does not run while the screen change into the room fades.
+func _test_room_timer_waits_for_fade() -> void:
+	var name := "room_timer_waits_for_fade"
+	change_scene_to_file(TITLE_PATH)
+	await process_frame
+	await process_frame
+	_game.goto(GameState.Flow.ROOM)
+	var ticked_during_fade := 0.0
+	var saw_room := false
+	while _game.is_transitioning():
+		var room := current_scene as Room
+		if room != null:
+			saw_room = true
+			ticked_during_fade = maxf(ticked_during_fade, room.elapsed)
+		await physics_frame
+	_check(saw_room, name, "the room never ran during the fade-in")
+	_check(ticked_during_fade == 0.0, name, "the timer ran %.2f s during the fade" % ticked_during_fade)
+	for i in 30:
+		await physics_frame
+	var room_after := current_scene as Room
+	_check(room_after != null and room_after.elapsed > 0.4, name, "the timer did not start after the fade")
+
+
+## Carrying set before the mime is in the tree shows the painting once it is.
+func _test_mime_carrying_before_ready() -> void:
+	var name := "mime_carrying_before_ready"
+	var mime := (load("res://scenes/mime.tscn") as PackedScene).instantiate() as Mime
+	mime.carrying = true
+	root.add_child(mime)
+	_check((mime.get_node("Carried") as Sprite2D).visible, name, "the carried painting is hidden when carrying was set before _ready")
+	mime.queue_free()
+	await process_frame
 
 
 func _check(condition: bool, test_name: String, detail: String) -> void:

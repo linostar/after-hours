@@ -2,8 +2,9 @@ class_name Mime
 extends Node2D
 ## The player's mime: walks a navmesh path (NavigationAgent2D) to wherever the room sends
 ## it, at SPEED. Its origin is its feet, so the room y-sorts it with the guards and props.
-## While swapping it draws a ring beside its head (clear of the painting above it) that fills (swap_progress 0..1); while
-## carrying the original, the little framed painting shows at its side.
+## While swapping it draws a ring beside its head (clear of the painting above it) that
+## fills (swap_progress 0..1); while carrying the original, the little framed painting
+## shows at its side.
 
 ## Walking speed in base units per second.
 const SPEED := 170.0
@@ -23,10 +24,15 @@ var swap_progress := 0.0:
 var carrying := false:
 	set(value):
 		carrying = value
-		_carried.visible = value
+		if is_node_ready():
+			_carried.visible = value
 
 @onready var _agent: NavigationAgent2D = $Agent
 @onready var _carried: Sprite2D = $Carried
+
+
+func _ready() -> void:
+	_carried.visible = carrying
 
 
 ## Walks to the navmesh point closest to `point`.
