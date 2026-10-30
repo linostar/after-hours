@@ -1,0 +1,40 @@
+class_name Mime
+extends Node2D
+## The player's mime: walks a navmesh path (NavigationAgent2D) to wherever the room sends
+## it, at SPEED. Its origin is its feet, so the room y-sorts it with the guards and props.
+
+## Walking speed in base units per second.
+const SPEED := 170.0
+
+## Emitted once when the mime reaches the end of its path.
+signal arrived(at: Vector2)
+
+var walking := false
+
+@onready var _agent: NavigationAgent2D = $Agent
+
+
+## Walks to the navmesh point closest to `point`.
+func walk_to(point: Vector2) -> void:
+	_agent.target_position = point
+	walking = true
+	print("[Mime] Walking from %s to %s" % [position.round(), point.round()])
+
+
+## Stops at once and stands at `point` (a reset, a toss).
+func place_at(point: Vector2) -> void:
+	position = point
+	_agent.target_position = point
+	walking = false
+
+
+func _physics_process(delta: float) -> void:
+	if not walking:
+		return
+	if _agent.is_navigation_finished():
+		walking = false
+		print("[Mime] Arrived at %s" % position.round())
+		arrived.emit(position)
+		return
+	var next := _agent.get_next_path_position()
+	position = position.move_toward(next, SPEED * delta)

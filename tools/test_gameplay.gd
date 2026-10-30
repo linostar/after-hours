@@ -7,6 +7,14 @@ extends SceneTree
 ## each one restores whatever it changes (Game.quiet_errors, Game.errors, the badge).
 
 const TITLE_PATH := "res://scenes/title.tscn"
+const ROOM_PATH := "res://scenes/room.tscn"
+## Every synthetic touch uses this index: a web build's index is the browser's
+## Touch.identifier, which iOS Safari makes large and never 0.
+const TOUCH_INDEX := 7
+## The slice room's partition footprint (room coordinates), which the mime never enters.
+const PARTITION_FOOTPRINT := Rect2(400, 300, 160, 60)
+## The walkable floor's top edge (the back wall's foot) in the slice room's navmesh.
+const FLOOR_TOP := 180.0
 const EXPORT_PRESETS_PATH := "res://export_presets.cfg"
 const BASE_WINDOW := Vector2i(960, 540)
 ## The CSS html/head_include must set so the browser never pulls to refresh, zooms on a
@@ -65,6 +73,8 @@ func _tests() -> Array[Callable]:
 		_test_detection_cone,
 		_test_detection_suspicion,
 		_test_stars,
+		_test_room_tap_walks_around_partition,
+		_test_room_tap_on_wall_stops_at_floor,
 	]
 
 
@@ -204,6 +214,72 @@ func _test_stars() -> void:
 	_check(Stars.earned(false, 60.0, 60.0)[Stars.Star.PAR], name, "an escape exactly at par misses the par star")
 	_check(not Stars.earned(false, 60.1, 60.0)[Stars.Star.PAR], name, "an escape over par earns the par star")
 	_check(Stars.count(Stars.earned(true, 99.0, 60.0)) == 1, name, "a seen, slow escape does not earn exactly the swap star")
+
+
+## Loads the slice room and waits until the navigation map has synced its navmesh.
+func _load_room() -> Room:
+	var error := change_scene_to_file(ROOM_PATH)
+	if error != OK:
+		_check(false, "load_room", "cannot load %s: %s" % [ROOM_PATH, error_string(error)])
+		return null
+	for i in 3:
+		await physics_frame
+	return current_scene as Room
+
+
+## A pressed then released touch at `at` (canvas base units), as a finger would.
+func _tap_at(at: Vector2) -> void:
+	for pressed: bool in [true, false]:
+		var touch := InputEventScreenTouch.new()
+		touch.index = TOUCH_INDEX
+		touch.position = root.get_final_transform() * at
+		touch.pressed = pressed
+		Input.parse_input_event(touch)
+		await process_frame
+
+
+## Waits until the mime stops walking (at most `max_frames` physics frames) and returns
+## every position it passed through.
+func _walk_trace(mime: Mime, max_frames: int) -> Array[Vector2]:
+	var trace: Array[Vector2] = [mime.position]
+	for i in max_frames:
+		await physics_frame
+		trace.append(mime.position)
+		if not mime.walking:
+			break
+	return trace
+
+
+## From the door, a tap across the partition walks the mime around it to the tap.
+func _test_room_tap_walks_around_partition() -> void:
+	var name := "room_tap_walks_around_partition"
+	var room := await _load_room()
+	if room == null:
+		return
+	_check(_game.state == GameState.Flow.ROOM, name, "Game.state is %s, expected ROOM" % GameState.Flow.keys()[_game.state])
+	_check(room.mime.position == Room.ENTRANCE, name, "the mime starts at %s, not the entrance %s" % [room.mime.position, Room.ENTRANCE])
+	var target := Vector2(720, 330)
+	await _tap_at(target)
+	_check(room.mime.walking, name, "a floor tap did not start a walk")
+	var trace := await _walk_trace(room.mime, 600)
+	_check(not room.mime.walking, name, "the mime was still walking after 600 frames")
+	_check(room.mime.position.distance_to(target) <= 6.0, name, "the mime stopped at %s, not at the tap %s" % [room.mime.position, target])
+	var inside := trace.filter(func(point: Vector2) -> bool: return PARTITION_FOOTPRINT.has_point(point))
+	_check(inside.is_empty(), name, "the mime walked through the partition at %s" % [inside.slice(0, 3)])
+	var detour := trace.any(func(point: Vector2) -> bool: return point.y < PARTITION_FOOTPRINT.position.y or point.y > PARTITION_FOOTPRINT.end.y)
+	_check(detour, name, "the mime never left the partition's row (no detour around it)")
+
+
+## A tap on the back wall walks the mime to the nearest floor point below it.
+func _test_room_tap_on_wall_stops_at_floor() -> void:
+	var name := "room_tap_on_wall_stops_at_floor"
+	var room := await _load_room()
+	if room == null:
+		return
+	await _tap_at(Vector2(200, 60))
+	await _walk_trace(room.mime, 600)
+	_check(not room.mime.walking, name, "the mime was still walking after 600 frames")
+	_check(absf(room.mime.position.y - FLOOR_TOP) <= 6.0 and absf(room.mime.position.x - 200.0) <= 6.0, name, "the mime stopped at %s, expected about (200, %d)" % [room.mime.position, FLOOR_TOP])
 
 
 func _check(condition: bool, test_name: String, detail: String) -> void:

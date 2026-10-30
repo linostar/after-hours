@@ -4,10 +4,17 @@ extends Node
 ## Every error goes to the log (push_error) and shows the cracked-frame ErrorBadge,
 ## never text (CLAUDE.md, "Errors are visible without words").
 
-enum Flow { TITLE }
+enum Flow { TITLE, ROOM }
+
+## Scripts reach the autoload through this path (get_node(GameState.AUTOLOAD_PATH)), never
+## the bare Game name, which tool runs (--script) cannot compile against.
+const AUTOLOAD_PATH := ^"/root/Game"
 
 ## The scene each flow state runs (run_main.gd checks the running scene against it).
-var scene_paths: Dictionary[Flow, String] = {Flow.TITLE: "res://scenes/title.tscn"}
+var scene_paths: Dictionary[Flow, String] = {
+	Flow.TITLE: "res://scenes/title.tscn",
+	Flow.ROOM: "res://scenes/room.tscn",
+}
 var state := Flow.TITLE
 ## Every error reported this run, oldest first.
 var errors: Array[String] = []

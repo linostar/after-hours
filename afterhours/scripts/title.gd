@@ -4,4 +4,4 @@ extends Control
 
 
 func _ready() -> void:
-	Game.arrive(GameState.Flow.TITLE)
+	(get_node(GameState.AUTOLOAD_PATH) as GameState).arrive(GameState.Flow.TITLE)
