@@ -366,8 +366,10 @@ func _test_canvas_traces_and_grades() -> void:
 	await process_frame
 
 
-## Putting the brush down keeps the finished strokes and drops the one in progress;
-## reopening resumes; a canvas without ghosts is reported and stays shut.
+## Putting the brush down (by tap or by key) keeps the finished strokes; reopening
+## resumes; putting it down during the grade's hold delivers the fake at once (only
+## once); the start dot pulses under the 2 Hz flash limit; a canvas without ghosts is
+## reported and stays shut.
 func _test_canvas_close_keeps_strokes() -> void:
 	var name := "canvas_close_keeps_strokes"
 	var result: Array[float] = []
@@ -379,10 +381,19 @@ func _test_canvas_close_keeps_strokes() -> void:
 	_check(not canvas.visible and canvas.traced.size() == 1, name, "putting the brush down: visible %s, %d traced (expected hidden, 1)" % [canvas.visible, canvas.traced.size()])
 	canvas.open()
 	_check(canvas.visible and canvas.traced.size() == 1, name, "reopening does not resume at the second stroke")
+	await process_frame
+	await _press_accept()
+	_check(not canvas.visible and canvas.traced.size() == 1, name, "ui_accept on the focused put-down-brush button did not leave the canvas, keeping the stroke")
+	canvas.open()
 	# The dab tapped 100 off: (1 + 0.25) / 2 is Good.
 	await _tap_at(_on_pad(canvas, canvas.ghosts[1])[0] + Vector2(-100, 0))
-	_check(await _wait_until(func() -> bool: return not result.is_empty(), 120), name, "painted never came after the resumed stroke")
-	_check(not result.is_empty() and Forgery.grade(result[0]) == Forgery.Grade.GOOD, name, "an exact sweep and a dab 100 off painted %s, not Good" % [result])
+	_check(result.is_empty() and canvas.visible, name, "painted came before the grade's hold")
+	canvas.close()
+	_check(result.size() == 1 and not canvas.visible, name, "putting the brush down during the grade's hold did not deliver the fake at once (painted %s)" % [result])
+	for i in ceili((ForgeryCanvas.GRADE_POP + ForgeryCanvas.GRADE_HOLD) * 60.0) + 10:
+		await physics_frame
+	_check(result.size() == 1 and Forgery.grade(result[0]) == Forgery.Grade.GOOD, name, "an exact sweep and a dab 100 off painted %s, not Good once" % [result])
+	_check(ForgeryCanvas.PULSE_HZ < 2.0, name, "the start dot pulses at %.1f Hz, not under 2 Hz" % ForgeryCanvas.PULSE_HZ)
 	canvas.ghosts = []
 	var errors_before := _game.errors.size()
 	_game.quiet_errors = true
@@ -394,6 +405,16 @@ func _test_canvas_close_keeps_strokes() -> void:
 	(_game.get_node("ErrorLayer/ErrorBadge") as TextureRect).visible = false
 	canvas.queue_free()
 	await process_frame
+
+
+## Presses and releases ui_accept (Enter / Space on the focused button), as a keyboard would.
+func _press_accept() -> void:
+	for pressed: bool in [true, false]:
+		var accept := InputEventAction.new()
+		accept.action = "ui_accept"
+		accept.pressed = pressed
+		Input.parse_input_event(accept)
+		await process_frame
 
 
 ## Assist mode: the assist button is hidden by default; on, it shows with the visible
@@ -413,12 +434,7 @@ func _test_canvas_assist_paints_good() -> void:
 	_check(assist.visible and assist.has_focus(true), name, "with Assist mode on, the assist button is hidden or lacks the visible focus")
 	_check(assist.accessibility_name != "" and assist.get_global_rect().size.x >= 44.0, name, "the assist button has no accessibility name or is under 44 wide")
 	await _drag_along(_on_pad(canvas, Forgery.resample(canvas.ghosts[0])))
-	for pressed: bool in [true, false]:
-		var accept := InputEventAction.new()
-		accept.action = "ui_accept"
-		accept.pressed = pressed
-		Input.parse_input_event(accept)
-		await process_frame
+	await _press_accept()
 	_game.assist = false
 	_check(await _wait_until(func() -> bool: return not result.is_empty(), 120), name, "ui_accept on the assist button never painted")
 	_check(not result.is_empty() and result[0] == Forgery.ASSIST_QUALITY and Forgery.grade(result[0]) == Forgery.Grade.GOOD, name, "Assist painted %s, not exactly ASSIST_QUALITY (Good)" % [result])

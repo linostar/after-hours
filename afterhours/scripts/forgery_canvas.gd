@@ -45,6 +45,9 @@ var traced: Array[PackedVector2Array] = []
 var _current := PackedVector2Array()
 var _painting := false
 var _pulse := 0.0
+## The grade's pop-and-hold, and the quality it delivers when it ends.
+var _pop: Tween
+var _pop_quality := 0.0
 
 @onready var _pad: StrokePad = $Pad
 @onready var _ink: Node2D = $Ink
@@ -89,8 +92,13 @@ func open() -> void:
 
 
 ## Leaves the canvas, keeping the finished strokes (a stroke half traced is dropped).
+## During the grade's pop and hold the finished fake is delivered at once.
 func close() -> void:
 	if not visible:
+		return
+	if _pop != null and _pop.is_running():
+		_pop.kill()
+		_deliver()
 		return
 	_pad.reset()
 	_current.clear()
@@ -168,12 +176,17 @@ func _finish(fake_quality: float) -> void:
 	_grade.scale = Vector2.ZERO
 	_grade.show()
 	_assist.hide()
-	var pop := create_tween()
-	pop.tween_property(_grade, "scale", Vector2.ONE, GRADE_POP).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	pop.tween_interval(GRADE_HOLD)
-	pop.tween_callback(func() -> void:
-		hide()
-		painted.emit(fake_quality))
+	_pop_quality = fake_quality
+	_pop = create_tween()
+	_pop.tween_property(_grade, "scale", Vector2.ONE, GRADE_POP).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_pop.tween_interval(GRADE_HOLD)
+	_pop.tween_callback(_deliver)
+
+
+func _deliver() -> void:
+	hide()
+	print("[Forgery] Canvas closed with the fake")
+	painted.emit(_pop_quality)
 
 
 func _draw_eye() -> void:
