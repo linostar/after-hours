@@ -8,6 +8,7 @@ extends SceneTree
 
 const TITLE_PATH := "res://scenes/title.tscn"
 const ROOM_PATH := "res://scenes/room.tscn"
+const CANVAS_PATH := "res://scenes/forgery_canvas.tscn"
 ## Every synthetic touch uses this index: a web build's index is the browser's
 ## Touch.identifier, which iOS Safari makes large and never 0.
 const TOUCH_INDEX := 7
@@ -75,6 +76,8 @@ func _tests() -> Array[Callable]:
 		_test_stars,
 		_test_forgery_scoring,
 		_test_forgery_grades,
+		_test_canvas_traces_and_grades,
+		_test_canvas_close_keeps_strokes,
 		_test_room_tap_walks_around_partition,
 		_test_room_tap_on_wall_stops_at_floor,
 		_test_guard_patrols,
@@ -287,6 +290,104 @@ func _test_forgery_grades() -> void:
 	_check(Forgery.is_noticed(Forgery.Grade.SLOPPY, 1), name, "a Sloppy fake survives its first inspection")
 	_check(not Forgery.is_noticed(Forgery.Grade.GOOD, 1) and Forgery.is_noticed(Forgery.Grade.GOOD, 2), name, "a Good fake does not survive exactly one inspection")
 	_check(not Forgery.is_noticed(Forgery.Grade.PERFECT, 99), name, "a Perfect fake is noticed")
+
+
+## A finger pressed at the first of `points` (canvas base units), dragged through the
+## rest and lifted at the last, one event a frame.
+func _drag_along(points: PackedVector2Array) -> void:
+	var press := InputEventScreenTouch.new()
+	press.index = TOUCH_INDEX
+	press.position = root.get_final_transform() * points[0]
+	press.pressed = true
+	Input.parse_input_event(press)
+	await process_frame
+	for i in range(1, points.size()):
+		var drag := InputEventScreenDrag.new()
+		drag.index = TOUCH_INDEX
+		drag.position = root.get_final_transform() * points[i]
+		drag.relative = (points[i] - points[i - 1]) * root.get_final_transform().get_scale()
+		Input.parse_input_event(drag)
+		await process_frame
+	var release := InputEventScreenTouch.new()
+	release.index = TOUCH_INDEX
+	release.position = root.get_final_transform() * points[points.size() - 1]
+	Input.parse_input_event(release)
+	await process_frame
+
+
+## A forgery canvas on its own, tracing a sweep then a dab; `painted` lands in `result`.
+func _make_canvas(result: Array[float]) -> ForgeryCanvas:
+	var canvas := (load(CANVAS_PATH) as PackedScene).instantiate() as ForgeryCanvas
+	canvas.ghosts = [_arc(Vector2(200, 260), 140.0), PackedVector2Array([Vector2(330, 60)])]
+	canvas.painted.connect(func(fake_quality: float) -> void: result.append(fake_quality))
+	root.add_child(canvas)
+	return canvas
+
+
+## `points` (pad-local) in canvas base units.
+func _on_pad(canvas: ForgeryCanvas, points: PackedVector2Array) -> PackedVector2Array:
+	var origin := (canvas.get_node("Pad") as Control).get_global_rect().position
+	var moved := PackedVector2Array()
+	for point in points:
+		moved.append(origin + point)
+	return moved
+
+
+## Tracing every ghost exactly grades Perfect: the icon pops, holds, and the canvas
+## closes with painted; a touch off the pad paints nothing; reopening starts afresh.
+func _test_canvas_traces_and_grades() -> void:
+	var name := "canvas_traces_and_grades"
+	var result: Array[float] = []
+	var canvas := _make_canvas(result)
+	await process_frame
+	_check(not canvas.visible, name, "the canvas shows before it is opened")
+	canvas.open()
+	await process_frame
+	_check(canvas.visible and (canvas.get_node("CloseButton") as Button).has_focus(true), name, "the open canvas does not focus its put-down-brush button with a visible ring")
+	await _tap_at(Vector2(200, 450))
+	_check(canvas.traced.is_empty(), name, "a tap off the pad painted a stroke")
+	await _drag_along(_on_pad(canvas, Forgery.resample(canvas.ghosts[0])))
+	_check(canvas.traced.size() == 1 and canvas.visible and result.is_empty(), name, "after the first stroke: %d traced, visible %s, painted %s" % [canvas.traced.size(), canvas.visible, result])
+	await _tap_at(_on_pad(canvas, canvas.ghosts[1])[0])
+	var grade := canvas.get_node("Grade") as TextureRect
+	_check(grade.visible and grade.texture == ForgeryCanvas.GRADE_ICONS[Forgery.Grade.PERFECT], name, "an exact fake does not show the Perfect icon")
+	_check(await _wait_until(func() -> bool: return not result.is_empty(), 120), name, "painted never came after the last stroke")
+	_check(not result.is_empty() and Forgery.grade(result[0]) == Forgery.Grade.PERFECT, name, "an exact fake painted %s, not Perfect" % [result])
+	_check(not canvas.visible, name, "the canvas stays open after painting")
+	canvas.open()
+	_check(canvas.traced.is_empty(), name, "reopening a finished canvas keeps the old strokes")
+	canvas.queue_free()
+	await process_frame
+
+
+## Putting the brush down keeps the finished strokes and drops the one in progress;
+## reopening resumes; a canvas without ghosts is reported and stays shut.
+func _test_canvas_close_keeps_strokes() -> void:
+	var name := "canvas_close_keeps_strokes"
+	var result: Array[float] = []
+	var canvas := _make_canvas(result)
+	await process_frame
+	canvas.open()
+	await _drag_along(_on_pad(canvas, Forgery.resample(canvas.ghosts[0])))
+	await _tap_control(canvas.get_node("CloseButton") as Button)
+	_check(not canvas.visible and canvas.traced.size() == 1, name, "putting the brush down: visible %s, %d traced (expected hidden, 1)" % [canvas.visible, canvas.traced.size()])
+	canvas.open()
+	_check(canvas.visible and canvas.traced.size() == 1, name, "reopening does not resume at the second stroke")
+	# The dab tapped 100 off: (1 + 0.25) / 2 is Good.
+	await _tap_at(_on_pad(canvas, canvas.ghosts[1])[0] + Vector2(-100, 0))
+	_check(await _wait_until(func() -> bool: return not result.is_empty(), 120), name, "painted never came after the resumed stroke")
+	_check(not result.is_empty() and Forgery.grade(result[0]) == Forgery.Grade.GOOD, name, "an exact sweep and a dab 100 off painted %s, not Good" % [result])
+	canvas.ghosts = []
+	var errors_before := _game.errors.size()
+	_game.quiet_errors = true
+	canvas.open()
+	_game.quiet_errors = false
+	_check(_game.errors.size() == errors_before + 1 and "no ghost strokes" in _game.errors[-1], name, "a canvas without ghosts was not reported")
+	_check(not canvas.visible, name, "a canvas without ghosts opens")
+	_game.errors.resize(errors_before)
+	(_game.get_node("ErrorLayer/ErrorBadge") as TextureRect).visible = false
+	canvas.queue_free()
+	await process_frame
 
 
 ## Loads the slice room and waits until the navigation map has synced its navmesh.

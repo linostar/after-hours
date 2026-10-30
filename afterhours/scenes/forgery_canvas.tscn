@@ -1,0 +1,99 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/forgery_canvas.gd" id="1_canvas"]
+[ext_resource type="Script" path="res://scripts/ui/stroke_pad.gd" id="2_pad"]
+[ext_resource type="Texture2D" path="res://art/svg/masterpiece.svg" id="3_painting"]
+[ext_resource type="Texture2D" path="res://art/svg/icon_brush_down.svg" id="4_close"]
+
+[node name="ForgeryCanvas" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_canvas")
+
+[node name="Dim" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.04, 0.03, 0.07, 0.3)
+
+[node name="Easel" type="ColorRect" parent="."]
+layout_mode = 0
+offset_left = 448.0
+offset_top = 28.0
+offset_right = 912.0
+offset_bottom = 480.0
+mouse_filter = 2
+color = Color(0.36, 0.22, 0.12, 1)
+
+[node name="Border" type="ColorRect" parent="."]
+layout_mode = 0
+offset_left = 468.0
+offset_top = 48.0
+offset_right = 892.0
+offset_bottom = 372.0
+mouse_filter = 2
+color = Color(0.79, 0.64, 0.29, 1)
+
+[node name="Paper" type="ColorRect" parent="."]
+layout_mode = 0
+offset_left = 480.0
+offset_top = 60.0
+offset_right = 880.0
+offset_bottom = 360.0
+mouse_filter = 2
+color = Color(0.95, 0.92, 0.84, 1)
+
+[node name="Reference" type="TextureRect" parent="."]
+modulate = Color(1, 1, 1, 0.35)
+layout_mode = 0
+offset_left = 480.0
+offset_top = 60.0
+offset_right = 880.0
+offset_bottom = 360.0
+mouse_filter = 2
+texture = ExtResource("3_painting")
+expand_mode = 1
+
+[node name="Ink" type="Node2D" parent="."]
+position = Vector2(480, 60)
+
+[node name="Eye" type="Node2D" parent="."]
+position = Vector2(680, 428)
+
+[node name="Pad" type="Control" parent="."]
+layout_mode = 0
+offset_left = 480.0
+offset_top = 60.0
+offset_right = 880.0
+offset_bottom = 360.0
+script = ExtResource("2_pad")
+
+[node name="Grade" type="TextureRect" parent="."]
+visible = false
+layout_mode = 0
+offset_left = 620.0
+offset_top = 150.0
+offset_right = 740.0
+offset_bottom = 270.0
+pivot_offset = Vector2(60, 60)
+mouse_filter = 2
+
+[node name="CloseButton" type="Button" parent="."]
+layout_mode = 0
+offset_left = 808.0
+offset_top = 392.0
+offset_right = 880.0
+offset_bottom = 464.0
+accessibility_name = "Put the brush down"
+icon = ExtResource("4_close")
+flat = true
+icon_alignment = 1
+expand_icon = true

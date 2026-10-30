@@ -132,15 +132,20 @@ func _update_cone() -> void:
 
 
 func _draw() -> void:
-	if suspicion <= 0.0:
-		return
-	# An almond eye whose iris grows and reddens with suspicion.
+	if suspicion > 0.0:
+		draw_eye(self, EYE_CENTER, suspicion)
+
+
+## Draws the suspicion eye on `item` at `center`, `size_scale` times its size on a guard:
+## an almond eye whose iris grows and reddens with `suspicion`.
+static func draw_eye(item: CanvasItem, center: Vector2, eye_suspicion: float, size_scale := 1.0) -> void:
+	var size := EYE_SIZE * size_scale
 	var outline := PackedVector2Array()
 	for i in 16:
 		var t := TAU * i / 16.0
-		outline.append(EYE_CENTER + Vector2(cos(t) * EYE_SIZE.x, sin(t) * EYE_SIZE.y * (0.55 + 0.45 * absf(cos(t)))))
-	draw_colored_polygon(outline, EYE_WHITE)
-	draw_circle(EYE_CENTER, lerpf(3.0, EYE_SIZE.y - 1.0, suspicion), EYE_CALM.lerp(EYE_ALARM, suspicion))
-	draw_circle(EYE_CENTER, 2.5, EYE_INK)
+		outline.append(center + Vector2(cos(t) * size.x, sin(t) * size.y * (0.55 + 0.45 * absf(cos(t)))))
+	item.draw_colored_polygon(outline, EYE_WHITE)
+	item.draw_circle(center, lerpf(3.0, EYE_SIZE.y - 1.0, eye_suspicion) * size_scale, EYE_CALM.lerp(EYE_ALARM, eye_suspicion))
+	item.draw_circle(center, 2.5 * size_scale, EYE_INK)
 	outline.append(outline[0])
-	draw_polyline(outline, EYE_INK, 2.0, true)
+	item.draw_polyline(outline, EYE_INK, 2.0 * size_scale, true)
