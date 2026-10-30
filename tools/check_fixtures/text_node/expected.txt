@@ -1,0 +1,6 @@
+res://scenes/screen.tscn: uses 'RichTextLabel'
+res://scenes/screen.tscn: uses 'ConfirmationDialog'
+res://scripts/banner.gd: uses 'Label'
+res://scripts/banner.gd: uses 'LabelSettings'
+res://scripts/banner.gd: uses 'Font'
+res://scripts/banner.gd: uses 'fallback_font'

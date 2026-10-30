@@ -1,0 +1,13 @@
+[gd_scene format=3]
+
+[node name="Screen" type="Control"]
+layout_mode = 3
+offset_right = 300.0
+offset_bottom = 200.0
+
+[node name="Caption" type="RichTextLabel" parent="."]
+layout_mode = 0
+offset_right = 200.0
+offset_bottom = 40.0
+
+[node name="Quit" type="ConfirmationDialog" parent="."]

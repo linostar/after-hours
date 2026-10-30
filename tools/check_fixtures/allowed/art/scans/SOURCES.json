@@ -1,0 +1,5 @@
+[
+  {"id": "wave", "file": "wave.webp", "artist": "Katsushika Hokusai", "title": "The Great Wave off Kanagawa",
+   "year": 1831, "source_url": "https://example.org/wave.jpg", "licence": "Public domain",
+   "sha256": "1111111111111111111111111111111111111111111111111111111111111111"}
+]

@@ -1,0 +1,3 @@
+res://scripts/score.gd:6: sets a Control's text
+res://scripts/score.gd:7: sets a Control's text
+res://scenes/menu.tscn: Button 'Play' shows text 'Play'

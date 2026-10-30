@@ -1,0 +1,9 @@
+res://fonts/caption.ttf: is a font file
+res://fonts/pixel.woff2: is a font file
+res://scripts/caption.gd: uses 'LineEdit'
+res://scripts/caption.gd: uses 'draw_string'
+res://scripts/caption.gd: uses 'draw_char'
+res://scripts/caption.gd: uses 'get_theme_default_font'
+res://scripts/caption.gd: uses 'tooltip_text'
+res://scripts/caption.gd: uses 'placeholder_text'
+res://scripts/caption.gd: uses 'OS.alert'
