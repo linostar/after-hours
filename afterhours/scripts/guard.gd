@@ -7,7 +7,8 @@ extends Node2D
 ## guard and emits caught (the room tosses the mime out and resets the guard).
 
 const PATROL_SPEED := 70.0
-## Seconds the guard stands at each waypoint before turning to the next.
+## Seconds the guard stands at each waypoint, still facing the leg it walked, before it
+## turns to the next one (it always faces the way it walks).
 const WAYPOINT_PAUSE := 0.8
 const CONE_RANGE := 180.0
 ## 32 degrees either side of the facing.
@@ -56,7 +57,7 @@ func reset() -> void:
 		return
 	position = route[0]
 	_next = 1 % route.size()
-	if route.size() > 1:
+	if route.size() > 1 and not route[_next].is_equal_approx(route[0]):
 		facing = (route[_next] - route[0]).normalized()
 	_update_cone()
 	queue_redraw()
@@ -86,13 +87,15 @@ func _patrol(delta: float) -> void:
 		_pause -= delta
 		return
 	var goal := route[_next]
+	# A zero step (two identical waypoints) keeps the old facing: a zero facing would see all round.
+	if not position.is_equal_approx(goal):
+		facing = (goal - position).normalized()
 	position = position.move_toward(goal, PATROL_SPEED * delta)
 	if position.is_equal_approx(goal):
 		position = goal
 		print("[Guard] %s reaches waypoint %d at %s" % [name, _next, goal.round()])
 		_next = (_next + 1) % route.size()
 		_pause = WAYPOINT_PAUSE
-		facing = (route[_next] - goal).normalized()
 
 
 func _look(delta: float) -> void:

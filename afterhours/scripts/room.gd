@@ -9,7 +9,8 @@ extends Node2D
 ## glows, and reaching EXIT ends the wing: the stars (Stars, against PAR_TIME) show in the
 ## results overlay. A guard that catches the mime shakes it and tosses it back
 ## through the entrance (TOSS_SHAKE, then TOSS_FLIGHT along an arc TOSS_HEIGHT high); taps
-## are ignored meanwhile, then the guard starts its route again. The timer (elapsed) keeps
+## are ignored meanwhile, then the guard starts its route again (a mime carrying the
+## original keeps it: only the guard resets). The timer (elapsed) keeps
 ## running through it all; ever_seen records whether any guard ever spotted the mime.
 
 ## Where the mime enters the room (the door in the left wall), in room coordinates.
@@ -75,8 +76,12 @@ func _physics_process(delta: float) -> void:
 func _on_floor_tapped(at: Vector2) -> void:
 	if tossing or finished:
 		return
+	var on_painting := PAINTING_RECT.has_point(at) and not mime.carrying
+	if on_painting and swap_intent:
+		# Already heading there or swapping: a second tap keeps the progress.
+		return
 	_cancel_swap()
-	if PAINTING_RECT.has_point(at) and not mime.carrying:
+	if on_painting:
 		swap_intent = true
 		mime.walk_to(SWAP_SPOT)
 		return

@@ -79,6 +79,8 @@ func _tests() -> Array[Callable]:
 		_test_guard_sees_and_tosses,
 		_test_guard_partition_blocks_sight,
 		_test_guard_ignores_behind,
+		_test_guard_pauses_facing_its_leg,
+		_test_catches_during_swap_and_while_carrying,
 		_test_title_play_starts_room,
 		_test_goto_missing_scene_reports,
 		_test_room_swap_and_escape,
@@ -360,6 +362,58 @@ func _test_guard_partition_blocks_sight() -> void:
 	_check(room.guard.suspicion == 0.0 and not room.ever_seen, name, "the guard saw the mime through the partition (suspicion %.2f)" % room.guard.suspicion)
 	room.guard.position = Vector2(390, 470)
 	_check(room.guard.can_see(Vector2(566, 470)), name, "the guard cannot see the same distance across open floor (the control case)")
+
+
+## At a waypoint the guard pauses still facing the leg it walked, then turns to the next.
+func _test_guard_pauses_facing_its_leg() -> void:
+	var name := "guard_pauses_facing_its_leg"
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.target = null
+	var corner := room.guard.route[1]
+	var reached := await _wait_until(func() -> bool: return room.guard.position == corner, 600)
+	_check(reached, name, "the guard never reached its second waypoint %s" % corner)
+	var first_leg := (corner - room.guard.route[0]).normalized()
+	for i in roundi(Guard.WAYPOINT_PAUSE * 60.0) - 4:
+		await physics_frame
+	_check(room.guard.position == corner and room.guard.facing.is_equal_approx(first_leg), name, "during the pause the guard faces %s, not its finished leg %s" % [room.guard.facing, first_leg])
+	for i in 12:
+		await physics_frame
+	var next_leg := (room.guard.route[2] - corner).normalized()
+	_check(room.guard.facing.is_equal_approx(next_leg), name, "after the pause the guard faces %s, not its next leg %s" % [room.guard.facing, next_leg])
+
+
+## A catch mid-swap cancels the swap. A catch while carrying keeps the original (only the
+## guard resets): the mime still escapes, and being seen costs the unseen star.
+func _test_catches_during_swap_and_while_carrying() -> void:
+	var name := "catches_during_swap_and_while_carrying"
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.active = false
+	await _tap_at(Room.PAINTING_RECT.get_center())
+	await _wait_until(func() -> bool: return room.mime.swap_progress > 0.3, 900)
+	await _tap_at(Room.PAINTING_RECT.get_center())
+	_check(room.mime.swap_progress > 0.3 and room.swap_intent, name, "a second tap on the painting restarted the swap")
+	room.guard.active = true
+	_stage_guard(room, room.mime.position + Vector2(-80, 0), Vector2.RIGHT, room.mime.position)
+	await _wait_until(func() -> bool: return room.tossing, 120)
+	_check(room.tossing and room.mime.swap_progress == 0.0 and not room.swap_intent, name, "a catch mid-swap did not cancel it")
+	await _wait_until(func() -> bool: return not room.tossing, 180)
+	room.guard.active = false
+	room.mime.place_at(Room.SWAP_SPOT)
+	room.swap_intent = true
+	await _wait_until(func() -> bool: return room.mime.carrying, 180)
+	room.guard.active = true
+	_stage_guard(room, Vector2(700, 330), Vector2.RIGHT, Vector2(780, 330))
+	await _wait_until(func() -> bool: return room.tossing, 120)
+	await _wait_until(func() -> bool: return not room.tossing, 180)
+	_check(room.mime.carrying and (room.get_node("ExitGlow") as Polygon2D).visible, name, "a catch while carrying took the original away")
+	room.guard.active = false
+	await _tap_at(Vector2(950, 330))
+	var escaped := await _wait_until(func() -> bool: return room.finished, 900)
+	_check(escaped and room.stars[Stars.Star.SWAP] and not room.stars[Stars.Star.UNSEEN], name, "after being seen the escape earned %s (escaped %s)" % [room.stars, escaped])
 
 
 func _test_guard_ignores_behind() -> void:
