@@ -57,6 +57,7 @@ func _ready() -> void:
 	guard.caught.connect(_on_caught)
 	_floor.tapped.connect(_on_floor_tapped)
 	(get_node(GameState.AUTOLOAD_PATH) as GameState).arrive(GameState.Flow.ROOM)
+	print("[Room] Masterpiece at %s, exit at %s" % [PAINTING_RECT, EXIT])
 
 
 func _physics_process(delta: float) -> void:

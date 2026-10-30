@@ -3,11 +3,22 @@
 // (844x390 at 3x, touch, mobile). Each run fails on any failed request, HTTP error, page
 // error, console error, missing engine boot log, the title not arriving ("[Game] Arrived
 // at TITLE"), a still-visible Godot status overlay, a missing canvas, a page whose
-// touch/selection CSS is not applied, or a screenshot with nothing drawn.
+// touch/selection CSS is not applied, or a screenshot with nothing drawn. Then it plays the
+// slice with the mouse (desktop) or CDP touches with id 7 (phone; iOS Safari's touch ids are
+// never 0): tap the title's play button where it logs itself ("[Title] Play button at ..."),
+// require "[Game] Arrived at ROOM", then play like a player who watches the guard: wait
+// until it reaches the room's bottom-right corner ("[Guard] Guard reaches waypoint 2", from
+// where it walks the bottom leg facing away from the painting), tap the masterpiece where
+// the room logs it ("[Room] Masterpiece at ..., exit at ...") until "[Room] Swapped" (a
+// catch, "[Room] Caught", is
+// waited out until the mime is back at the entrance, then the tap is repeated, at most
+// ATTEMPTS times), then tap the exit the same way until "[Room] Escaped", and require
+// "[Results] Stars".
 // Usage: node tools/smoke_web.mjs [buildDir]   (default: build/web)
 // Env:   SMOKE_BOOT_TIMEOUT_MS (default 30000), SMOKE_SETTLE_MS (default 2000),
 //        SMOKE_STEP_TIMEOUT_MS (each waited-for log line, default 20000)
-// Screenshots (next to buildDir): build/smoke-<run>.png (the title).
+// Screenshots (next to buildDir): build/smoke-<run>.png (the title) and
+// build/smoke-<run>-results.png (the results overlay).
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { launchChrome, serveBuild } from './web_util.mjs';
@@ -28,11 +39,23 @@ const RUNS = [
 // text selection and long-press menus never fire. -webkit-touch-callout is iOS-only and
 // Chrome does not compute it; test_gameplay.gd checks it is in the preset's head_include.
 const TOUCH_CSS = { touchAction: 'none', overscrollBehavior: 'none', userSelect: 'none' };
+// project.godot base viewport (aspect expand: the visible area grows on one axis from (0, 0)).
+const BASE = { width: 960, height: 540 };
+const RECT = '\\[P: \\(([\\d.-]+), ([\\d.-]+)\\), S: \\(([\\d.-]+), ([\\d.-]+)\\)\\]';
+const PLAY_RECT = new RegExp(`^\\[Title\\] Play button at ${RECT}`);
+const ROOM_LAYOUT = new RegExp(`^\\[Room\\] Masterpiece at ${RECT}, exit at \\(([\\d.-]+), ([\\d.-]+)\\)`);
+// How many times a tap is repeated after a catch tossed the mime back to the entrance.
+const ATTEMPTS = 5;
+// The guard at the slice room's bottom-right corner: it then walks the bottom leg facing
+// away from the painting, the window a watching player takes.
+const GUARD_SAFE = /^\[Guard\] Guard reaches waypoint 2 /;
+// Long enough for the guard's whole patrol loop (about 19 s).
+const GUARD_WAIT_MS = 30000;
 
 // Waits until a console line logged at or after index `from` matches `pattern` (a RegExp)
 // and returns its match (with `index`: the line's index in logs).
-async function waitForLog(page, logs, pattern, what, from = 0) {
-  const deadline = Date.now() + STEP_TIMEOUT_MS;
+async function waitForLog(page, logs, pattern, what, from = 0, timeoutMs = STEP_TIMEOUT_MS) {
+  const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     for (let i = logs.length - 1; i >= from; i--) {
       const match = logs[i].match(pattern);
@@ -40,7 +63,59 @@ async function waitForLog(page, logs, pattern, what, from = 0) {
     }
     await page.waitForTimeout(50);
   }
-  throw new Error(`timed out after ${STEP_TIMEOUT_MS} ms waiting for ${what} (${pattern})`);
+  throw new Error(`timed out after ${timeoutMs} ms waiting for ${what} (${pattern})`);
+}
+
+// Pointer input for one run: real touches (CDP touch events) on a phone, the mouse on desktop.
+async function pointerFor(page, context, run) {
+  if (!run.context.hasTouch) return { tap: (p) => page.mouse.click(p.x, p.y) };
+  const cdp = await context.newCDPSession(page);
+  // id 7: iOS Safari gives touches large identifiers, never 0, and Godot web uses them as the index.
+  const touch = (type, points) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points });
+  return {
+    tap: async (p) => {
+      await touch('touchStart', [{ x: p.x, y: p.y, id: 7 }]);
+      await touch('touchEnd', []);
+    },
+  };
+}
+
+// A base-unit point in page coordinates. Godot fits the 960x540 base by the smaller ratio
+// and expands the other axis from the top-left; the web reports no safe-area insets.
+async function pagePoint(page, x, y) {
+  const box = await page.locator('canvas').boundingBox();
+  const scale = Math.min(box.width / BASE.width, box.height / BASE.height);
+  return { x: box.x + x * scale, y: box.y + y * scale };
+}
+
+// Taps `point` (base units) until the room logs `goal` (a RegExp); a catch in between is
+// waited out until the mime is back at the entrance, then the tap is repeated. With
+// `window` (a RegExp), each tap waits for a fresh log line matching it first.
+async function tapUntil(page, logs, pointer, point, goal, what, window = null) {
+  for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+    if (window !== null) await waitForLog(page, logs, window, `the guard's safe window before ${what}`, logs.length, GUARD_WAIT_MS);
+    const from = logs.length;
+    await pointer.tap(await pagePoint(page, point.x, point.y));
+    const outcome = await waitForLog(page, logs, new RegExp(`${goal.source}|^\\[Room\\] Caught`), what, from);
+    if (goal.test(outcome[0])) return attempt;
+    await waitForLog(page, logs, /^\[Room\] The mime is back at the entrance/, 'the end of the toss', outcome.index);
+  }
+  throw new Error(`${what}: caught on every one of ${ATTEMPTS} attempts`);
+}
+
+// The slice end to end: play, swap the masterpiece, escape, the results.
+async function playSlice(page, logs, pointer, run) {
+  const play = await waitForLog(page, logs, PLAY_RECT, 'the play button\'s rect');
+  const [px, py, pw, ph] = play.slice(1).map(Number);
+  const from = logs.length;
+  await pointer.tap(await pagePoint(page, px + pw / 2, py + ph / 2));
+  await waitForLog(page, logs, /^\[Game\] Arrived at ROOM/, 'the room after tapping play', from);
+  const layout = await waitForLog(page, logs, ROOM_LAYOUT, 'the room layout', from);
+  const [rx, ry, rw, rh, ex, ey] = layout.slice(1).map(Number);
+  const swaps = await tapUntil(page, logs, pointer, { x: rx + rw / 2, y: ry + rh / 2 }, /^\[Room\] Swapped/, 'the swap', GUARD_SAFE);
+  const exits = await tapUntil(page, logs, pointer, { x: ex, y: ey }, /^\[Room\] Escaped/, 'the escape');
+  const stars = await waitForLog(page, logs, /^\[Results\] Stars/, 'the results');
+  console.log(`[${run.name}] slice: swap on attempt ${swaps}, escape on attempt ${exits}; ${stars.input}`);
 }
 
 async function smoke(browser, url, run) {
@@ -105,7 +180,14 @@ async function smoke(browser, url, run) {
       return colors.size;
     }, png.toString('base64'));
     if (distinctColors < 2) failures.push('screenshot is a single flat colour (nothing rendered)');
-    for (const line of logs.filter((l) => /^\[Game\]/.test(l))) console.log(`[${run.name}] ${line}`);
+    if (failures.length === 0) {
+      await playSlice(page, logs, await pointerFor(page, context, run), run);
+      await page.waitForTimeout(settleMs);
+      const resultsPath = join(buildDir, '..', `smoke-${run.name}-results.png`);
+      await page.screenshot({ path: resultsPath });
+      console.log(`[${run.name}] screenshot: ${resultsPath}`);
+    }
+    for (const line of logs.filter((l) => /^\[(Game|Room|Results)\]/.test(l))) console.log(`[${run.name}] ${line}`);
   } catch (err) {
     failures.push(`smoke test aborted: ${err.message}`);
     // The game's last log lines show where the run got stuck.

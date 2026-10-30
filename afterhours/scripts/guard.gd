@@ -89,6 +89,7 @@ func _patrol(delta: float) -> void:
 	position = position.move_toward(goal, PATROL_SPEED * delta)
 	if position.is_equal_approx(goal):
 		position = goal
+		print("[Guard] %s reaches waypoint %d at %s" % [name, _next, goal.round()])
 		_next = (_next + 1) % route.size()
 		_pause = WAYPOINT_PAUSE
 		facing = (route[_next] - goal).normalized()
