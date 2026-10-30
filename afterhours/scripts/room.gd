@@ -9,7 +9,10 @@ extends Node2D
 ## masterpiece (PAINTING_RECT) walks the mime to SWAP_SPOT below it, where standing still
 ## for SWAP_TIME swaps the fake for the original (tapping elsewhere cancels the swap); a
 ## tap there without one is a tap on the floor. Carrying the original, the exit door
-## glows, and reaching EXIT ends the wing: the stars (Stars, against PAR_TIME) show in the
+## glows, and the fake hangs in the original's place: a guard who sees it (FAKE_VIEW_POINT,
+## the floor at its foot) inspects it once per pass, a "?" over the painting; a fake
+## found out (Forgery.is_noticed) turns the "?" into "!" and raises the guard's alarm until
+## the room ends. Reaching EXIT ends the wing: the stars (Stars, against PAR_TIME) show in the
 ## results overlay. A guard that catches the mime shakes it and tosses it back
 ## through the entrance (TOSS_SHAKE, then TOSS_FLIGHT along an arc TOSS_HEIGHT high),
 ## closing the canvas if it was painting (its finished strokes are kept); taps are ignored
@@ -28,6 +31,11 @@ const SWAP_SPOT := Vector2(780, 235)
 ## end of its bottom leg), and where the mime stands to paint.
 const EASEL_RECT := Rect2(147, 260, 70, 110)
 const EASEL_SPOT := Vector2(230, 372)
+## Where a guard looks to inspect the hung fake: the floor at the painting's foot (sight
+## rays to the painting itself would hit the back wall).
+const FAKE_VIEW_POINT := Vector2(780, 180)
+const QUERY_ICON := preload("res://art/svg/icon_query.svg")
+const ALARM_ICON := preload("res://art/svg/icon_alarm.svg")
 ## How close to SWAP_SPOT (or EASEL_SPOT) counts as standing there.
 const SWAP_REACH := 8.0
 const SWAP_TIME := 1.5
@@ -53,6 +61,12 @@ var swap_intent := false
 var paint_intent := false
 ## The quality (Forgery) of the fake the mime carries, or of the one hung by the swap.
 var fake_quality := 0.0
+## Whether the swap has hung the fake, and how many inspections it has had.
+var fake_hung := false
+var inspections := 0
+## Whether the guard's next sight of the fake starts an inspection (once per pass: it
+## re-arms when the guard no longer sees it).
+var _inspect_armed := true
 var finished := false
 var stars: Array[bool] = []
 
@@ -62,6 +76,7 @@ var stars: Array[bool] = []
 @onready var _exit_glow: Polygon2D = $ExitGlow
 @onready var _easel_glow: Polygon2D = $EaselGlow
 @onready var _canvas: ForgeryCanvas = $EaselLayer/ForgeryCanvas
+@onready var _fake_icon: Sprite2D = $FakeIcon
 @onready var _results: Results = $ResultsLayer/Results
 @onready var _game := get_node(GameState.AUTOLOAD_PATH) as GameState
 
@@ -72,6 +87,7 @@ func _ready() -> void:
 	guard.reset()
 	guard.spotted.connect(_on_spotted)
 	guard.caught.connect(_on_caught)
+	guard.inspected.connect(_on_inspected)
 	_floor.tapped.connect(_on_floor_tapped)
 	_canvas.watcher = guard
 	_canvas.painted.connect(_on_painted)
@@ -87,6 +103,12 @@ func _physics_process(delta: float) -> void:
 	if paint_intent and not tossing and not mime.walking and mime.position.distance_to(EASEL_SPOT) <= SWAP_REACH:
 		paint_intent = false
 		_canvas.open()
+	if fake_hung and guard.active and not guard.inspecting and not guard.alarmed:
+		var sees_fake := guard.can_see(FAKE_VIEW_POINT)
+		if sees_fake and _inspect_armed:
+			_start_inspection()
+		elif not sees_fake:
+			_inspect_armed = true
 	if swap_intent and not tossing and not mime.walking and mime.position.distance_to(SWAP_SPOT) <= SWAP_REACH:
 		mime.swap_progress = minf(mime.swap_progress + delta / SWAP_TIME, 1.0)
 		if mime.swap_progress >= 1.0:
@@ -134,8 +156,28 @@ func _swap() -> void:
 	mime.swap_progress = 0.0
 	mime.has_fake = false
 	mime.carrying = true
+	fake_hung = true
 	_exit_glow.visible = true
 	print("[Room] Swapped the forgery for the original at t %.2f (fake %s)" % [elapsed, Forgery.Grade.keys()[Forgery.grade(fake_quality)]])
+
+
+func _start_inspection() -> void:
+	_inspect_armed = false
+	inspections += 1
+	_fake_icon.texture = QUERY_ICON
+	_fake_icon.show()
+	guard.inspect(FAKE_VIEW_POINT)
+
+
+func _on_inspected() -> void:
+	var fake_grade := Forgery.grade(fake_quality)
+	var noticed := Forgery.is_noticed(fake_grade, inspections)
+	print("[Room] Inspection %d of the %s fake at t %.2f: %s" % [inspections, Forgery.Grade.keys()[fake_grade], elapsed, "found out" if noticed else "passed"])
+	if not noticed:
+		_fake_icon.hide()
+		return
+	_fake_icon.texture = ALARM_ICON
+	guard.alarm()
 
 
 func _escape() -> void:
@@ -157,6 +199,10 @@ func _on_caught() -> void:
 	_cancel_swap()
 	paint_intent = false
 	_canvas.close()
+	if guard.inspecting:
+		# A catch cuts the inspection short: it does not count.
+		inspections -= 1
+		_fake_icon.hide()
 	var from := mime.position
 	mime.place_at(from)
 	print("[Room] Caught (%d) at t %.2f: tossing the mime from %s to the entrance" % [catches, elapsed, from.round()])
@@ -177,5 +223,6 @@ func _end_toss() -> void:
 	mime.rotation = 0.0
 	mime.place_at(ENTRANCE)
 	guard.reset()
+	_inspect_armed = true
 	tossing = false
 	print("[Room] The mime is back at the entrance at t %.2f" % elapsed)

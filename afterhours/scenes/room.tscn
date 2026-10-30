@@ -57,6 +57,11 @@ z_index = -9
 position = Vector2(780, 75)
 texture = ExtResource("5_painting")
 
+[node name="FakeIcon" type="Sprite2D" parent="."]
+visible = false
+z_index = -8
+position = Vector2(780, 75)
+
 [node name="Walls" type="StaticBody2D" parent="."]
 
 [node name="Back" type="CollisionPolygon2D" parent="Walls"]

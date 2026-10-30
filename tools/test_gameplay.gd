@@ -92,6 +92,9 @@ func _tests() -> Array[Callable]:
 		_test_room_swap_cancel_and_locked_exit,
 		_test_room_easel_paints_fake,
 		_test_room_catch_while_painting,
+		_test_sloppy_fake_raises_alarm,
+		_test_good_and_perfect_fakes_pass,
+		_test_catch_cuts_inspection_short,
 		_test_results_buttons,
 		_test_guard_bad_route_reports,
 		_test_room_timer_waits_for_fade,
@@ -753,6 +756,91 @@ func _test_room_catch_while_painting() -> void:
 	room.guard.active = false
 	canvas = await _open_easel(room)
 	_check(canvas.visible and canvas.traced.size() == 1, name, "after the toss the easel does not resume at stroke 2")
+
+
+## The room with a fake of `quality` hung, the mime carrying the original out of sight,
+## and the guard standing still on its top leg facing the fake.
+func _inspection_room(quality: float) -> Room:
+	var room := await _load_room()
+	if room == null:
+		return null
+	room._on_painted(quality)
+	room._swap()
+	_stage_guard(room, Vector2(640, 250), Vector2.RIGHT, Vector2(100, 480))
+	return room
+
+
+## Waits for the guard's next inspection to start and run out; returns whether it did.
+func _await_inspection(room: Room) -> bool:
+	var started := await _wait_until(func() -> bool: return room.guard.inspecting, 30)
+	var query_shown := (room.get_node("FakeIcon") as Sprite2D).visible and (room.get_node("FakeIcon") as Sprite2D).texture == Room.QUERY_ICON
+	var ended := await _wait_until(func() -> bool: return not room.guard.inspecting, ceili(Guard.INSPECT_TIME * 60.0) + 10)
+	return started and query_shown and ended
+
+
+## The guard looks away for a moment, then back at the fake: a new pass.
+func _new_pass(room: Room) -> void:
+	room.guard.facing = Vector2.LEFT
+	for i in 3:
+		await physics_frame
+	room.guard.facing = Vector2.RIGHT
+
+
+## A Sloppy fake is found out at the first inspection: "!" over the painting, and the
+## guard's alarm (faster, wider, red) outlasts a reset.
+func _test_sloppy_fake_raises_alarm() -> void:
+	var name := "sloppy_fake_raises_alarm"
+	var room := await _inspection_room(0.2)
+	if room == null:
+		return
+	_check(await _await_inspection(room), name, "the guard facing the hung fake did not inspect it under a \"?\"")
+	var icon := room.get_node("FakeIcon") as Sprite2D
+	_check(room.guard.alarmed and icon.visible and icon.texture == Room.ALARM_ICON, name, "a Sloppy fake was not found out (alarmed %s, icon %s)" % [room.guard.alarmed, icon.texture])
+	await physics_frame
+	var cone := room.guard.get_node("Cone") as Polygon2D
+	_check(cone.color == Guard.CONE_ALERT_COLOR and room.guard.half_angle() == Guard.ALARM_HALF_ANGLE, name, "the alarmed guard's cone is not red and wide")
+	room.guard.patrolling = true
+	room.guard.position = room.guard.route[0]
+	var from := room.guard.position
+	for i in 30:
+		await physics_frame
+	var moved := room.guard.position.distance_to(from)
+	_check(absf(moved - Guard.ALARM_SPEED * 0.5) < 3.0, name, "the alarmed guard walked %.1f in 0.5 s, not ALARM_SPEED (%.1f)" % [moved, Guard.ALARM_SPEED * 0.5])
+	room.guard.reset()
+	_check(room.guard.alarmed, name, "a reset calmed the alarmed guard")
+
+
+## A Good fake passes its first inspection (and is not re-inspected within the same
+## pass) and is found out on the next pass; a Perfect fake passes both.
+func _test_good_and_perfect_fakes_pass() -> void:
+	var name := "good_and_perfect_fakes_pass"
+	for fake_quality: float in [Forgery.ASSIST_QUALITY, 0.95]:
+		var room := await _inspection_room(fake_quality)
+		if room == null:
+			return
+		var grade: String = Forgery.Grade.keys()[Forgery.grade(fake_quality)]
+		_check(await _await_inspection(room), name, "%s: the first inspection did not run" % grade)
+		_check(not room.guard.alarmed and not (room.get_node("FakeIcon") as Sprite2D).visible, name, "%s: the first inspection found the fake out" % grade)
+		for i in 30:
+			await physics_frame
+		_check(room.inspections == 1, name, "%s: the guard re-inspected within one pass (%d inspections)" % [grade, room.inspections])
+		await _new_pass(room)
+		_check(await _await_inspection(room), name, "%s: the second pass did not inspect" % grade)
+		var expect_alarm := Forgery.grade(fake_quality) == Forgery.Grade.GOOD
+		_check(room.guard.alarmed == expect_alarm, name, "%s: after the second inspection alarmed is %s" % [grade, room.guard.alarmed])
+
+
+## A catch during an inspection cuts it short: it does not count and the "?" goes.
+func _test_catch_cuts_inspection_short() -> void:
+	var name := "catch_cuts_inspection_short"
+	var room := await _inspection_room(0.2)
+	if room == null:
+		return
+	await _wait_until(func() -> bool: return room.guard.inspecting, 30)
+	room.mime.place_at(Vector2(720, 230))
+	await _wait_until(func() -> bool: return room.tossing, 120)
+	_check(room.tossing and room.inspections == 0 and not (room.get_node("FakeIcon") as Sprite2D).visible, name, "a catch mid-inspection: tossing %s, %d inspections, icon shown %s" % [room.tossing, room.inspections, (room.get_node("FakeIcon") as Sprite2D).visible])
+	_check(not room.guard.alarmed, name, "a cut-short inspection raised the alarm")
 
 
 ## After an escape, replay starts the room afresh and home returns to the title.

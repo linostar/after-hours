@@ -5,14 +5,21 @@ extends Node2D
 ## its suspicion (Detection) while it sees its target. The cone is drawn on the floor and
 ## the suspicion as an eye above its head that fills and reddens; full suspicion stops the
 ## guard and emits caught (the room tosses the mime out and resets the guard).
+## The room can stop it to inspect a point (inspect: it stands facing it for INSPECT_TIME,
+## still looking, then emits inspected) and can raise its alarm (alarm: faster, a wider
+## red cone, until the room ends; a reset keeps it).
 
 const PATROL_SPEED := 70.0
+const ALARM_SPEED := 110.0
+const INSPECT_TIME := 1.2
 ## Seconds the guard stands at each waypoint, still facing the leg it walked, before it
 ## turns to the next one (it always faces the way it walks).
 const WAYPOINT_PAUSE := 0.8
 const CONE_RANGE := 180.0
 ## 32 degrees either side of the facing.
 const CONE_HALF_ANGLE := PI * 32.0 / 180.0
+## 45 degrees either side while alarmed.
+const ALARM_HALF_ANGLE := PI * 45.0 / 180.0
 ## Rays in the drawn cone's fan (the floor polygon follows where walls cut them).
 const CONE_RAYS := 24
 ## Physics layers that block sight (walls, partitions).
@@ -31,6 +38,8 @@ const EYE_ALARM := Color(0.85, 0.15, 0.12)
 signal spotted
 ## Emitted once when suspicion is full.
 signal caught
+## Emitted when an inspection (inspect) has run its INSPECT_TIME.
+signal inspected
 
 ## The patrol loop (room coordinates); the guard starts at its first point.
 @export var route: PackedVector2Array
@@ -42,6 +51,9 @@ var patrolling := true
 var active := true
 var facing := Vector2.RIGHT
 var suspicion := 0.0
+var inspecting := false
+var alarmed := false
+var _inspect_left := 0.0
 var _next := 0
 var _pause := 0.0
 
@@ -53,6 +65,7 @@ var _pause := 0.0
 func reset() -> void:
 	suspicion = 0.0
 	_pause = 0.0
+	inspecting = false
 	active = true
 	if route.size() < 2:
 		(get_node(GameState.AUTOLOAD_PATH) as GameState).report_error("Guard '%s' has a route of %d point(s) (%s); it needs at least 2 to patrol" % [get_path(), route.size(), route])
@@ -66,9 +79,28 @@ func reset() -> void:
 	queue_redraw()
 
 
+## Stops to look at `point` (room coordinates) for INSPECT_TIME, then emits inspected.
+func inspect(point: Vector2) -> void:
+	inspecting = true
+	_inspect_left = INSPECT_TIME
+	if not point.is_equal_approx(position):
+		facing = (point - position).normalized()
+	print("[Guard] %s inspects %s" % [name, point.round()])
+
+
+## From now until the room ends: faster, with a wider, red cone.
+func alarm() -> void:
+	alarmed = true
+	print("[Guard] %s raises the alarm" % name)
+
+
+func half_angle() -> float:
+	return ALARM_HALF_ANGLE if alarmed else CONE_HALF_ANGLE
+
+
 ## Whether the guard sees `point` (global): inside its cone and no wall in between.
 func can_see(point: Vector2) -> bool:
-	if not Detection.in_cone(global_position, facing, point, CONE_RANGE, CONE_HALF_ANGLE):
+	if not Detection.in_cone(global_position, facing, point, CONE_RANGE, half_angle()):
 		return false
 	var query := PhysicsRayQueryParameters2D.create(global_position, point, SIGHT_MASK)
 	return get_world_2d().direct_space_state.intersect_ray(query).is_empty()
@@ -77,7 +109,12 @@ func can_see(point: Vector2) -> bool:
 func _physics_process(delta: float) -> void:
 	if not active:
 		return
-	if patrolling:
+	if inspecting:
+		_inspect_left -= delta
+		if _inspect_left <= 0.0:
+			inspecting = false
+			inspected.emit()
+	elif patrolling:
 		_patrol(delta)
 	_look(delta)
 	_update_cone()
@@ -93,7 +130,7 @@ func _patrol(delta: float) -> void:
 	# A zero step (two identical waypoints) keeps the old facing: a zero facing would see all round.
 	if not position.is_equal_approx(goal):
 		facing = (goal - position).normalized()
-	position = position.move_toward(goal, PATROL_SPEED * delta)
+	position = position.move_toward(goal, (ALARM_SPEED if alarmed else PATROL_SPEED) * delta)
 	if position.is_equal_approx(goal):
 		position = goal
 		print("[Guard] %s reaches waypoint %d at %s" % [name, _next, goal.round()])
@@ -123,12 +160,12 @@ func _update_cone() -> void:
 	var space := get_world_2d().direct_space_state
 	var points := PackedVector2Array([Vector2.ZERO])
 	for i in CONE_RAYS + 1:
-		var angle := facing.angle() - CONE_HALF_ANGLE + 2.0 * CONE_HALF_ANGLE * i / CONE_RAYS
+		var angle := facing.angle() - half_angle() + 2.0 * half_angle() * i / CONE_RAYS
 		var end := global_position + Vector2.from_angle(angle) * CONE_RANGE
 		var hit := space.intersect_ray(PhysicsRayQueryParameters2D.create(global_position, end, SIGHT_MASK))
 		points.append(to_local(hit["position"] if not hit.is_empty() else end))
 	_cone.polygon = points
-	_cone.color = CONE_COLOR.lerp(CONE_ALERT_COLOR, suspicion)
+	_cone.color = CONE_ALERT_COLOR if alarmed else CONE_COLOR.lerp(CONE_ALERT_COLOR, suspicion)
 
 
 func _draw() -> void:
