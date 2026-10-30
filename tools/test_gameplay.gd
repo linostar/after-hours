@@ -75,6 +75,10 @@ func _tests() -> Array[Callable]:
 		_test_stars,
 		_test_room_tap_walks_around_partition,
 		_test_room_tap_on_wall_stops_at_floor,
+		_test_guard_patrols,
+		_test_guard_sees_and_tosses,
+		_test_guard_partition_blocks_sight,
+		_test_guard_ignores_behind,
 	]
 
 
@@ -256,6 +260,7 @@ func _test_room_tap_walks_around_partition() -> void:
 	var room := await _load_room()
 	if room == null:
 		return
+	room.guard.active = false
 	_check(_game.state == GameState.Flow.ROOM, name, "Game.state is %s, expected ROOM" % GameState.Flow.keys()[_game.state])
 	_check(room.mime.position == Room.ENTRANCE, name, "the mime starts at %s, not the entrance %s" % [room.mime.position, Room.ENTRANCE])
 	var target := Vector2(720, 330)
@@ -276,10 +281,91 @@ func _test_room_tap_on_wall_stops_at_floor() -> void:
 	var room := await _load_room()
 	if room == null:
 		return
+	room.guard.active = false
 	await _tap_at(Vector2(200, 60))
 	await _walk_trace(room.mime, 600)
 	_check(not room.mime.walking, name, "the mime was still walking after 600 frames")
 	_check(absf(room.mime.position.y - FLOOR_TOP) <= 6.0 and absf(room.mime.position.x - 200.0) <= 6.0, name, "the mime stopped at %s, expected about (200, %d)" % [room.mime.position, FLOOR_TOP])
+
+
+## Stands the room's guard still at `at`, facing `facing`, and puts the mime at `mime_at`.
+func _stage_guard(room: Room, at: Vector2, facing: Vector2, mime_at: Vector2) -> void:
+	room.guard.patrolling = false
+	room.guard.position = at
+	room.guard.facing = facing
+	room.mime.place_at(mime_at)
+
+
+## The guard walks its route's first leg, facing the way it walks.
+func _test_guard_patrols() -> void:
+	var name := "guard_patrols"
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.target = null
+	var start := room.guard.position
+	# _load_room waits 3 physics frames, which the guard spends walking.
+	_check(start.distance_to(room.guard.route[0]) <= 3.0 * Guard.PATROL_SPEED / 60.0 + 0.01, name, "the guard starts at %s, not at its route's first point %s" % [start, room.guard.route[0]])
+	for i in 60:
+		await physics_frame
+	var leg := (room.guard.route[1] - room.guard.route[0]).normalized()
+	var moved := room.guard.position - start
+	_check(moved.length() > 0.5 * Guard.PATROL_SPEED and is_equal_approx(moved.normalized().dot(leg), 1.0), name, "after 1 s the guard moved %s, not along its first leg %s" % [moved, leg])
+	_check(room.guard.facing.is_equal_approx(leg), name, "the guard faces %s while walking %s" % [room.guard.facing, leg])
+
+
+## Seen in the open, the mime is caught and tossed to the entrance; taps are ignored
+## during the toss; then the guard restarts its route and the timer has kept running.
+func _test_guard_sees_and_tosses() -> void:
+	var name := "guard_sees_and_tosses"
+	var room := await _load_room()
+	if room == null:
+		return
+	_stage_guard(room, Vector2(200, 460), Vector2.RIGHT, Vector2(300, 460))
+	var frames := 0
+	while not room.tossing and frames < 120:
+		await physics_frame
+		frames += 1
+	_check(room.tossing and room.catches == 1, name, "a mime 100 units ahead in the open was not caught within 2 s (suspicion %.2f)" % room.guard.suspicion)
+	_check(room.ever_seen, name, "the room did not record that the mime was seen")
+	_check(not room.guard.active, name, "the guard keeps looking during the toss")
+	var caught_at := room.elapsed
+	await _tap_at(Vector2(600, 480))
+	_check(not room.mime.walking, name, "a tap during the toss started a walk")
+	frames = 0
+	while room.tossing and frames < 180:
+		await physics_frame
+		frames += 1
+	_check(not room.tossing, name, "the toss did not end within 3 s")
+	_check(room.mime.position == Room.ENTRANCE and room.mime.rotation == 0.0, name, "after the toss the mime is at %s (rotation %f), not upright at the entrance" % [room.mime.position, room.mime.rotation])
+	_check(room.guard.active and room.guard.suspicion == 0.0 and room.guard.position == room.guard.route[0], name, "the guard was not reset to its route's start, calm")
+	_check(room.elapsed - caught_at >= Room.TOSS_SHAKE + Room.TOSS_FLIGHT - 0.05, name, "the timer stopped during the toss (%.2f s passed)" % (room.elapsed - caught_at))
+
+
+## The partition blocks sight: a mime behind it within range is never seen, while the
+## same distance across open floor is.
+func _test_guard_partition_blocks_sight() -> void:
+	var name := "guard_partition_blocks_sight"
+	var room := await _load_room()
+	if room == null:
+		return
+	_stage_guard(room, Vector2(390, 330), Vector2.RIGHT, Vector2(566, 330))
+	for i in 90:
+		await physics_frame
+	_check(room.guard.suspicion == 0.0 and not room.ever_seen, name, "the guard saw the mime through the partition (suspicion %.2f)" % room.guard.suspicion)
+	room.guard.position = Vector2(390, 470)
+	_check(room.guard.can_see(Vector2(566, 470)), name, "the guard cannot see the same distance across open floor (the control case)")
+
+
+func _test_guard_ignores_behind() -> void:
+	var name := "guard_ignores_behind"
+	var room := await _load_room()
+	if room == null:
+		return
+	_stage_guard(room, Vector2(300, 460), Vector2.RIGHT, Vector2(220, 460))
+	for i in 60:
+		await physics_frame
+	_check(room.guard.suspicion == 0.0 and not room.ever_seen, name, "the guard saw the mime behind it (suspicion %.2f)" % room.guard.suspicion)
 
 
 func _check(condition: bool, test_name: String, detail: String) -> void:

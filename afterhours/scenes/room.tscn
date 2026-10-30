@@ -1,8 +1,9 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/room.gd" id="1_room"]
 [ext_resource type="PackedScene" path="res://scenes/mime.tscn" id="2_mime"]
 [ext_resource type="Script" path="res://scripts/ui/floor_input.gd" id="3_floor"]
+[ext_resource type="PackedScene" path="res://scenes/guard.tscn" id="4_guard"]
 
 [sub_resource type="NavigationPolygon" id="NavigationPolygon_floor"]
 vertices = PackedVector2Array(40, 180, 920, 180, 920, 500, 40, 500, 392, 292, 568, 292, 568, 368, 392, 368)
@@ -12,20 +13,38 @@ polygons = [PackedInt32Array(0, 1, 5, 4), PackedInt32Array(1, 2, 6, 5), PackedIn
 script = ExtResource("1_room")
 
 [node name="BackWall" type="Polygon2D" parent="."]
+z_index = -10
 color = Color(0.29, 0.12, 0.16, 1)
 polygon = PackedVector2Array(0, 0, 960, 0, 960, 170, 0, 170)
 
 [node name="Wainscot" type="Polygon2D" parent="."]
+z_index = -10
 color = Color(0.2, 0.08, 0.11, 1)
 polygon = PackedVector2Array(0, 130, 960, 130, 960, 170, 0, 170)
 
 [node name="Floor" type="Polygon2D" parent="."]
+z_index = -10
 color = Color(0.36, 0.25, 0.17, 1)
 polygon = PackedVector2Array(0, 170, 960, 170, 960, 540, 0, 540)
 
 [node name="EntranceDoor" type="Polygon2D" parent="."]
+z_index = -10
 color = Color(0.12, 0.09, 0.1, 1)
 polygon = PackedVector2Array(0, 290, 24, 290, 24, 370, 0, 370)
+
+[node name="Walls" type="StaticBody2D" parent="."]
+
+[node name="Back" type="CollisionPolygon2D" parent="Walls"]
+polygon = PackedVector2Array(0, 150, 960, 150, 960, 172, 0, 172)
+
+[node name="Left" type="CollisionPolygon2D" parent="Walls"]
+polygon = PackedVector2Array(-20, 150, 2, 150, 2, 560, -20, 560)
+
+[node name="Right" type="CollisionPolygon2D" parent="Walls"]
+polygon = PackedVector2Array(958, 150, 980, 150, 980, 560, 958, 560)
+
+[node name="Front" type="CollisionPolygon2D" parent="Walls"]
+polygon = PackedVector2Array(-20, 538, 980, 538, 980, 560, -20, 560)
 
 [node name="Navigation" type="NavigationRegion2D" parent="."]
 navigation_polygon = SubResource("NavigationPolygon_floor")
@@ -48,6 +67,9 @@ color = Color(0.7, 0.66, 0.58, 1)
 polygon = PackedVector2Array(-80, -90, 80, -90, 80, 0, -80, 0)
 
 [node name="Mime" parent="Actors" instance=ExtResource("2_mime")]
+
+[node name="Guard" parent="Actors" instance=ExtResource("4_guard")]
+route = PackedVector2Array(300, 250, 660, 250, 660, 430, 300, 430)
 
 [node name="FloorInput" type="Control" parent="."]
 layout_mode = 3

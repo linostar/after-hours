@@ -1,0 +1,15 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/guard.gd" id="1_guard"]
+[ext_resource type="Texture2D" path="res://art/svg/guard.svg" id="2_sprite"]
+
+[node name="Guard" type="Node2D"]
+script = ExtResource("1_guard")
+
+[node name="Cone" type="Polygon2D" parent="."]
+z_index = -1
+color = Color(1, 0.92, 0.55, 0.18)
+
+[node name="Sprite" type="Sprite2D" parent="."]
+texture = ExtResource("2_sprite")
+offset = Vector2(0, -46)
