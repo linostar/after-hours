@@ -162,6 +162,7 @@ func _tests() -> Array[Callable]:
 		_test_gimmick_slows_and_ticks,
 		_test_gimmick_loud_floor,
 		_test_gimmick_clue_investigated,
+		_test_gimmick_mix_combines,
 		_test_unknown_painting_reports,
 	]
 
@@ -1931,6 +1932,40 @@ func _test_gimmick_clue_investigated() -> void:
 	gimmick.clue = Vector2(200, 450)
 	await physics_frame
 	_check(gimmick.clue == Vector2(200, 450), name, "a chasing guard was shown a clue")
+
+
+## GimmickMix applies all its parts: light and slowing multiply (any shade hides), the
+## loudest noise wins, the first part's clue is shown, and every part ticks and learns the
+## mime.
+func _test_gimmick_mix_combines() -> void:
+	var name := "gimmick_mix_combines"
+	var mix := GimmickMix.new()
+	var a := TestGimmick.new()
+	var b := TestGimmick.new()
+	mix.add_child(a)
+	mix.add_child(b)
+	root.add_child(mix)
+	a.light = 2.0
+	b.light = 0.5
+	a.slow = 0.5
+	b.slow = 0.8
+	a.noise = 0.3
+	b.noise = 0.9
+	_check(is_equal_approx(mix.light_at(Vector2.ZERO), 1.0) and is_equal_approx(mix.slow_at(Vector2.ZERO), 0.4) and is_equal_approx(mix.noise_at(Vector2.ZERO), 0.9), name, "mixed light %.2f, slow %.2f, noise %.2f (expected 1, 0.4, 0.9)" % [mix.light_at(Vector2.ZERO), mix.slow_at(Vector2.ZERO), mix.noise_at(Vector2.ZERO)])
+	b.light = 0.0
+	_check(mix.light_at(Vector2.ZERO) == 0.0, name, "one part's shade does not hide the mime")
+	b.clue = Vector2(7, 7)
+	_check(mix.clue_seen_by(null) == Vector2(7, 7), name, "the mix did not show its part's clue")
+	a.clue = Vector2(1, 1)
+	b.clue = Vector2(2, 2)
+	_check(mix.clue_seen_by(null) == Vector2(1, 1) and b.clue == Vector2(2, 2), name, "the mix did not show the first part's clue (only)")
+	var mime := (load("res://scenes/mime.tscn") as PackedScene).instantiate() as Mime
+	mix.mime = mime
+	mix.tick(0.1)
+	_check(a.ticks == 1 and b.ticks == 1 and a.mime == mime and b.mime == mime, name, "a tick did not reach every part with the mime")
+	mime.free()
+	mix.queue_free()
+	await process_frame
 
 
 ## A frame naming an unknown painting is reported and stays empty.
