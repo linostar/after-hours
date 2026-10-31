@@ -107,11 +107,17 @@ func _ready() -> void:
 	guard.inspected.connect(_on_inspected)
 	_floor.tapped.connect(_on_floor_tapped)
 	_keys.interacted.connect(_on_interacted)
-	for frame in $Frames.get_children():
-		_frames.append(frame as TiltFrame)
+	for child in $Frames.get_children():
+		if child is TiltFrame:
+			_frames.append(child)
+		else:
+			_game.report_error("Room '%s': Frames child '%s' is a %s, not a TiltFrame" % [scene_file_path, child.name, child.get_class()])
 	guard.frames = _frames
-	for portrait in $Portraits.get_children():
-		_portraits.append(portrait as HidingPortrait)
+	for child in $Portraits.get_children():
+		if child is HidingPortrait:
+			_portraits.append(child)
+		else:
+			_game.report_error("Room '%s': Portraits child '%s' is a %s, not a HidingPortrait" % [scene_file_path, child.name, child.get_class()])
 	_canvas.watcher = guard
 	_canvas.painted.connect(_on_painted)
 	if DebugOverlay.wanted():
@@ -248,6 +254,7 @@ func _hide_in(portrait: HidingPortrait) -> void:
 	hide_target = null
 	var seen := guard.active and guard.can_see(mime.global_position)
 	if seen:
+		ever_seen = true
 		guard.saw_hiding()
 	hidden_in = portrait
 	portrait.occupied = true

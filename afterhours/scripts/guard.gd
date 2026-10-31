@@ -16,8 +16,9 @@ extends Node2D
 ## - CHASE: from full suspicion, runs at the mime at CHASE_SPEED (to where it last saw it
 ##   while it cannot see it); within CATCH_REACH it emits caught and stops until the room
 ##   resets it. Out of sight for CHASE_MEMORY, it searches the last-seen spot. A hidden
-##   target (not visible) is never seen, unless the guard saw it hide (saw_hiding): then
-##   it chases to the hiding place and pulls it out.
+##   target (not visible) is never seen or caught, unless the guard saw it hide
+##   (saw_hiding): then it chases to the hiding place and pulls it out, until the target
+##   steps out again.
 ## It walks the room's navmesh (Agent). The cone is drawn on the floor (red while it
 ## chases or searches), the suspicion as an eye above its head that fills and reddens, and
 ## the intent as an icon above that (INTENT_ICONS; none while patrolling) that pops in
@@ -195,6 +196,8 @@ func _physics_process(delta: float) -> void:
 	if chosen != intent:
 		_leave(intent)
 		intent = chosen
+		if intent == GuardBrain.Intent.STRAIGHTEN:
+			_straighten_left = STRAIGHTEN_TIME
 		_show_intent()
 		print("[Guard] %s now %s" % [name, GuardBrain.Intent.keys()[intent]])
 	match intent:
@@ -275,7 +278,8 @@ func _patrol(delta: float) -> void:
 
 func _chase(delta: float) -> void:
 	_travel(last_seen, CHASE_SPEED, delta)
-	if target != null and global_position.distance_to(target.global_position) <= CATCH_REACH:
+	# A hidden target is caught only by a guard that saw it hide.
+	if target != null and (target.visible or _knows_hiding) and global_position.distance_to(target.global_position) <= CATCH_REACH:
 		active = false
 		print("[Guard] %s catches the mime at %s" % [name, target.global_position.round()])
 		caught.emit()
@@ -359,6 +363,9 @@ func _look(delta: float) -> void:
 	var before := suspicion
 	suspicion = Detection.suspicion_after(suspicion, seen, global_position.distance_to(target.global_position), CONE_RANGE, delta)
 	senses.suspicion = suspicion
+	if _knows_hiding and target.visible:
+		# Out of its hiding place again: the chase can lose it like any other.
+		_knows_hiding = false
 	if seen:
 		last_seen = target.global_position
 		senses.lost_sight_for = 0.0

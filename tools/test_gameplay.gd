@@ -92,6 +92,9 @@ func _tests() -> Array[Callable]:
 		_test_tilted_frame_seen_and_straightened,
 		_test_hide_unseen_and_step_out,
 		_test_guard_saw_hiding_pulls_out,
+		_test_guard_loses_mime_after_hiding,
+		_test_guard_ignores_unseen_hiding,
+		_test_investigate_without_frame,
 		_test_intent_icons_and_overlay,
 		_test_keyboard_walks_and_interacts,
 		_test_guard_pauses_facing_its_leg,
@@ -762,7 +765,13 @@ func _test_tilt_decoy_investigated() -> void:
 	_check(await _wait_until(func() -> bool: return room.guard.intent == GuardBrain.Intent.INVESTIGATE, 10), name, "the guard in earshot did not investigate (intent %s)" % _intent_name(room.guard.intent))
 	await _tap_at(frame.position)
 	_check(room.tilt_target == null, name, "a tilted frame became a tilt target")
-	_check(await _wait_until(func() -> bool: return not frame.tilted, 900), name, "the guard never straightened the frame (intent %s, at %s)" % [_intent_name(room.guard.intent), room.guard.position])
+	_check(await _wait_until(func() -> bool: return room.guard.intent == GuardBrain.Intent.STRAIGHTEN, 900), name, "the guard never went to straighten the frame (intent %s, at %s)" % [_intent_name(room.guard.intent), room.guard.position])
+	var straighten_frames := 0
+	while frame.tilted and straighten_frames < 600:
+		await physics_frame
+		straighten_frames += 1
+	_check(not frame.tilted, name, "the guard never straightened the frame (intent %s, at %s)" % [_intent_name(room.guard.intent), room.guard.position])
+	_check(straighten_frames >= roundi(Guard.STRAIGHTEN_TIME * 60.0) - 2, name, "the frame was straightened %d frames after STRAIGHTEN began, under STRAIGHTEN_TIME" % straighten_frames)
 	await physics_frame
 	_check(room.guard.intent == GuardBrain.Intent.PATROL, name, "after straightening the guard is %s, not patrolling" % _intent_name(room.guard.intent))
 	room.guard.position = Vector2(900, 500)
@@ -819,6 +828,7 @@ func _test_guard_saw_hiding_pulls_out() -> void:
 	await _tap_at(portrait.position)
 	_check(await _wait_until(func() -> bool: return room.hidden_in == portrait, 30), name, "the mime did not hide")
 	_check(room.guard.senses.chasing, name, "the guard that watched the mime hide did not give chase")
+	_check(room.ever_seen, name, "being seen going in did not cost the unseen star")
 	_check(await _wait_until(func() -> bool: return room.tossing, 240), name, "the guard never pulled the hidden mime out (intent %s, at %s)" % [_intent_name(room.guard.intent), room.guard.position])
 	await _wait_until(func() -> bool: return not room.tossing, 180)
 	_check(room.mime.visible and room.hidden_in == null and not portrait.occupied, name, "after the toss the mime is still hidden")
@@ -897,6 +907,57 @@ func _test_keyboard_walks_and_interacts() -> void:
 	await _key(KEY_E, true)
 	await _key(KEY_E, false)
 	_check(room.hidden_in == null and room.mime.visible, name, "E while hidden did not step the mime out")
+
+
+## A guard that saw the mime hide loses it like any other once it steps out and gets away
+## unseen: it searches the hiding place instead of chasing forever.
+func _test_guard_loses_mime_after_hiding() -> void:
+	var name := "guard_loses_mime_after_hiding"
+	var room := await _load_room()
+	if room == null:
+		return
+	var portrait := room.get_node("Portraits/PortraitA") as HidingPortrait
+	_stage_guard(room, portrait.spot() + Vector2(110, 0), Vector2.LEFT, portrait.spot())
+	await _tap_at(portrait.position)
+	_check(await _wait_until(func() -> bool: return room.hidden_in == portrait, 30) and room.guard.senses.chasing, name, "the guard did not see the mime hide")
+	# Out again and behind the partition, out of the guard's sight.
+	room._step_out()
+	room.mime.place_at(Vector2(480, 380))
+	var searching := await _wait_until(func() -> bool: return room.guard.intent == GuardBrain.Intent.SEARCH, ceili(GuardBrain.CHASE_MEMORY * 60.0) + 120)
+	_check(searching and not room.tossing, name, "after the mime stepped out unseen the guard is %s (tossing %s), not searching" % [_intent_name(room.guard.intent), room.tossing])
+
+
+## A chasing guard that did not see the mime hide passes the portrait it hides in: no
+## catch, and it gives up into a search.
+func _test_guard_ignores_unseen_hiding() -> void:
+	var name := "guard_ignores_unseen_hiding"
+	var room := await _load_room()
+	if room == null:
+		return
+	var portrait := room.get_node("Portraits/PortraitA") as HidingPortrait
+	_stage_guard(room, portrait.spot() + Vector2(150, 0), Vector2.RIGHT, portrait.spot())
+	await _tap_at(portrait.position)
+	_check(await _wait_until(func() -> bool: return room.hidden_in == portrait, 30) and not room.guard.senses.chasing, name, "the mime did not hide unseen")
+	room.guard.senses.chasing = true
+	room.guard.senses.lost_sight_for = 0.0
+	room.guard.last_seen = portrait.spot()
+	var searching := await _wait_until(func() -> bool: return room.guard.intent == GuardBrain.Intent.SEARCH, ceili(GuardBrain.CHASE_MEMORY * 60.0) + 60)
+	_check(searching and not room.tossing and room.hidden_in == portrait, name, "a guard that never saw the mime hide caught it (tossing %s, intent %s)" % [room.tossing, _intent_name(room.guard.intent)])
+
+
+## A noise with nothing to straighten there: the guard walks to it, looks, and goes back
+## to patrolling.
+func _test_investigate_without_frame() -> void:
+	var name := "investigate_without_frame"
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.target = null
+	_stage_guard(room, Vector2(660, 430), Vector2.LEFT, Room.ENTRANCE)
+	room.guard.hear(Vector2(450, 200))
+	_check(await _wait_until(func() -> bool: return room.guard.intent == GuardBrain.Intent.INVESTIGATE, 10), name, "the guard did not investigate the noise")
+	var done := await _wait_until(func() -> bool: return room.guard.intent == GuardBrain.Intent.PATROL, 600)
+	_check(done and not room.guard.senses.noise_heard and room.guard.position.distance_to(Vector2(450, 200)) < 10.0, name, "the guard did not reach the noise and go back to patrolling (intent %s, at %s)" % [_intent_name(room.guard.intent), room.guard.position])
 
 
 ## Taps the centre of `control`, as a finger would.
