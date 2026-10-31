@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Validation gate: asset import, project check (No Text, public-domain scan credits,
 # touch-first and landscape rules + strict script compile) and its violation fixtures,
-# headless gameplay tests, headless run of the main scene. Exits non-zero on the first failure and points at
+# scan fetcher self-test, headless gameplay tests, headless run of the main scene. Exits non-zero on the first failure and points at
 # the log that explains it. Every Godot call is killed after GODOT_TIMEOUT seconds.
 # Env: GODOT (Godot binary), GODOT_TIMEOUT (default 300), RUN_FRAMES (headless run length, default 120).
 set -euo pipefail
@@ -14,7 +14,7 @@ mkdir -p "$LOG_DIR"
 
 fail() {
   echo "FAIL $1 (log: $2)" >&2
-  grep -E "ERROR|WARNING|check_project|test_gameplay|run_main|import_cache" "$2" >&2 || true
+  grep -E "ERROR|WARNING|check_project|test_gameplay|run_main|import_cache|scans" "$2" >&2 || true
   exit 1
 }
 
@@ -62,6 +62,11 @@ CACHE_MISS="Cannot open file 'res://\.godot/imported/|Unable to open file: res:/
 # not stale), and that rule's self-test on made-up projects.
 if ! python3 tools/import_cache.py --self-test >"$LOG_DIR/import_cache.log" 2>&1 || ! grep -q "^import_cache: OK" "$LOG_DIR/import_cache.log"; then
   fail "import cache check self-test" "$LOG_DIR/import_cache.log"
+fi
+# The scan fetcher's rules (pinning, mismatch, crop, downscale, non-images refused) on local
+# images; skipped without Pillow.
+if ! python3 -I tools/scans.py --self-test >"$LOG_DIR/scans.log" 2>&1 || ! grep -qE "^scans: (OK|self-test skipped)" "$LOG_DIR/scans.log"; then
+  fail "scans self-test" "$LOG_DIR/scans.log"
 fi
 cache_state="$(python3 tools/import_cache.py afterhours 2>>"$LOG_DIR/import_cache.log")" || fail "import cache check" "$LOG_DIR/import_cache.log"
 if [ "$cache_state" != "fresh" ]; then
@@ -111,7 +116,7 @@ for fixture in tools/check_fixtures/*/; do
   fixtures=$((fixtures + 1))
 done
 run_script test_gameplay "$LOG_DIR/test.log" --fixed-fps 60
-summary="$(grep "^import_cache: OK" "$LOG_DIR/import_cache.log"); $(grep "^check_project: OK" "$LOG_DIR/check.log"); check fixtures: $fixtures; $(grep "^test_gameplay: OK" "$LOG_DIR/test.log")"
+summary="$(grep "^import_cache: OK" "$LOG_DIR/import_cache.log"); $(grep -E "^scans: (OK|self-test skipped)" "$LOG_DIR/scans.log"); $(grep "^check_project: OK" "$LOG_DIR/check.log"); check fixtures: $fixtures; $(grep "^test_gameplay: OK" "$LOG_DIR/test.log")"
 # The main scene (the title) runs 120 frames (2 s at 60 fixed fps) by default; run_main
 # requires the flow state to match the running scene.
 RUN_FRAMES="${RUN_FRAMES:-120}" run_script run_main "$LOG_DIR/run.log" --fixed-fps 60
