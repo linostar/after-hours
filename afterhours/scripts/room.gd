@@ -13,7 +13,10 @@ extends Node2D
 ## earshot hears (Guard.hear). A tap on a tall portrait (a HidingPortrait under
 ## Portraits) walks the mime there and it steps in, out of every guard's sight (a guard
 ## who sees it step in chases it there and pulls it out); the next tap steps it out and
-## goes on as that tap. Carrying the original, the exit door
+## goes on as that tap. The keyboard (KeyboardInput) walks the mime directly (cancelling
+## any of the above, stepping out of a portrait) and E acts as a tap on the nearest thing
+## within INTERACT_REACH it can use (easel, masterpiece, straight frame, portrait; E while
+## hidden steps out). Carrying the original, the exit door
 ## glows, and the fake hangs in the original's place: the guard watches it (FAKE_VIEW_POINT,
 ## the floor at its foot) and inspects it once per pass, a "?" over the painting while it
 ## does; a fake found out (Forgery.is_noticed) turns the "?" into "!" for good, and the guard
@@ -44,6 +47,8 @@ const ALARM_ICON := preload("res://art/svg/icon_alarm.svg")
 ## How close to SWAP_SPOT (or EASEL_SPOT) counts as standing there.
 const SWAP_REACH := 8.0
 const SWAP_TIME := 1.5
+## How close (to where it would stand) the mime must be for E to use something.
+const INTERACT_REACH := 70.0
 ## The exit (in front of the right-wall door) and how close counts as leaving.
 const EXIT := Vector2(925, 330)
 const EXIT_REACH := 24.0
@@ -82,6 +87,7 @@ var stars: Array[bool] = []
 @onready var mime: Mime = $Actors/Mime
 @onready var guard: Guard = $Actors/Guard
 @onready var _floor: FloorInput = $FloorInput
+@onready var _keys: KeyboardInput = $KeyboardInput
 @onready var _exit_glow: Polygon2D = $ExitGlow
 @onready var _easel_glow: Polygon2D = $EaselGlow
 @onready var _canvas: ForgeryCanvas = $EaselLayer/ForgeryCanvas
@@ -100,6 +106,7 @@ func _ready() -> void:
 	guard.caught.connect(_on_caught)
 	guard.inspected.connect(_on_inspected)
 	_floor.tapped.connect(_on_floor_tapped)
+	_keys.interacted.connect(_on_interacted)
 	for frame in $Frames.get_children():
 		_frames.append(frame as TiltFrame)
 	guard.frames = _frames
@@ -129,6 +136,15 @@ func _physics_process(delta: float) -> void:
 	if finished or _game.is_transitioning():
 		return
 	elapsed += delta
+	var walk := _keys.direction()
+	if walk != Vector2.ZERO and _accepts_input():
+		if hidden_in != null:
+			_step_out()
+		_cancel_swap()
+		paint_intent = false
+		tilt_target = null
+		hide_target = null
+		mime.nudge(walk, delta)
 	if paint_intent and not tossing and not mime.walking and mime.position.distance_to(EASEL_SPOT) <= SWAP_REACH:
 		paint_intent = false
 		_canvas.open()
@@ -180,6 +196,45 @@ func _on_floor_tapped(at: Vector2) -> void:
 		mime.walk_to(SWAP_SPOT)
 		return
 	mime.walk_to(at)
+
+
+## Whether the player can act in the room now (not tossed, painting or finished).
+func _accepts_input() -> bool:
+	return not tossing and not finished and not _canvas.visible
+
+
+## E: steps out of a portrait, or taps the nearest usable thing within INTERACT_REACH of
+## where the mime would stand for it.
+func _on_interacted() -> void:
+	if not _accepts_input():
+		return
+	if hidden_in != null:
+		_step_out()
+		return
+	var best_tap := Vector2.INF
+	var best_distance := INTERACT_REACH
+	for usable: Array[Vector2] in _usables():
+		var distance := mime.position.distance_to(usable[0])
+		if distance <= best_distance:
+			best_distance = distance
+			best_tap = usable[1]
+	if best_tap != Vector2.INF:
+		_on_floor_tapped(best_tap)
+
+
+## What the mime can use now, each as [where it stands, where a tap means it].
+func _usables() -> Array[Array]:
+	var usables: Array[Array] = []
+	if not mime.carrying:
+		usables.append([EASEL_SPOT, EASEL_RECT.get_center()] as Array[Vector2])
+	if mime.has_fake:
+		usables.append([SWAP_SPOT, PAINTING_RECT.get_center()] as Array[Vector2])
+	for frame in _frames:
+		if not frame.tilted:
+			usables.append([frame.spot(), frame.position] as Array[Vector2])
+	for portrait in _portraits:
+		usables.append([portrait.spot(), portrait.position] as Array[Vector2])
+	return usables
 
 
 func _cancel_swap() -> void:

@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="Script" path="res://scripts/room.gd" id="1_room"]
 [ext_resource type="PackedScene" path="res://scenes/mime.tscn" id="2_mime"]
@@ -10,6 +10,7 @@
 [ext_resource type="Texture2D" path="res://art/svg/easel.svg" id="8_easel"]
 [ext_resource type="PackedScene" path="res://scenes/tilt_frame.tscn" id="9_frame"]
 [ext_resource type="PackedScene" path="res://scenes/hiding_portrait.tscn" id="10_portrait"]
+[ext_resource type="Script" path="res://scripts/ui/keyboard_input.gd" id="11_keys"]
 
 [sub_resource type="NavigationPolygon" id="NavigationPolygon_floor"]
 vertices = PackedVector2Array(40, 180, 920, 180, 920, 500, 40, 500, 392, 292, 568, 292, 568, 368, 392, 368)
@@ -130,6 +131,9 @@ anchors_preset = 0
 offset_right = 960.0
 offset_bottom = 540.0
 script = ExtResource("3_floor")
+
+[node name="KeyboardInput" type="Node" parent="."]
+script = ExtResource("11_keys")
 
 [node name="EaselLayer" type="CanvasLayer" parent="."]
 layer = 5

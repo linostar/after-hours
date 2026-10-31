@@ -93,6 +93,7 @@ func _tests() -> Array[Callable]:
 		_test_hide_unseen_and_step_out,
 		_test_guard_saw_hiding_pulls_out,
 		_test_intent_icons_and_overlay,
+		_test_keyboard_walks_and_interacts,
 		_test_guard_pauses_facing_its_leg,
 		_test_catches_during_swap_and_while_carrying,
 		_test_title_play_starts_room,
@@ -514,7 +515,11 @@ func _load_room() -> Room:
 		return null
 	for i in 3:
 		await physics_frame
-	return current_scene as Room
+	var room := current_scene as Room
+	var map := room.get_world_2d().navigation_map
+	if not await _wait_until(func() -> bool: return NavigationServer2D.map_get_closest_point_owner(map, room.mime.position).is_valid(), 60):
+		_check(false, "load_room", "the room's navigation map never synced")
+	return room
 
 
 ## A pressed then released touch at `at` (canvas base units), as a finger would.
@@ -839,6 +844,59 @@ func _test_intent_icons_and_overlay() -> void:
 	_check(room.guard.nav_path().size() > 1 and overlay.guards == [room.guard], name, "the overlay has no guard path to draw")
 	await process_frame
 	_check(_game.errors.is_empty(), name, "drawing the overlay reported errors: %s" % [_game.errors])
+
+
+## A physical key pressed or released, as a keyboard would.
+func _key(keycode: Key, pressed: bool) -> void:
+	var key := InputEventKey.new()
+	key.physical_keycode = keycode
+	key.pressed = pressed
+	Input.parse_input_event(key)
+	await process_frame
+
+
+## The arrows walk the mime at SPEED; W walks it up but never off the navmesh; E opens the
+## easel's canvas next to it, hides it in a portrait next to it, and steps it out again.
+func _test_keyboard_walks_and_interacts() -> void:
+	var name := "keyboard_walks_and_interacts"
+	# A key held from the room's first frame, before the map holds its navmesh (queries
+	# answer (0, 0) then), leaves the mime where it is.
+	change_scene_to_file(ROOM_PATH)
+	await process_frame
+	await process_frame
+	var early := current_scene as Room
+	early.mime.nudge(Vector2.RIGHT, 1.0 / 60.0)
+	_check(early.mime.position == Room.ENTRANCE, name, "a nudge before the navmesh was in moved the mime to %s" % early.mime.position)
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.active = false
+	var from := room.mime.position
+	Input.action_press("ui_right")
+	for i in 30:
+		await physics_frame
+	Input.action_release("ui_right")
+	var moved := room.mime.position - from
+	_check(absf(moved.x - Mime.SPEED * 0.5) < 4.0 and absf(moved.y) < 0.5, name, "holding right for 0.5 s moved the mime %s, not %.0f right" % [moved, Mime.SPEED * 0.5])
+	await _key(KEY_W, true)
+	for i in 120:
+		await physics_frame
+	await _key(KEY_W, false)
+	_check(room.mime.position.y < from.y - 100.0 and room.mime.position.y >= FLOOR_TOP - 0.5, name, "holding W left the mime at %s (expected well up, but on the floor)" % room.mime.position)
+	var canvas := room.get_node("EaselLayer/ForgeryCanvas") as ForgeryCanvas
+	room.mime.place_at(Room.EASEL_SPOT + Vector2(40, 0))
+	await _key(KEY_E, true)
+	await _key(KEY_E, false)
+	_check(await _wait_until(func() -> bool: return canvas.visible, 120), name, "E beside the easel did not open the canvas")
+	canvas.close()
+	var portrait := room.get_node("Portraits/PortraitA") as HidingPortrait
+	room.mime.place_at(portrait.spot() + Vector2(40, 0))
+	await _key(KEY_E, true)
+	await _key(KEY_E, false)
+	_check(await _wait_until(func() -> bool: return room.hidden_in == portrait, 120), name, "E beside the portrait did not hide the mime in it")
+	await _key(KEY_E, true)
+	await _key(KEY_E, false)
+	_check(room.hidden_in == null and room.mime.visible, name, "E while hidden did not step the mime out")
 
 
 ## Taps the centre of `control`, as a finger would.

@@ -51,6 +51,20 @@ func walk_to(point: Vector2) -> void:
 	print("[Mime] Walking from %s to %s" % [position.round(), point.round()])
 
 
+## Steps along `direction` (length at most 1) for `delta` seconds at SPEED, kept on the
+## navmesh so it slides along walls (keyboard walking); a path walk stops. Until the
+## map holds the room's navmesh (no region owns a closest point; its queries answer
+## (0, 0) then) it stays put.
+func nudge(direction: Vector2, delta: float) -> void:
+	walking = false
+	var map := _agent.get_navigation_map()
+	var step := position + direction * SPEED * delta
+	if not NavigationServer2D.map_get_closest_point_owner(map, step).is_valid():
+		return
+	position = NavigationServer2D.map_get_closest_point(map, step)
+	_agent.target_position = position
+
+
 ## Stops at once and stands at `point` (a reset, a toss).
 func place_at(point: Vector2) -> void:
 	position = point
