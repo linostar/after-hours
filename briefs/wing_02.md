@@ -1,0 +1,27 @@
+# Wing 2 brief: The Great Wave off Kanagawa (Hokusai)
+
+## Constraints
+- Two rooms; 3 to 6 minutes; every star reachable (bot-proved).
+- New idea: time. The player waits for the right moment instead of finding a hidden path.
+- Gimmick: the tide. The sea floods the front of each room and draws back in a steady
+  rhythm; on wet floor the mime wades at 55% speed and every step splashes loudly enough
+  for the nearest guard to come and look. Guards wade unhindered.
+- Two guards in the gallery: the first two-guard room.
+
+## Layout
+- Room 0, the print room (Hokusai's paper walls, an indigo wainscot): the easel stands by
+  the back wall on the right, behind a partition; one guard walks the waterline along the
+  front. The tide floods to y 360 every 10 s. The exit, low on the left wall, is in the
+  surf: leaving means timing the tide or splashing.
+- Room 1, the gallery: The Great Wave hangs in the middle. One guard walks the back row
+  under the painting; another loops the flooded front between two partitions. The tide
+  reaches y 300 at its height, so a hurried swap at high tide wades.
+
+## Intended route
+Round the partition to the easel; paint while the front guard walks away; through the right
+door; wait for the back-row guard to pass the painting, then swap; back through the left
+door; out by the lower door when the tide has drawn back.
+
+## Bot result
+`tools/bot.gd --record`: 31 plays; the swap waits 1.75 s for the back-row guard, the way
+out 4.75 s for the tide and the front guard; the run takes 25.6 s, par 70 s.
