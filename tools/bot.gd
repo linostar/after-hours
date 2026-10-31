@@ -14,16 +14,20 @@ extends SceneTree
 ##   fails unless it escapes unseen within par_time; prints "bot: OK (N wings)".
 ## --record: searches bot_waits leg by leg (each wait from 0 to MAX_WAIT in WAIT_STEP,
 ##   the first that gets the leg through unseen), then writes them, par_time (the bot's
-##   time times PAR_FACTOR, up to the next PAR_ROUND seconds) and the ghost replay
+##   time plus PAINT_ALLOWANCE per ghost stroke, times PAR_FACTOR, up to the next
+##   PAR_ROUND seconds) and the ghost replay
 ##   (data/ghosts/<wing file name>.ghost.json, or beside a wing outside data/wings: the
 ##   mime's room, position and hiding every TRAIL_GAP frames) for the wing.
 
 const TOUCH_INDEX := 7
 const BASE_WINDOW := Vector2i(960, 540)
 const WAIT_STEP := 0.25
-const MAX_WAIT := 8.0
+const MAX_WAIT := 16.0
 const LEG_TIMEOUT := 30.0
 const PAR_FACTOR := 1.25
+## Seconds a person takes per ghost stroke beyond the bot's instant tracing, added to the
+## bot's time before PAR_FACTOR.
+const PAINT_ALLOWANCE := 4.0
 const PAR_ROUND := 5.0
 const TRAIL_GAP := 6
 const GHOSTS_DIR := "res://data/ghosts/"
@@ -150,7 +154,7 @@ func _record(path: String) -> bool:
 		print("bot: %s: leg %d (%s) waits %.2f s" % [path, leg, _leg_name(wing, leg), waits[leg]])
 	var best := await _play(wing, waits, wing.bot_route.size())
 	wing.bot_waits = waits
-	wing.par_time = ceilf(best.time * PAR_FACTOR / PAR_ROUND) * PAR_ROUND
+	wing.par_time = ceilf((best.time + PAINT_ALLOWANCE * wing.ghosts.size()) * PAR_FACTOR / PAR_ROUND) * PAR_ROUND
 	var error := ResourceSaver.save(wing, path)
 	if error != OK:
 		printerr("bot: FAILED: cannot save %s: %s" % [path, error_string(error)])

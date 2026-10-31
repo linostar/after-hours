@@ -1,0 +1,48 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/room_base.tscn" id="base"]
+[ext_resource type="PackedScene" path="res://scenes/tilt_frame.tscn" id="frame"]
+[ext_resource type="PackedScene" path="res://scenes/hiding_portrait.tscn" id="portrait"]
+[ext_resource type="PackedScene" path="res://scenes/easel.tscn" id="easel"]
+[ext_resource type="PackedScene" path="res://scenes/door.tscn" id="door"]
+
+[node name="Room" instance=ExtResource("base")]
+
+[node name="Entrance" parent="."]
+position = Vector2(70, 330)
+
+[node name="BackWall" parent="."]
+color = Color(0.22, 0.25, 0.3, 1)
+
+[node name="Wainscot" parent="."]
+color = Color(0.15, 0.17, 0.21, 1)
+
+[node name="Floor" parent="."]
+color = Color(0.42, 0.36, 0.28, 1)
+
+[node name="DoorArt0" type="Polygon2D" parent="."]
+z_index = -10
+color = Color(0.12, 0.09, 0.1, 1)
+polygon = PackedVector2Array(0, 290, 24, 290, 24, 370, 0, 370)
+
+[node name="FrameA" parent="Frames" instance=ExtResource("frame")]
+position = Vector2(450, 75)
+painting = "great_wave"
+
+[node name="PortraitA" parent="Portraits" instance=ExtResource("portrait")]
+position = Vector2(640, 105)
+painting = "mona_lisa"
+face = Vector2(0, -24)
+
+[node name="Easel" parent="Actors" instance=ExtResource("easel")]
+position = Vector2(300, 420)
+
+[node name="ToGallery" parent="Doors" instance=ExtResource("door")]
+position = Vector2(925, 330)
+to_room = 1
+
+[node name="Exit" parent="Doors" instance=ExtResource("door")]
+position = Vector2(45, 470)
+to_room = -1
+opening = Rect2(-45, -40, 24, 80)
+arrival = Vector2(60, 0)

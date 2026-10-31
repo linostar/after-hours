@@ -149,6 +149,7 @@ func _tests() -> Array[Callable]:
 		_test_room_layout_optional_and_checked,
 		_test_navmesh_baked_around_partitions,
 		_test_content_validates_wings,
+		_test_wings_are_complete,
 		_test_wing_doors_carry_the_run,
 		_test_gimmick_shade_and_light,
 		_test_gimmick_slows_and_ticks,
@@ -1262,7 +1263,7 @@ func _wait_until(done: Callable, max_frames: int) -> bool:
 	return done.call()
 
 
-## The title's play button fades to the room; a second goto during the fade is ignored.
+## Play on the title starts wing 1 in its first room; a goto during the fade is ignored.
 func _test_title_play_starts_room() -> void:
 	var name := "title_play_starts_room"
 	change_scene_to_file(TITLE_PATH)
@@ -1274,8 +1275,12 @@ func _test_title_play_starts_room() -> void:
 	_check(_game.is_transitioning(), name, "tapping play did not start a screen change")
 	_game.goto(GameState.Flow.TITLE)
 	var arrived := await _wait_until(func() -> bool: return not _game.is_transitioning(), 120)
-	_check(arrived and current_scene != null and current_scene.scene_file_path == ROOM_PATH, name, "the room is not running after the fade (a goto during it was not ignored?)")
+	var first := (load(Content.WINGS[0]) as WingData).rooms[0]
+	_check(arrived and current_scene != null and current_scene.scene_file_path == first, name, "wing 1's first room is not running after the fade (a goto during it was not ignored?)")
 	_check(_game.state == GameState.Flow.ROOM, name, "Game.state is %s, expected ROOM" % GameState.Flow.keys()[_game.state])
+	_check(_game.run != null and _game.run.wing.resource_path == Content.WINGS[0], name, "play did not start a run of wing 1")
+	_game.run = null
+	_game.scene_paths[GameState.Flow.ROOM] = ROOM_PATH
 
 
 func _test_goto_missing_scene_reports() -> void:
@@ -1711,6 +1716,42 @@ func _test_content_validates_wings() -> void:
 	var problems: Array[String] = []
 	_check(Content.load_wing("res://data/wings/missing.tres", problems) == null and problems.size() == 1, name, "a missing wing file loaded or was not reported: %s" % [problems])
 	_check(Content.validate(null, "x.tres") == (["x.tres: is not a WingData"] as Array[String]), name, "a missing WingData was not reported")
+
+
+## Every wing in Content.WINGS validates, and its rooms make a whole wing: each room loads
+## as a Room, every door leads to one of the wing's rooms and has a door back, and the wing
+## has exactly one easel, one masterpiece and one exit.
+func _test_wings_are_complete() -> void:
+	var name := "wings_are_complete"
+	_check(not Content.WINGS.is_empty(), name, "Content lists no wings")
+	for path in Content.WINGS:
+		var problems: Array[String] = []
+		var wing := Content.load_wing(path, problems)
+		_check(wing != null, name, "%s does not validate: %s" % [path, problems])
+		if wing == null:
+			continue
+		var easels := 0
+		var masterpieces := 0
+		var exits := 0
+		var links: Array[Vector2i] = []
+		for i in wing.rooms.size():
+			var room := (load(wing.rooms[i]) as PackedScene).instantiate() as Room
+			_check(room != null, name, "%s room %d (%s) is not a Room" % [path, i, wing.rooms[i]])
+			if room == null:
+				continue
+			easels += 1 if room.has_node("Actors/Easel") else 0
+			masterpieces += 1 if room.has_node("Masterpiece") else 0
+			for door in room.get_node("Doors").get_children():
+				var to := (door as Door).to_room
+				if to == Door.EXIT:
+					exits += 1
+				else:
+					_check(to >= 0 and to < wing.rooms.size() and to != i, name, "%s room %d's door %s leads to room %d" % [path, i, door.name, to])
+					links.append(Vector2i(i, to))
+			room.free()
+		for link in links:
+			_check(Vector2i(link.y, link.x) in links, name, "%s: room %d leads to room %d, which has no door back" % [path, link.x, link.y])
+		_check(easels == 1 and masterpieces == 1 and exits == 1, name, "%s has %d easel(s), %d masterpiece(s) and %d exit(s), not one each" % [path, easels, masterpieces, exits])
 
 
 ## A valid two-room wing on the test halls (scenes/test): the easel and the exit in hall A,
