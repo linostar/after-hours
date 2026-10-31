@@ -9,6 +9,8 @@ const WINGS: Array[String] = []
 ## The forgery canvas's paper size, in canvas units (scenes/forgery_canvas.tscn's Pad):
 ## every ghost point must lie on it, edges included.
 const CANVAS := Vector2(320, 240)
+## The base screen: every bot tap lies on it.
+const BASE := Vector2(960, 540)
 
 
 ## What is wrong with `wing`, loaded from `path` (one line per problem; empty when valid).
@@ -36,6 +38,12 @@ static func validate(wing: WingData, path: String) -> Array[String]:
 			if point.x < 0.0 or point.y < 0.0 or point.x > CANVAS.x or point.y > CANVAS.y:
 				problems.append("%s: ghosts[%d] point %s is off the canvas %s" % [path, i, point, CANVAS])
 				break
+	if wing.bot_route.is_empty():
+		problems.append("%s: bot_route is empty" % path)
+	for point in wing.bot_route:
+		if point.x < 0.0 or point.y < 0.0 or point.x > BASE.x or point.y > BASE.y:
+			problems.append("%s: bot_route tap %s is off the %s screen" % [path, point, BASE])
+			break
 	return problems
 
 

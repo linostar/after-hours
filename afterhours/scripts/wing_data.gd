@@ -12,3 +12,7 @@ extends Resource
 @export var par_time := 120.0
 ## The forgery's ghost strokes, in canvas units (ForgeryCanvas.ghosts).
 @export var ghosts: Array[PackedVector2Array] = []
+## The playtest bot's taps (tools/bot.gd; base units), in order, and the seconds it waits
+## before each (found by bot.gd --record, which also sets par_time).
+@export var bot_route: PackedVector2Array = PackedVector2Array()
+@export var bot_waits: PackedFloat32Array = PackedFloat32Array()

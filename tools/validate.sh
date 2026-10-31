@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Validation gate: asset import, project check (No Text, public-domain scan credits,
 # touch-first and landscape rules + strict script compile) and its violation fixtures,
-# scan fetcher self-test, headless gameplay tests, headless run of the main scene. Exits non-zero on the first failure and points at
+# scan fetcher self-test, headless gameplay tests, the playtest bot's replays, headless run of the main scene. Exits non-zero on the first failure and points at
 # the log that explains it. Every Godot call is killed after GODOT_TIMEOUT seconds.
 # Env: GODOT (Godot binary), GODOT_TIMEOUT (default 300), RUN_FRAMES (headless run length, default 120).
 set -euo pipefail
@@ -14,7 +14,7 @@ mkdir -p "$LOG_DIR"
 
 fail() {
   echo "FAIL $1 (log: $2)" >&2
-  grep -E "ERROR|WARNING|check_project|test_gameplay|run_main|import_cache|scans" "$2" >&2 || true
+  grep -E "ERROR|WARNING|check_project|test_gameplay|run_main|import_cache|scans|bot" "$2" >&2 || true
   exit 1
 }
 
@@ -116,7 +116,14 @@ for fixture in tools/check_fixtures/*/; do
   fixtures=$((fixtures + 1))
 done
 run_script test_gameplay "$LOG_DIR/test.log" --fixed-fps 60
-summary="$(grep "^import_cache: OK" "$LOG_DIR/import_cache.log"); $(grep -E "^scans: (OK|self-test skipped)" "$LOG_DIR/scans.log"); $(grep "^check_project: OK" "$LOG_DIR/check.log"); check fixtures: $fixtures; $(grep "^test_gameplay: OK" "$LOG_DIR/test.log")"
+# The playtest bot replays every wing's recorded run (tools/bot.gd; and the slice fixture
+# wing's, which keeps the bot itself honest): each must escape unseen within its par time.
+bot_status=0
+godot "$LOG_DIR/bot.log" --headless --path afterhours --fixed-fps 60 --script "$PWD/tools/bot.gd" -- --wing res://scenes/test/slice_wing.tres || bot_status=$?
+if [ "$bot_status" -ne 0 ] || ! grep -q "^bot: OK" "$LOG_DIR/bot.log" || grep -qE "ERROR|WARNING" "$LOG_DIR/bot.log"; then
+  fail "bot (status $bot_status)" "$LOG_DIR/bot.log"
+fi
+summary="$(grep "^import_cache: OK" "$LOG_DIR/import_cache.log"); $(grep -E "^scans: (OK|self-test skipped)" "$LOG_DIR/scans.log"); $(grep "^check_project: OK" "$LOG_DIR/check.log"); check fixtures: $fixtures; $(grep "^test_gameplay: OK" "$LOG_DIR/test.log"); $(grep "^bot: OK" "$LOG_DIR/bot.log")"
 # The main scene (the title) runs 120 frames (2 s at 60 fixed fps) by default; run_main
 # requires the flow state to match the running scene.
 RUN_FRAMES="${RUN_FRAMES:-120}" run_script run_main "$LOG_DIR/run.log" --fixed-fps 60

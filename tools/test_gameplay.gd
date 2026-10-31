@@ -1697,6 +1697,8 @@ func _test_content_validates_wings() -> void:
 		"ghosts is empty": func(w: WingData) -> void: w.ghosts = [],
 		"ghosts[0] has no points": func(w: WingData) -> void: w.ghosts = [PackedVector2Array()],
 		"off the canvas": func(w: WingData) -> void: w.ghosts = [PackedVector2Array([Vector2(321, 10)])],
+		"bot_route is empty": func(w: WingData) -> void: w.bot_route = PackedVector2Array(),
+		"off the (960": func(w: WingData) -> void: w.bot_route = PackedVector2Array([Vector2(10, 541)]),
 	}
 	for field in cases:
 		var wing := _test_wing()
@@ -1719,6 +1721,7 @@ func _test_wing() -> WingData:
 	wing.rooms = ["res://scenes/test/hall_a.tscn", "res://scenes/test/hall_b.tscn"]
 	wing.par_time = 60.0
 	wing.ghosts = [PackedVector2Array([Vector2(160, 120)])]
+	wing.bot_route = PackedVector2Array([Vector2(182, 315)])
 	return wing
 
 
