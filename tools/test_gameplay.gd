@@ -124,6 +124,7 @@ func _tests() -> Array[Callable]:
 		_test_room_timer_waits_for_fade,
 		_test_mime_carrying_before_ready,
 		_test_room_paintings_framed,
+		_test_room_layout_optional_and_checked,
 		_test_unknown_painting_reports,
 	]
 
@@ -620,7 +621,7 @@ func _test_room_tap_walks_around_partition() -> void:
 		return
 	room.guard.active = false
 	_check(_game.state == GameState.Flow.ROOM, name, "Game.state is %s, expected ROOM" % GameState.Flow.keys()[_game.state])
-	_check(room.mime.position == Room.ENTRANCE, name, "the mime starts at %s, not the entrance %s" % [room.mime.position, Room.ENTRANCE])
+	_check(room.mime.position == room.entrance, name, "the mime starts at %s, not the entrance %s" % [room.mime.position, room.entrance])
 	var target := Vector2(720, 330)
 	await _tap_at(target)
 	_check(room.mime.walking, name, "a floor tap did not start a walk")
@@ -695,7 +696,7 @@ func _test_guard_sees_and_tosses() -> void:
 		await physics_frame
 		frames += 1
 	_check(not room.tossing, name, "the toss did not end within 3 s")
-	_check(room.mime.position == Room.ENTRANCE and room.mime.rotation == 0.0, name, "after the toss the mime is at %s (rotation %f), not upright at the entrance" % [room.mime.position, room.mime.rotation])
+	_check(room.mime.position == room.entrance and room.mime.rotation == 0.0, name, "after the toss the mime is at %s (rotation %f), not upright at the entrance" % [room.mime.position, room.mime.rotation])
 	_check(room.guard.active and room.guard.suspicion == 0.0 and room.guard.position == room.guard.route[0], name, "the guard was not reset to its route's start, calm")
 	_check(room.elapsed - caught_at >= Room.TOSS_SHAKE + Room.TOSS_FLIGHT - 0.05, name, "the timer stopped during the toss (%.2f s passed)" % (room.elapsed - caught_at))
 
@@ -744,9 +745,9 @@ func _test_catches_during_swap_and_while_carrying() -> void:
 		return
 	room.guard.active = false
 	room._on_painted(Forgery.ASSIST_QUALITY)
-	await _tap_at(Room.PAINTING_RECT.get_center())
+	await _tap_at(room.painting_rect().get_center())
 	await _wait_until(func() -> bool: return room.mime.swap_progress > 0.3, 900)
-	await _tap_at(Room.PAINTING_RECT.get_center())
+	await _tap_at(room.painting_rect().get_center())
 	_check(room.mime.swap_progress > 0.3 and room.swap_intent, name, "a second tap on the painting restarted the swap")
 	room.guard.active = true
 	_stage_guard(room, room.mime.position + Vector2(-80, 0), Vector2.RIGHT, room.mime.position)
@@ -754,7 +755,7 @@ func _test_catches_during_swap_and_while_carrying() -> void:
 	_check(room.tossing and room.mime.swap_progress == 0.0 and not room.swap_intent, name, "a catch mid-swap did not cancel it")
 	await _wait_until(func() -> bool: return not room.tossing, 180)
 	room.guard.active = false
-	room.mime.place_at(Room.SWAP_SPOT)
+	room.mime.place_at(room.swap_spot())
 	room._on_painted(Forgery.ASSIST_QUALITY)
 	room.swap_intent = true
 	await _wait_until(func() -> bool: return room.mime.carrying, 180)
@@ -762,7 +763,7 @@ func _test_catches_during_swap_and_while_carrying() -> void:
 	_stage_guard(room, Vector2(700, 330), Vector2.RIGHT, Vector2(780, 330))
 	await _wait_until(func() -> bool: return room.tossing, 120)
 	await _wait_until(func() -> bool: return not room.tossing, 180)
-	_check(room.mime.carrying and (room.get_node("ExitGlow") as Polygon2D).visible, name, "a catch while carrying took the original away")
+	_check(room.mime.carrying and room.exit_door.glowing, name, "a catch while carrying took the original away")
 	room.guard.active = false
 	await _tap_at(Vector2(950, 330))
 	var escaped := await _wait_until(func() -> bool: return room.finished, 900)
@@ -821,7 +822,7 @@ func _test_tilt_decoy_investigated() -> void:
 	if room == null:
 		return
 	room.guard.target = null
-	_stage_guard(room, Vector2(660, 430), Vector2.LEFT, Room.ENTRANCE)
+	_stage_guard(room, Vector2(660, 430), Vector2.LEFT, room.entrance)
 	var frame := room.get_node("Frames/FrameB") as TiltFrame
 	await _tap_at(frame.position)
 	_check(room.tilt_target == frame, name, "a tap on the frame did not make it the tilt target")
@@ -856,7 +857,7 @@ func _test_decoy_pulls_nearest_guard() -> void:
 		each.target = null
 	_stand(near, Vector2(660, 430), Vector2.DOWN)
 	_stand(far, Vector2(300, 430), Vector2.DOWN)
-	room.mime.place_at(Room.ENTRANCE)
+	room.mime.place_at(room.entrance)
 	var frame := room.get_node("Frames/FrameB") as TiltFrame
 	await _tap_at(frame.position)
 	_check(await _wait_until(func() -> bool: return frame.tilted, 600), name, "the mime never tilted the frame")
@@ -934,7 +935,7 @@ func _test_tilted_frame_seen_and_straightened() -> void:
 	room.guard.target = null
 	var frame := room.get_node("Frames/FrameA") as TiltFrame
 	frame.tilt()
-	_stage_guard(room, Vector2(frame.position.x, 260), Vector2.UP, Room.ENTRANCE)
+	_stage_guard(room, Vector2(frame.position.x, 260), Vector2.UP, room.entrance)
 	_check(await _wait_until(func() -> bool: return room.guard.intent == GuardBrain.Intent.STRAIGHTEN, 10), name, "a guard facing a tilted frame did not go to straighten it (intent %s)" % _intent_name(room.guard.intent))
 	var straightened := await _wait_until(func() -> bool: return not frame.tilted, ceili(Guard.STRAIGHTEN_TIME * 60.0) + 120)
 	_check(straightened and not room.guard.senses.tilted_frame_known, name, "the seen frame was not straightened")
@@ -947,7 +948,7 @@ func _test_hide_unseen_and_step_out() -> void:
 	var room := await _load_room()
 	if room == null:
 		return
-	_stage_guard(room, Vector2(500, 430), Vector2.RIGHT, Room.ENTRANCE)
+	_stage_guard(room, Vector2(500, 430), Vector2.RIGHT, room.entrance)
 	var portrait := room.get_node("Portraits/PortraitA") as HidingPortrait
 	await _tap_at(portrait.position)
 	var hid := await _wait_until(func() -> bool: return room.hidden_in == portrait, 600)
@@ -989,7 +990,7 @@ func _test_hide_unknown_painting_reports() -> void:
 	var room := await _load_room()
 	if room == null:
 		return
-	_stage_guard(room, Vector2(500, 430), Vector2.RIGHT, Room.ENTRANCE)
+	_stage_guard(room, Vector2(500, 430), Vector2.RIGHT, room.entrance)
 	var portrait := room.get_node("Portraits/PortraitA") as HidingPortrait
 	var errors_before := _game.errors.size()
 	_game.quiet_errors = true
@@ -1064,7 +1065,7 @@ func _test_keyboard_walks_and_interacts() -> void:
 	await process_frame
 	var early := current_scene as Room
 	early.mime.nudge(Vector2.RIGHT, 1.0 / 60.0)
-	_check(early.mime.position == Room.ENTRANCE, name, "a nudge before the navmesh was in moved the mime to %s" % early.mime.position)
+	_check(early.mime.position == early.entrance, name, "a nudge before the navmesh was in moved the mime to %s" % early.mime.position)
 	var room := await _load_room()
 	if room == null:
 		return
@@ -1082,7 +1083,7 @@ func _test_keyboard_walks_and_interacts() -> void:
 	await _key(KEY_W, false)
 	_check(room.mime.position.y < from.y - 100.0 and room.mime.position.y >= FLOOR_TOP - 0.5, name, "holding W left the mime at %s (expected well up, but on the floor)" % room.mime.position)
 	var canvas := room.get_node("EaselLayer/ForgeryCanvas") as ForgeryCanvas
-	room.mime.place_at(Room.EASEL_SPOT + Vector2(40, 0))
+	room.mime.place_at(room.easel.spot() + Vector2(40, 0))
 	await _key(KEY_E, true)
 	await _key(KEY_E, false)
 	_check(await _wait_until(func() -> bool: return canvas.visible, 120), name, "E beside the easel did not open the canvas")
@@ -1141,7 +1142,7 @@ func _test_investigate_without_frame() -> void:
 	if room == null:
 		return
 	room.guard.target = null
-	_stage_guard(room, Vector2(660, 430), Vector2.LEFT, Room.ENTRANCE)
+	_stage_guard(room, Vector2(660, 430), Vector2.LEFT, room.entrance)
 	room.guard.hear(Vector2(450, 200))
 	_check(await _wait_until(func() -> bool: return room.guard.intent == GuardBrain.Intent.INVESTIGATE, 10), name, "the guard did not investigate the noise")
 	var done := await _wait_until(func() -> bool: return room.guard.intent == GuardBrain.Intent.PATROL, 600)
@@ -1157,7 +1158,7 @@ func _test_close_noise_straighten_takes_time() -> void:
 		return
 	room.guard.target = null
 	var frame := room.get_node("Frames/FrameB") as TiltFrame
-	_stage_guard(room, frame.view_point() + Vector2(0, 150), Vector2.DOWN, Room.ENTRANCE)
+	_stage_guard(room, frame.view_point() + Vector2(0, 150), Vector2.DOWN, room.entrance)
 	frame.tilt()
 	room.guard.hear(frame.view_point())
 	_check(await _wait_until(func() -> bool: return room.guard.intent == GuardBrain.Intent.INVESTIGATE, 10), name, "a close noise did not start an investigation (intent %s)" % _intent_name(room.guard.intent))
@@ -1201,7 +1202,7 @@ func _test_off_mesh_noise_and_chase_repath() -> void:
 	if room == null:
 		return
 	room.guard.target = null
-	_stage_guard(room, Vector2(450, 260), Vector2.UP, Room.ENTRANCE)
+	_stage_guard(room, Vector2(450, 260), Vector2.UP, room.entrance)
 	room.guard.hear(Vector2(450, 100))
 	var done := await _wait_until(func() -> bool: return room.guard.intent == GuardBrain.Intent.PATROL and not room.guard.senses.noise_heard, 300)
 	_check(done and room.guard.position.y < 190.0, name, "a noise on the wall was not investigated at the wall's foot and ended (intent %s, at %s)" % [_intent_name(room.guard.intent), room.guard.position])
@@ -1273,11 +1274,11 @@ func _test_room_swap_and_escape() -> void:
 		return
 	room.guard.active = false
 	room._on_painted(Forgery.ASSIST_QUALITY)
-	await _tap_at(Room.PAINTING_RECT.get_center())
+	await _tap_at(room.painting_rect().get_center())
 	_check(room.swap_intent, name, "a tap on the masterpiece did not mean swap")
 	var swapped := await _wait_until(func() -> bool: return room.mime.carrying, 900)
 	_check(swapped, name, "the mime never swapped the painting (at %s, progress %.2f)" % [room.mime.position, room.mime.swap_progress])
-	_check((room.get_node("ExitGlow") as Polygon2D).visible, name, "the exit door does not glow while carrying the original")
+	_check(room.exit_door.glowing, name, "the exit door does not glow while carrying the original")
 	await _tap_at(Vector2(950, 330))
 	var escaped := await _wait_until(func() -> bool: return room.finished, 900)
 	_check(escaped, name, "the mime never escaped (at %s)" % room.mime.position)
@@ -1304,13 +1305,13 @@ func _test_room_swap_cancel_and_locked_exit() -> void:
 		return
 	room.guard.active = false
 	room._on_painted(Forgery.ASSIST_QUALITY)
-	await _tap_at(Room.PAINTING_RECT.get_center())
+	await _tap_at(room.painting_rect().get_center())
 	var swapping := await _wait_until(func() -> bool: return room.mime.swap_progress > 0.3, 900)
 	_check(swapping, name, "the swap never got going")
 	await _tap_at(Vector2(950, 330))
 	_check(room.mime.swap_progress == 0.0 and not room.swap_intent, name, "tapping away did not cancel the swap")
 	await _walk_trace(room.mime, 900)
-	_check(room.mime.position.distance_to(Room.EXIT) <= Room.EXIT_REACH, name, "the mime did not reach the exit (at %s)" % room.mime.position)
+	_check(room.mime.position.distance_to(room.exit_door.position) <= Door.REACH, name, "the mime did not reach the exit (at %s)" % room.mime.position)
 	for i in 10:
 		await physics_frame
 	_check(not room.finished and not room.mime.carrying, name, "the exit ended the wing without the original")
@@ -1319,7 +1320,7 @@ func _test_room_swap_cancel_and_locked_exit() -> void:
 ## Taps the easel and waits (at most 600 frames) for the canvas to open; returns it.
 func _open_easel(room: Room) -> ForgeryCanvas:
 	var canvas := room.get_node("EaselLayer/ForgeryCanvas") as ForgeryCanvas
-	await _tap_at(Room.EASEL_RECT.get_center())
+	await _tap_at(room.easel.rect().get_center())
 	await _wait_until(func() -> bool: return canvas.visible, 600)
 	return canvas
 
@@ -1339,12 +1340,12 @@ func _test_room_easel_paints_fake() -> void:
 	if room == null:
 		return
 	room.guard.active = false
-	var glow := room.get_node("EaselGlow") as Polygon2D
+	var glow := room.easel.get_node("Glow") as Polygon2D
 	_check(glow.visible and not room.mime.has_fake, name, "the easel does not glow at the start, or the mime starts with a fake")
-	await _tap_at(Room.PAINTING_RECT.get_center())
+	await _tap_at(room.painting_rect().get_center())
 	_check(not room.swap_intent, name, "a tap on the masterpiece without a fake meant swap")
 	var canvas := await _open_easel(room)
-	_check(canvas.visible and room.mime.position.distance_to(Room.EASEL_SPOT) <= Room.SWAP_REACH, name, "tapping the easel did not open the canvas with the mime at the easel (at %s)" % room.mime.position)
+	_check(canvas.visible and room.mime.position.distance_to(room.easel.spot()) <= Room.SWAP_REACH, name, "tapping the easel did not open the canvas with the mime at the easel (at %s)" % room.mime.position)
 	await _tap_at(Vector2(100, 480))
 	_check(not room.mime.walking, name, "a tap beside the open canvas walked the mime")
 	await _trace_rest(canvas)
@@ -1353,10 +1354,10 @@ func _test_room_easel_paints_fake() -> void:
 	_check(Forgery.grade(room.fake_quality) == Forgery.Grade.PERFECT, name, "an exact trace of the room's painting graded %s (%.2f)" % [Forgery.Grade.keys()[Forgery.grade(room.fake_quality)], room.fake_quality])
 	var carried := room.mime.get_node("Carried") as FramedPainting
 	_check(carried.visible and carried.modulate == Mime.FAKE_TINT, name, "the carried fake does not show, tinted")
-	await _tap_at(Room.PAINTING_RECT.get_center())
+	await _tap_at(room.painting_rect().get_center())
 	_check(await _wait_until(func() -> bool: return room.mime.carrying, 900), name, "the fake never swapped for the original")
 	_check(not room.mime.has_fake and carried.modulate == Color.WHITE, name, "after the swap the mime still has the fake, or the original shows tinted")
-	await _tap_at(Room.EASEL_RECT.get_center())
+	await _tap_at(room.easel.rect().get_center())
 	_check(not room.paint_intent, name, "carrying the original, a tap on the easel meant paint")
 
 
@@ -1425,7 +1426,7 @@ func _test_sloppy_fake_starts_search() -> void:
 	await physics_frame
 	await physics_frame
 	var cone := room.guard.get_node("Cone") as Polygon2D
-	_check(room.guard.intent == GuardBrain.Intent.SEARCH and room.guard.search_point == Room.FAKE_VIEW_POINT, name, "after a found-out fake the guard is %s around %s, not searching the fake" % [_intent_name(room.guard.intent), room.guard.search_point])
+	_check(room.guard.intent == GuardBrain.Intent.SEARCH and room.guard.search_point == room.fake_view_point(), name, "after a found-out fake the guard is %s around %s, not searching the fake" % [_intent_name(room.guard.intent), room.guard.search_point])
 	_check(cone.color == Guard.CONE_ALERT_COLOR, name, "the searching guard's cone is not red")
 	var gave_up := await _wait_until(func() -> bool: return room.guard.intent == GuardBrain.Intent.PATROL, ceili(Guard.SEARCH_TIME * 60.0) + 240)
 	_check(gave_up, name, "the search never ended (intent %s)" % _intent_name(room.guard.intent))
@@ -1482,8 +1483,8 @@ func _test_canvas_leaves_approach_visible() -> void:
 	var route := room.guard.route
 	var guard_height := 110.0
 	var watched: Dictionary[String, Rect2] = {
-		"the easel": Room.EASEL_RECT,
-		"the painting mime": Rect2(Room.EASEL_SPOT - Vector2(30, 100), Vector2(60, 104)),
+		"the easel": room.easel.rect(),
+		"the painting mime": Rect2(room.easel.spot() - Vector2(30, 100), Vector2(60, 104)),
 		"the guard's left leg": Rect2(route[0].x - 24, route[0].y - guard_height, 48, route[3].y - route[0].y + guard_height),
 		"the guard's bottom leg": Rect2(route[3].x - 24, route[3].y - guard_height, route[2].x - route[3].x + 48, guard_height),
 	}
@@ -1601,6 +1602,43 @@ func _test_room_paintings_framed() -> void:
 	var reference := room.get_node("EaselLayer/ForgeryCanvas/Reference") as TextureRect
 	var reference_style := reference.material as ShaderMaterial
 	_check(reference.texture == Paintings.SCANS[&"starry_night"] and reference_style != null and reference_style.shader == Paintings.STYLES[&"starry_night"], name, "the forgery canvas does not show the masterpiece in its style")
+
+
+## A room's layout comes from its nodes: one without an easel, a masterpiece or an exit
+## still plays (a tap where they would be walks the mime there; nothing is usable), and a
+## child of the wrong type under Frames, Portraits or Doors is reported.
+func _test_room_layout_optional_and_checked() -> void:
+	var name := "room_layout_optional_and_checked"
+	var room := (load(ROOM_PATH) as PackedScene).instantiate() as Room
+	for path: String in ["Actors/Easel", "Masterpiece", "Doors/Exit"]:
+		room.get_node(path).free()
+	for parent: String in ["Frames", "Portraits", "Doors"]:
+		var stray := Node2D.new()
+		stray.name = "Stray"
+		room.get_node(parent).add_child(stray)
+	var errors_before := _game.errors.size()
+	_game.quiet_errors = true
+	var old := current_scene
+	root.add_child(room)
+	current_scene = room
+	if old != null:
+		old.queue_free()
+	_game.quiet_errors = false
+	var reported := _game.errors.slice(errors_before)
+	for kind: String in ["not a TiltFrame", "not a HidingPortrait", "not a Door"]:
+		_check(reported.any(func(e: String) -> bool: return kind in e and "Stray" in e), name, "a stray child (%s) was not reported (errors: %s)" % [kind, reported])
+	_game.errors.resize(errors_before)
+	(_game.get_node("ErrorLayer/ErrorBadge") as TextureRect).visible = false
+	_check(room.easel == null and room.masterpiece == null and room.exit_door == null, name, "a room without them still has an easel, masterpiece or exit")
+	_check(room.painting_rect() == Rect2() and room.swap_spot() == Vector2.INF, name, "a room without a masterpiece has somewhere to swap")
+	var map := room.get_world_2d().navigation_map
+	await _wait_until(func() -> bool: return NavigationServer2D.map_get_closest_point_owner(map, room.mime.position).is_valid(), 60)
+	room.guard.active = false
+	room._on_floor_tapped(Vector2(182, 330))
+	_check(room.mime.walking and not room.paint_intent, name, "a tap where an easel would be did not just walk the mime")
+	room.mime.place_at(Vector2(230, 372))
+	room._on_interacted()
+	_check(not room.paint_intent and not room.swap_intent, name, "E found something to use in an empty room")
 
 
 ## A frame naming an unknown painting is reported and stays empty.

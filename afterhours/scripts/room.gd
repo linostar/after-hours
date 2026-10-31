@@ -1,64 +1,57 @@
 class_name Room
 extends Node2D
-## The vertical slice's gallery room, seen 3/4 top-down: the back wall across the top, a
-## parquet floor, a freestanding display partition the mime walks around (its navmesh
-## leaves the partition's footprint out) and the guards cannot see through. A tap on the
-## floor walks the mime there. A tap on the glowing easel (EASEL_RECT) walks it to
-## EASEL_SPOT, where the forgery canvas opens over the still-running room; a painted fake
-## puts the glow out (tapping the easel again repaints it). With a fake, a tap on the
-## masterpiece (PAINTING_RECT) walks the mime to SWAP_SPOT below it, where standing still
-## for SWAP_TIME swaps the fake for the original (tapping elsewhere cancels the swap); a
-## tap there without one is a tap on the floor. A tap on a straight small frame (a
-## TiltFrame under Frames) walks the mime under it and tilts it: a noise the nearest guard
-## in earshot hears (Guard.hear) and walks over to. A tap on a tall portrait (a HidingPortrait under
-## Portraits) walks the mime there and it steps in, out of every guard's sight (a guard
-## who sees it step in chases it there and pulls it out); the next tap steps it out and
-## goes on as that tap. The keyboard (KeyboardInput) walks the mime directly (cancelling
-## any of the above, stepping out of a portrait) and E acts as a tap on the nearest thing
-## within INTERACT_REACH it can use (easel, masterpiece, straight frame, portrait; E while
-## hidden steps out). Carrying the original, the exit door
-## glows, and the fake hangs in the original's place: every guard watches it (FAKE_VIEW_POINT,
-## the floor at its foot) and inspects it once per pass, a "?" over the painting while one
-## does; a fake found out (Forgery.is_noticed; inspections count across the guards) turns the
-## "?" into "!" for good, and the guard who found it out searches around it. Reaching EXIT ends the wing: the stars (Stars, against PAR_TIME) show in the
-## results overlay. A guard that chases the mime down (Guard) shakes it and tosses it back
-## through the entrance (TOSS_SHAKE, then TOSS_FLIGHT along an arc TOSS_HEIGHT high),
-## closing the canvas if it was painting (its finished strokes are kept); taps are ignored
-## meanwhile, then every guard starts its route again (a mime carrying the fake or the
-## original keeps it: only the guards reset). The guards are the Guard children of Actors. The timer (elapsed) keeps running through
-## it all, but not while a screen change fades (the player cannot act then); ever_seen
-## records whether any guard ever spotted the mime.
+## A gallery room, seen 3/4 top-down. scenes/room_base.tscn holds what every room shares;
+## each room scene inherits it and adds its walls, navmesh, partitions (the mime walks
+## around them, guards cannot see through them), guards (the Guard children of Actors),
+## frames, portraits, doors and, optionally, the Easel and the Masterpiece. The mime starts
+## at the Entrance marker. A tap on the floor walks the mime there. A tap on the glowing
+## easel (Easel.rect) walks it to Easel.spot, where the forgery canvas opens over the
+## still-running room; a painted fake puts the glow out (tapping the easel again repaints
+## it). With a fake, a tap on the masterpiece (painting_rect) walks the mime to swap_spot
+## below it, where standing still for SWAP_TIME swaps the fake for the original (tapping
+## elsewhere cancels the swap); a tap there without one is a tap on the floor. A tap on a
+## straight small frame (a TiltFrame under Frames) walks the mime under it and tilts it: a
+## noise the nearest guard in earshot hears (Guard.hear) and walks over to. A tap on a tall
+## portrait (a HidingPortrait under Portraits) walks the mime there and it steps in, out of
+## every guard's sight (a guard who sees it step in chases it there and pulls it out); the
+## next tap steps it out and goes on as that tap. The keyboard (KeyboardInput) walks the
+## mime directly (cancelling any of the above, stepping out of a portrait) and E acts as a
+## tap on the nearest thing within INTERACT_REACH it can use (easel, masterpiece, straight
+## frame, portrait; E while hidden steps out). Carrying the original, the exit (the Door
+## under Doors whose to_room is Door.EXIT) glows, and the fake hangs in the original's
+## place: every guard watches it (fake_view_point, the floor at its foot) and inspects it
+## once per pass, a "?" over the painting while one does; a fake found out
+## (Forgery.is_noticed; inspections count across the guards) turns the "?" into "!" for
+## good, and the guard who found it out searches around it. Reaching the exit ends the
+## wing: the stars (Stars, against par_time) show in the results overlay. A guard that
+## chases the mime down (Guard) shakes it and tosses it back to the entrance (TOSS_SHAKE,
+## then TOSS_FLIGHT along an arc TOSS_HEIGHT high), closing the canvas if it was painting
+## (its finished strokes are kept); taps are ignored meanwhile, then every guard starts its
+## route again (a mime carrying the fake or the original keeps it: only the guards reset).
+## The timer (elapsed) keeps running through it all, but not while a screen change fades
+## (the player cannot act then); ever_seen records whether any guard ever spotted the mime.
 
-## Where the mime enters the room (the door in the left wall), in room coordinates.
-const ENTRANCE := Vector2(70, 330)
-## The masterpiece on the back wall (where a tap means "swap"), and where the mime stands
-## to swap it.
-const PAINTING_RECT := Rect2(720, 30, 120, 90)
-const SWAP_SPOT := Vector2(780, 235)
-## The easel (the forgery kit, by the left wall, where the guard's cone sweeps past at the
-## end of its bottom leg), and where the mime stands to paint.
-const EASEL_RECT := Rect2(147, 260, 70, 110)
-const EASEL_SPOT := Vector2(230, 372)
-## Where a guard looks to inspect the hung fake: the floor at the painting's foot (sight
-## rays to the painting itself would hit the back wall).
-const FAKE_VIEW_POINT := Vector2(780, 180)
+## Where the mime stands to swap the masterpiece (below it), and where a guard looks to
+## inspect the hung fake: the floor at the painting's foot (sight rays to the painting
+## itself would hit the back wall).
+const SWAP_Y := 235.0
+const FAKE_VIEW_Y := 180.0
 const QUERY_ICON := preload("res://art/svg/icon_query.svg")
 const ALARM_ICON := preload("res://art/svg/icon_alarm.svg")
-## How close to SWAP_SPOT (or EASEL_SPOT) counts as standing there.
+## How close to the swap spot (or the easel's, a frame's or a portrait's) counts as
+## standing there.
 const SWAP_REACH := 8.0
 const SWAP_TIME := 1.5
 ## How close (to where it would stand) the mime must be for E to use something.
 const INTERACT_REACH := 70.0
-## The exit (in front of the right-wall door) and how close counts as leaving.
-const EXIT := Vector2(925, 330)
-const EXIT_REACH := 24.0
-## The par time for the third star, in seconds.
-const PAR_TIME := 45.0
 const TOSS_SHAKE := 0.45
 const TOSS_FLIGHT := 0.8
 const TOSS_HEIGHT := 120.0
 ## The mime's wobble while the guard shakes it (radians either way).
 const SHAKE_ANGLE := 0.3
+
+## The par time for the third star, in seconds.
+@export var par_time := 45.0
 
 ## Seconds since the room started (the wing timer: a toss does not stop it).
 var elapsed := 0.0
@@ -83,6 +76,14 @@ var inspections := 0
 var found_out := false
 var finished := false
 var stars: Array[bool] = []
+## The layout, read from the room's nodes: where the mime starts (Entrance), the forgery
+## kit and the masterpiece (null in a room without them), and the doors (Doors), the exit
+## among them (null in a room without one).
+var entrance := Vector2.ZERO
+var easel: Easel
+var masterpiece: FramedPainting
+var doors: Array[Door] = []
+var exit_door: Door
 
 @onready var mime: Mime = $Actors/Mime
 ## The room's guards (the Guard children of Actors), and the first of them.
@@ -90,11 +91,8 @@ var guards: Array[Guard] = []
 var guard: Guard
 @onready var _floor: FloorInput = $FloorInput
 @onready var _keys: KeyboardInput = $KeyboardInput
-@onready var _exit_glow: Polygon2D = $ExitGlow
-@onready var _easel_glow: Polygon2D = $EaselGlow
 @onready var _canvas: ForgeryCanvas = $EaselLayer/ForgeryCanvas
 @onready var _fake_icon: Sprite2D = $FakeIcon
-@onready var _masterpiece: FramedPainting = $Masterpiece
 ## The view from inside a portrait: the room through that painting's style, in its frame.
 @onready var _style_view: Control = $StyleLayer/StyleView
 var _frames: Array[TiltFrame] = []
@@ -104,9 +102,21 @@ var _portraits: Array[HidingPortrait] = []
 
 
 func _ready() -> void:
-	mime.place_at(ENTRANCE)
-	mime.painting = _masterpiece.painting
-	_canvas.painting = _masterpiece.painting
+	entrance = ($Entrance as Node2D).position
+	easel = get_node_or_null("Actors/Easel") as Easel
+	masterpiece = get_node_or_null("Masterpiece") as FramedPainting
+	for child in $Doors.get_children():
+		if child is Door:
+			doors.append(child)
+			if child.to_room == Door.EXIT and exit_door == null:
+				exit_door = child
+		else:
+			_game.report_error("Room '%s': Doors child '%s' is a %s, not a Door" % [scene_file_path, child.name, child.get_class()])
+	mime.place_at(entrance)
+	if masterpiece != null:
+		mime.painting = masterpiece.painting
+		_canvas.painting = masterpiece.painting
+		_fake_icon.position = masterpiece.position
 	for child in $Actors.get_children():
 		if child is Guard:
 			guards.append(child)
@@ -136,8 +146,25 @@ func _ready() -> void:
 	if DebugOverlay.wanted():
 		add_debug_overlay()
 	_game.arrive(GameState.Flow.ROOM)
-	print("[Room] Masterpiece at %s, exit at %s" % [PAINTING_RECT, EXIT])
-	print("[Room] Easel at %s" % EASEL_RECT)
+	if masterpiece != null and exit_door != null:
+		print("[Room] Masterpiece at %s, exit at %s" % [painting_rect(), exit_door.position])
+	if easel != null:
+		print("[Room] Easel at %s" % easel.rect())
+
+
+## Where a tap means the masterpiece (an empty rect in a room without one).
+func painting_rect() -> Rect2:
+	if masterpiece == null:
+		return Rect2()
+	return Rect2(masterpiece.position - masterpiece.size / 2.0, masterpiece.size)
+
+
+func swap_spot() -> Vector2:
+	return Vector2(masterpiece.position.x, SWAP_Y) if masterpiece != null else Vector2.INF
+
+
+func fake_view_point() -> Vector2:
+	return Vector2(masterpiece.position.x, FAKE_VIEW_Y) if masterpiece != null else Vector2.INF
 
 
 ## Adds the dev-only guard debug overlay (DebugOverlay) above the room.
@@ -164,7 +191,7 @@ func _physics_process(delta: float) -> void:
 		tilt_target = null
 		hide_target = null
 		mime.nudge(walk, delta)
-	if paint_intent and not tossing and not mime.walking and mime.position.distance_to(EASEL_SPOT) <= SWAP_REACH:
+	if paint_intent and not tossing and not mime.walking and mime.position.distance_to(easel.spot()) <= SWAP_REACH:
 		paint_intent = false
 		_canvas.open()
 	if tilt_target != null and not tossing and not mime.walking and mime.position.distance_to(tilt_target.spot()) <= SWAP_REACH:
@@ -173,11 +200,11 @@ func _physics_process(delta: float) -> void:
 		_hide_in(hide_target)
 	if fake_hung and not found_out:
 		_fake_icon.visible = guards.any(func(each: Guard) -> bool: return each.inspecting)
-	if swap_intent and not tossing and not mime.walking and mime.position.distance_to(SWAP_SPOT) <= SWAP_REACH:
+	if swap_intent and not tossing and not mime.walking and mime.position.distance_to(swap_spot()) <= SWAP_REACH:
 		mime.swap_progress = minf(mime.swap_progress + delta / SWAP_TIME, 1.0)
 		if mime.swap_progress >= 1.0:
 			_swap()
-	if mime.carrying and not tossing and mime.position.distance_to(EXIT) <= EXIT_REACH:
+	if mime.carrying and not tossing and exit_door != null and mime.position.distance_to(exit_door.position) <= Door.REACH:
 		_escape()
 
 
@@ -188,7 +215,7 @@ func _on_floor_tapped(at: Vector2) -> void:
 		if hidden_in.rect().has_point(at):
 			return
 		_step_out()
-	var on_painting := PAINTING_RECT.has_point(at) and mime.has_fake
+	var on_painting := painting_rect().has_point(at) and mime.has_fake
 	if on_painting and swap_intent:
 		# Already heading there or swapping: a second tap keeps the progress.
 		return
@@ -206,13 +233,13 @@ func _on_floor_tapped(at: Vector2) -> void:
 			tilt_target = frame
 			mime.walk_to(frame.spot())
 			return
-	if EASEL_RECT.has_point(at) and not mime.carrying:
+	if easel != null and easel.rect().has_point(at) and not mime.carrying:
 		paint_intent = true
-		mime.walk_to(EASEL_SPOT)
+		mime.walk_to(easel.spot())
 		return
 	if on_painting:
 		swap_intent = true
-		mime.walk_to(SWAP_SPOT)
+		mime.walk_to(swap_spot())
 		return
 	mime.walk_to(at)
 
@@ -244,10 +271,10 @@ func _on_interacted() -> void:
 ## What the mime can use now, each as [where it stands, where a tap means it].
 func _usables() -> Array[Array]:
 	var usables: Array[Array] = []
-	if not mime.carrying:
-		usables.append([EASEL_SPOT, EASEL_RECT.get_center()] as Array[Vector2])
-	if mime.has_fake:
-		usables.append([SWAP_SPOT, PAINTING_RECT.get_center()] as Array[Vector2])
+	if easel != null and not mime.carrying:
+		usables.append([easel.spot(), easel.rect().get_center()] as Array[Vector2])
+	if masterpiece != null and mime.has_fake:
+		usables.append([swap_spot(), painting_rect().get_center()] as Array[Vector2])
 	for frame in _frames:
 		if not frame.tilted:
 			usables.append([frame.spot(), frame.position] as Array[Vector2])
@@ -317,7 +344,8 @@ func nearest_in_earshot(point: Vector2) -> Guard:
 func _on_painted(quality: float) -> void:
 	fake_quality = quality
 	mime.has_fake = true
-	_easel_glow.visible = false
+	if easel != null:
+		easel.glowing = false
 	print("[Room] Fake ready at t %.2f (quality %.2f, %s)" % [elapsed, quality, Forgery.Grade.keys()[Forgery.grade(quality)]])
 
 
@@ -328,10 +356,11 @@ func _swap() -> void:
 	mime.carrying = true
 	fake_hung = true
 	for each in guards:
-		each.fake_point = FAKE_VIEW_POINT
+		each.fake_point = fake_view_point()
 		each.watches_fake = true
 	_fake_icon.texture = QUERY_ICON
-	_exit_glow.visible = true
+	if exit_door != null:
+		exit_door.glowing = true
 	print("[Room] Swapped the forgery for the original at t %.2f (fake %s)" % [elapsed, Forgery.Grade.keys()[Forgery.grade(fake_quality)]])
 
 
@@ -347,7 +376,7 @@ func _on_inspected(by: Guard) -> void:
 	_fake_icon.show()
 	for each in guards:
 		each.watches_fake = false
-	by.search(FAKE_VIEW_POINT)
+	by.search(fake_view_point())
 
 
 func _escape() -> void:
@@ -355,8 +384,8 @@ func _escape() -> void:
 	for each in guards:
 		each.active = false
 	mime.place_at(mime.position)
-	stars = Stars.earned(ever_seen, elapsed, PAR_TIME)
-	print("[Room] Escaped with the original at t %.2f (par %.0f, seen %s)" % [elapsed, PAR_TIME, ever_seen])
+	stars = Stars.earned(ever_seen, elapsed, par_time)
+	print("[Room] Escaped with the original at t %.2f (par %.0f, seen %s)" % [elapsed, par_time, ever_seen])
 	_results.present(stars)
 
 
@@ -386,13 +415,13 @@ func _on_caught() -> void:
 
 ## The mime along the toss arc, `t` from 0 (where it was caught) to 1 (the entrance).
 func _toss_step(t: float, from: Vector2) -> void:
-	mime.position = from.lerp(ENTRANCE, t) + Vector2(0.0, -sin(t * PI) * TOSS_HEIGHT)
+	mime.position = from.lerp(entrance, t) + Vector2(0.0, -sin(t * PI) * TOSS_HEIGHT)
 	mime.rotation = t * TAU
 
 
 func _end_toss() -> void:
 	mime.rotation = 0.0
-	mime.place_at(ENTRANCE)
+	mime.place_at(entrance)
 	for each in guards:
 		each.reset()
 		each.watches_fake = fake_hung and not found_out
