@@ -9,6 +9,7 @@ const WINGS: Array[String] = [
 	"res://data/wings/wing_01.tres",
 	"res://data/wings/wing_02.tres",
 	"res://data/wings/wing_03.tres",
+	"res://data/wings/wing_04.tres",
 ]
 ## The forgery canvas's paper size, in canvas units (scenes/forgery_canvas.tscn's Pad):
 ## every ghost point must lie on it, edges included.
