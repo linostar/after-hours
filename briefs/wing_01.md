@@ -22,6 +22,9 @@
 Paint at the easel; through the right door; wait for the guard to turn the far corner and for
 the light to drift away, then swap; back through the left door; out by the lower door.
 
+## Design loop
+The first draft passed: the bot found a wait for every leg on its first recording.
+
 ## Bot result
 `tools/bot.gd --record`: 12 plays; the swap needs a 1.75 s wait for the guard's turn; the
 run takes 22.3 s, par 65 s (bot time plus 4 s per ghost stroke, x1.25).

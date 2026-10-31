@@ -22,6 +22,9 @@
 Wait behind the partition for a gap in the pools and the guard's loop; paint; through the
 right door; swap between the pools' passes; back and out low on the left.
 
+## Design loop
+The first draft passed: the bot found a wait for every leg on its first recording.
+
 ## Bot result
 `tools/bot.gd --record`: 40 plays; the easel waits 8 s for the pools and the guard; the run
 takes 28.3 s, par 80 s.

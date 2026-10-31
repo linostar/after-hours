@@ -22,6 +22,9 @@ Round the partition to the easel; paint while the front guard walks away; throug
 door; wait for the back-row guard to pass the painting, then swap; back through the left
 door; out by the lower door when the tide has drawn back.
 
+## Design loop
+The first draft passed: the bot found a wait for every leg on its first recording.
+
 ## Bot result
 `tools/bot.gd --record`: 31 plays; the swap waits 1.75 s for the back-row guard, the way
 out 4.75 s for the tide and the front guard; the run takes 25.6 s, par 70 s.

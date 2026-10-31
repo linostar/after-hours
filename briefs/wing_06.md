@@ -28,5 +28,5 @@
    guard now starts at the right, walking towards the painting.
 
 ## Bot result
-`tools/bot.gd --record`: 38 plays; the swap waits 8 s for the back-row guard to pass and
-turn; the run takes 27.6 s, par 75 s.
+`tools/bot.gd --record`: 37 plays; the swap waits for the back-row guard to pass and turn;
+the run takes 27.3 s, par 75 s.

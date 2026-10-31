@@ -163,6 +163,7 @@ func _tests() -> Array[Callable]:
 		_test_gimmick_loud_floor,
 		_test_gimmick_clue_investigated,
 		_test_gimmick_mix_combines,
+		_test_wing_gimmicks,
 		_test_unknown_painting_reports,
 	]
 
@@ -1973,6 +1974,69 @@ func _test_gimmick_mix_combines() -> void:
 	_check(a.ticks == 1 and b.ticks == 1 and a.mime == mime and b.mime == mime, name, "a tick did not reach every part with the mime")
 	mime.free()
 	mix.queue_free()
+	await process_frame
+
+
+## Each wing's gimmick keeps its rules: the window band is lit and drifts; the tide rises
+## and its water slows and splashes; a parasol shades and walking prints the lawn (prints
+## fade); a searchlight pool lights and reveals the mime once, to a guard in earshot only;
+## a creature squawks only close by.
+func _test_wing_gimmicks() -> void:
+	var name := "wing_gimmicks"
+	var window := WindowLight.new()
+	var band := Vector2(window.band_x(300.0), 300.0)
+	_check(window.light_at(band) == WindowLight.LIT and window.light_at(band + Vector2(window.width, 0)) == WindowLight.DIM, name, "the window band is not lit with dim around it")
+	window.tick(window.period / 4.0)
+	_check(not is_equal_approx(window.band_x(300.0), band.x), name, "the window band does not drift")
+	window.free()
+	var tide := Tide.new()
+	_check(is_equal_approx(tide.waterline(), tide.dry_y), name, "the tide does not start low (%.1f)" % tide.waterline())
+	tide.tick(tide.period / 2.0)
+	_check(is_equal_approx(tide.waterline(), tide.flood_y), name, "half a period on, the tide is at %.1f, not high (%.1f)" % [tide.waterline(), tide.flood_y])
+	var wet := Vector2(400, tide.flood_y + 20.0)
+	_check(tide.slow_at(wet) == Tide.SLOW and tide.noise_at(wet) == Tide.LOUD and tide.slow_at(Vector2(400, tide.flood_y - 20.0)) == 1.0, name, "the water does not slow and splash, or the dry floor does")
+	tide.free()
+	var mime := (load("res://scenes/mime.tscn") as PackedScene).instantiate() as Mime
+	root.add_child(mime)
+	var lawn := Footprints.new()
+	lawn.parasols = PackedVector3Array([Vector3(300, 300, 50)])
+	lawn.mime = mime
+	_check(lawn.light_at(Vector2(310, 300)) == 0.0 and lawn.light_at(Vector2(500, 300)) == 1.0, name, "the parasol does not shade, or the sun does not light")
+	mime.place_at(Vector2(500, 400))
+	mime.walking = true
+	lawn.tick(0.1)
+	mime.position = Vector2(500 + Footprints.PRINT_GAP, 400)
+	lawn.tick(0.1)
+	_check(lawn._prints.size() == 2, name, "walking %.0f printed %d prints, not 2" % [Footprints.PRINT_GAP, lawn._prints.size()])
+	mime.walking = false
+	lawn.tick(Footprints.PRINT_LIFE + 0.01)
+	_check(lawn._prints.is_empty(), name, "prints did not fade after PRINT_LIFE")
+	lawn.free()
+	var lights := Searchlights.new()
+	lights.orbits = PackedVector3Array([Vector3(400, 350, 0)])
+	lights.mime = mime
+	var near := (load("res://scenes/guard.tscn") as PackedScene).instantiate() as Guard
+	var far := (load("res://scenes/guard.tscn") as PackedScene).instantiate() as Guard
+	root.add_child(near)
+	root.add_child(far)
+	near.global_position = Vector2(500, 350)
+	far.global_position = Vector2(400 + GuardBrain.HEARING_RANGE + 10.0, 350)
+	mime.position = Vector2(400, 350)
+	_check(lights.light_at(mime.position) == Searchlights.LIT and lights.light_at(Vector2(700, 350)) == Searchlights.NIGHT, name, "the pool is not lit with night around it")
+	_check(lights.clue_seen_by(far) == Vector2.INF, name, "a guard out of earshot was shown the lit mime")
+	_check(lights.clue_seen_by(near) == mime.position and lights.clue_seen_by(near) == Vector2.INF, name, "the lit mime was not revealed exactly once")
+	mime.position = Vector2(700, 350)
+	lights.tick(0.0)
+	mime.position = Vector2(400, 350)
+	_check(lights.clue_seen_by(near) == mime.position, name, "stepping into the pool again did not reveal the mime again")
+	lights.free()
+	near.free()
+	far.free()
+	var beasts := Creatures.new()
+	beasts.loops = PackedVector3Array([Vector3(300, 400, 0)])
+	_check(beasts.noise_at(Vector2(300 + Creatures.REACH - 1.0, 400)) == Creatures.LOUD and beasts.noise_at(Vector2(300 + Creatures.REACH + 1.0, 400)) == 0.0, name, "the creature does not squawk only within REACH")
+	beasts.free()
+	mime.free()
 	await process_frame
 
 

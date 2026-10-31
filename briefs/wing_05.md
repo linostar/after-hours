@@ -24,6 +24,9 @@ Paint in Eden; cross the Garden between the creatures' loops and the guards' tur
 Hell; come back the same way, now carrying the original past the same creatures, and leave
 Eden low on the left.
 
+## Design loop
+The first draft passed: the bot found a wait for every leg on its first recording.
+
 ## Bot result
 `tools/bot.gd --record`: 50 plays; the first door waits 4.25 s and the Garden crossing 4 s
 for the creatures and guards, the exit 2.25 s; the run takes 40.6 s, par 95 s.

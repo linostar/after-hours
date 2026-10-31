@@ -51,6 +51,8 @@ class Play:
 	var caught := false
 	var failed_leg := -1
 	var time := 0.0
+	## The stars the game awarded (empty unless it escaped).
+	var stars: Array[bool] = []
 	var trail: Array = []
 
 
@@ -121,6 +123,8 @@ func _check_wing(path: String) -> String:
 		return "%s: the recorded run no longer escapes unseen (leg %d: %s)" % [path, play.failed_leg, _leg_name(wing, play.failed_leg)]
 	if play.time > wing.par_time:
 		return "%s: the run took %.2f s, over par %.0f" % [path, play.time, wing.par_time]
+	if Stars.count(play.stars) != Stars.Star.size():
+		return "%s: the game awarded %s, not every star" % [path, play.stars]
 	return ""
 
 
@@ -199,6 +203,7 @@ func _play(wing: WingData, waits: PackedFloat32Array, legs: int) -> Play:
 		room = current_scene as Room
 	if room != null:
 		play.escaped = room.finished
+		play.stars = room.stars
 		play.time = room.elapsed
 		play.seen = play.seen or room.ever_seen
 	play.trail = _trail
@@ -244,12 +249,15 @@ func _next_room(from: Room) -> Room:
 	return null
 
 
-## One physics frame, sampling the trail every TRAIL_GAP frames.
-func _tick(room: Room) -> void:
-	_trail_wait -= 1
-	if _trail_wait <= 0:
-		_trail_wait = TRAIL_GAP
-		_trail.append([_game.run.room if _game.run != null else 0, roundi(room.mime.position.x), roundi(room.mime.position.y), room.hidden_in != null])
+## One physics frame (with --fixed-fps 60 a frame is one physics tick), sampling the
+## trail every TRAIL_GAP frames while a room runs, painting included.
+func _tick(_room: Room = null) -> void:
+	var room := current_scene as Room
+	if room != null and not _game.is_transitioning():
+		_trail_wait -= 1
+		if _trail_wait <= 0:
+			_trail_wait = TRAIL_GAP
+			_trail.append([_game.run.room if _game.run != null else 0, roundi(room.mime.position.x), roundi(room.mime.position.y), room.hidden_in != null])
 	await physics_frame
 
 
@@ -275,19 +283,19 @@ func _drag_along(points: PackedVector2Array) -> void:
 	press.position = root.get_final_transform() * points[0]
 	press.pressed = true
 	Input.parse_input_event(press)
-	await process_frame
+	await _tick()
 	for i in range(1, points.size()):
 		var drag := InputEventScreenDrag.new()
 		drag.index = TOUCH_INDEX
 		drag.position = root.get_final_transform() * points[i]
 		drag.relative = (points[i] - points[i - 1]) * root.get_final_transform().get_scale()
 		Input.parse_input_event(drag)
-		await process_frame
+		await _tick()
 	var release := InputEventScreenTouch.new()
 	release.index = TOUCH_INDEX
 	release.position = root.get_final_transform() * points[points.size() - 1]
 	Input.parse_input_event(release)
-	await process_frame
+	await _tick()
 
 
 func _leg_name(wing: WingData, leg: int) -> String:

@@ -4,7 +4,8 @@ extends Gimmick
 ## floor, each on its own orbit like the painting's swirls (orbits: centre x, y and orbit
 ## radius; neighbours turn opposite ways). Outside them the room is night (NIGHT: guards are
 ## slow to notice the mime); in a pool the mime is lit (LIT) and revealed: the first active
-## guard to look is shown where it stands (clue_seen_by), once each time it steps in.
+## guard within hearing range to look is shown where it stands (clue_seen_by), once each
+## time it steps in.
 ## Drawn as the night over the floor, still stars on the back wall and the swirling pools.
 
 const SPOT_RADIUS := 55.0
@@ -66,6 +67,8 @@ func light_at(point: Vector2) -> float:
 
 func clue_seen_by(guard: Guard) -> Vector2:
 	if mime == null or not mime.visible or _revealed or not guard.active or not lit(mime.position):
+		return Vector2.INF
+	if guard.global_position.distance_to(mime.position) >= GuardBrain.HEARING_RANGE:
 		return Vector2.INF
 	_revealed = true
 	return mime.position

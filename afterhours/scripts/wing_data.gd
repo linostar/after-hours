@@ -4,8 +4,9 @@ extends Resource
 ## (room 0 is where the mime comes in; doors name rooms by index), the par time for the
 ## third star and the forgery's ghost strokes. Content.validate checks it.
 
-## The wing's masterpiece (a Paintings id; the enum lists Paintings.IDS).
-@export_enum("pearl_earring", "great_wave", "grande_jatte", "starry_night", "earthly_delights", "mona_lisa") var painting := "starry_night"
+## The wing's masterpiece (a Paintings id; the enum lists Paintings.IDS). Empty by default,
+## which Content.validate rejects, so every wing file names its painting.
+@export_enum("pearl_earring", "great_wave", "grande_jatte", "starry_night", "earthly_delights", "mona_lisa") var painting := ""
 ## Room scenes (res:// paths), room 0 first.
 @export var rooms: Array[String] = []
 ## Seconds, for the third star.
