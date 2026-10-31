@@ -10,6 +10,10 @@ script = ExtResource("1_guard")
 z_index = -1
 color = Color(1, 0.92, 0.55, 0.18)
 
+[node name="Agent" type="NavigationAgent2D" parent="."]
+path_desired_distance = 4.0
+target_desired_distance = 4.0
+
 [node name="Sprite" type="Sprite2D" parent="."]
 texture = ExtResource("2_sprite")
 offset = Vector2(0, -46)

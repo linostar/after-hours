@@ -87,6 +87,7 @@ func _tests() -> Array[Callable]:
 		_test_guard_sees_and_tosses,
 		_test_guard_partition_blocks_sight,
 		_test_guard_ignores_behind,
+		_test_guard_chase_search_return,
 		_test_guard_pauses_facing_its_leg,
 		_test_catches_during_swap_and_while_carrying,
 		_test_title_play_starts_room,
@@ -96,7 +97,7 @@ func _tests() -> Array[Callable]:
 		_test_room_easel_paints_fake,
 		_test_room_catch_while_painting,
 		_test_canvas_leaves_approach_visible,
-		_test_sloppy_fake_raises_alarm,
+		_test_sloppy_fake_starts_search,
 		_test_good_and_perfect_fakes_pass,
 		_test_catch_cuts_inspection_short,
 		_test_results_buttons,
@@ -702,6 +703,38 @@ func _test_guard_ignores_behind() -> void:
 	_check(room.guard.suspicion == 0.0 and not room.ever_seen, name, "the guard saw the mime behind it (suspicion %.2f)" % room.guard.suspicion)
 
 
+## Full suspicion starts a chase at CHASE_SPEED (slower than the mime); out of sight
+## behind the partition for CHASE_MEMORY, the guard searches the last-seen spot, gives up
+## after SEARCH_TIME and walks back onto its route.
+func _test_guard_chase_search_return() -> void:
+	var name := "guard_chase_search_return"
+	_check(Guard.CHASE_SPEED < Mime.SPEED, name, "the guard chases at %.0f, not slower than the mime (%.0f)" % [Guard.CHASE_SPEED, Mime.SPEED])
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.position = Vector2(300, 250)
+	room.guard.facing = Vector2.RIGHT
+	room.mime.place_at(Vector2(420, 250))
+	var chasing := await _wait_until(func() -> bool: return room.guard.intent == GuardBrain.Intent.CHASE, 120)
+	_check(chasing, name, "a guard watching the mime never gave chase (suspicion %.2f)" % room.guard.suspicion)
+	var seen_at := room.guard.last_seen
+	# Behind the partition, out of the guard's sight.
+	room.mime.place_at(Vector2(480, 420))
+	var from := room.guard.position
+	for i in 15:
+		await physics_frame
+	var moved := room.guard.position.distance_to(from)
+	_check(absf(moved - Guard.CHASE_SPEED * 0.25) < 4.0, name, "the chasing guard moved %.1f in 0.25 s, not CHASE_SPEED (%.1f)" % [moved, Guard.CHASE_SPEED * 0.25])
+	var searching := await _wait_until(func() -> bool: return room.guard.intent == GuardBrain.Intent.SEARCH, ceili(GuardBrain.CHASE_MEMORY * 60.0) + 30)
+	_check(searching and room.guard.search_point == seen_at, name, "out of sight the guard is %s around %s, not searching where it last saw the mime (%s)" % [_intent_name(room.guard.intent), room.guard.search_point, seen_at])
+	_check(not room.tossing, name, "the guard caught a mime it could not see")
+	var patrolling := await _wait_until(func() -> bool: return room.guard.intent == GuardBrain.Intent.PATROL, ceili(Guard.SEARCH_TIME * 60.0) + 240)
+	_check(patrolling, name, "the search never ended (intent %s)" % _intent_name(room.guard.intent))
+	var next_waypoint := room.guard.route[1]
+	var back := await _wait_until(func() -> bool: return room.guard.position.is_equal_approx(next_waypoint), 600)
+	_check(back, name, "the guard did not walk back to its next waypoint %s (at %s)" % [next_waypoint, room.guard.position])
+
+
 ## Taps the centre of `control`, as a finger would.
 func _tap_control(control: Control) -> void:
 	await _tap_at(control.get_global_rect().get_center())
@@ -878,8 +911,11 @@ func _inspection_room(quality: float) -> Room:
 ## Waits for the guard's next inspection to start and run out; returns whether it did.
 func _await_inspection(room: Room) -> bool:
 	var started := await _wait_until(func() -> bool: return room.guard.inspecting, 30)
+	# The room shows the "?" on its next tick (it runs before the guard's).
+	await physics_frame
 	var query_shown := (room.get_node("FakeIcon") as Sprite2D).visible and (room.get_node("FakeIcon") as Sprite2D).texture == Room.QUERY_ICON
 	var ended := await _wait_until(func() -> bool: return not room.guard.inspecting, ceili(Guard.INSPECT_TIME * 60.0) + 10)
+	await physics_frame
 	return started and query_shown and ended
 
 
@@ -891,28 +927,28 @@ func _new_pass(room: Room) -> void:
 	room.guard.facing = Vector2.RIGHT
 
 
-## A Sloppy fake is found out at the first inspection: "!" over the painting, and the
-## guard's alarm (faster, wider, red) outlasts a reset.
-func _test_sloppy_fake_raises_alarm() -> void:
-	var name := "sloppy_fake_raises_alarm"
+## A Sloppy fake is found out at the first inspection: "!" over the painting for good,
+## the guard searches around it (red cone) and gives up after SEARCH_TIME, and the fake is
+## never inspected again.
+func _test_sloppy_fake_starts_search() -> void:
+	var name := "sloppy_fake_starts_search"
 	var room := await _inspection_room(0.2)
 	if room == null:
 		return
 	_check(await _await_inspection(room), name, "the guard facing the hung fake did not inspect it under a \"?\"")
 	var icon := room.get_node("FakeIcon") as Sprite2D
-	_check(room.guard.alarmed and icon.visible and icon.texture == Room.ALARM_ICON, name, "a Sloppy fake was not found out (alarmed %s, icon %s)" % [room.guard.alarmed, icon.texture])
+	_check(room.found_out and icon.visible and icon.texture == Room.ALARM_ICON, name, "a Sloppy fake was not found out (found_out %s, icon %s)" % [room.found_out, icon.texture])
+	await physics_frame
 	await physics_frame
 	var cone := room.guard.get_node("Cone") as Polygon2D
-	_check(cone.color == Guard.CONE_ALERT_COLOR and room.guard.half_angle() == Guard.ALARM_HALF_ANGLE, name, "the alarmed guard's cone is not red and wide")
-	room.guard.patrolling = true
-	room.guard.position = room.guard.route[0]
-	var from := room.guard.position
+	_check(room.guard.intent == GuardBrain.Intent.SEARCH and room.guard.search_point == Room.FAKE_VIEW_POINT, name, "after a found-out fake the guard is %s around %s, not searching the fake" % [_intent_name(room.guard.intent), room.guard.search_point])
+	_check(cone.color == Guard.CONE_ALERT_COLOR, name, "the searching guard's cone is not red")
+	var gave_up := await _wait_until(func() -> bool: return room.guard.intent == GuardBrain.Intent.PATROL, ceili(Guard.SEARCH_TIME * 60.0) + 240)
+	_check(gave_up, name, "the search never ended (intent %s)" % _intent_name(room.guard.intent))
+	await _new_pass(room)
 	for i in 30:
 		await physics_frame
-	var moved := room.guard.position.distance_to(from)
-	_check(absf(moved - Guard.ALARM_SPEED * 0.5) < 3.0, name, "the alarmed guard walked %.1f in 0.5 s, not ALARM_SPEED (%.1f)" % [moved, Guard.ALARM_SPEED * 0.5])
-	room.guard.reset()
-	_check(room.guard.alarmed, name, "a reset calmed the alarmed guard")
+	_check(room.inspections == 1 and icon.texture == Room.ALARM_ICON and icon.visible, name, "a found-out fake was inspected again or lost its \"!\" (%d inspections)" % room.inspections)
 
 
 ## A Good fake passes its first inspection (and is not re-inspected within the same
@@ -925,14 +961,14 @@ func _test_good_and_perfect_fakes_pass() -> void:
 			return
 		var grade: String = Forgery.Grade.keys()[Forgery.grade(fake_quality)]
 		_check(await _await_inspection(room), name, "%s: the first inspection did not run" % grade)
-		_check(not room.guard.alarmed and not (room.get_node("FakeIcon") as Sprite2D).visible, name, "%s: the first inspection found the fake out" % grade)
+		_check(not room.found_out and not (room.get_node("FakeIcon") as Sprite2D).visible, name, "%s: the first inspection found the fake out" % grade)
 		for i in 30:
 			await physics_frame
 		_check(room.inspections == 1, name, "%s: the guard re-inspected within one pass (%d inspections)" % [grade, room.inspections])
 		await _new_pass(room)
 		_check(await _await_inspection(room), name, "%s: the second pass did not inspect" % grade)
-		var expect_alarm := Forgery.grade(fake_quality) == Forgery.Grade.GOOD
-		_check(room.guard.alarmed == expect_alarm, name, "%s: after the second inspection alarmed is %s" % [grade, room.guard.alarmed])
+		var expect_found := Forgery.grade(fake_quality) == Forgery.Grade.GOOD
+		_check(room.found_out == expect_found, name, "%s: after the second inspection found_out is %s" % [grade, room.found_out])
 
 
 ## A catch during an inspection cuts it short: it does not count and the "?" goes.
@@ -945,7 +981,7 @@ func _test_catch_cuts_inspection_short() -> void:
 	room.mime.place_at(Vector2(720, 230))
 	await _wait_until(func() -> bool: return room.tossing, 120)
 	_check(room.tossing and room.inspections == 0 and not (room.get_node("FakeIcon") as Sprite2D).visible, name, "a catch mid-inspection: tossing %s, %d inspections, icon shown %s" % [room.tossing, room.inspections, (room.get_node("FakeIcon") as Sprite2D).visible])
-	_check(not room.guard.alarmed, name, "a cut-short inspection raised the alarm")
+	_check(not room.found_out, name, "a cut-short inspection found the fake out")
 
 
 ## The open canvas covers nothing the painter must watch: the easel, the mime painting at

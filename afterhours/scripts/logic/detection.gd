@@ -2,7 +2,7 @@ class_name Detection
 extends RefCounted
 ## How guards see the mime: a vision cone (range and half angle around the facing), and a
 ## suspicion level from 0 to 1 that fills while the mime is seen (faster up close) and
-## drains while not. Full suspicion is a catch. Walls are the caller's business: the guard
+## drains while not. Full suspicion starts a chase. Walls are the caller's business: the guard
 ## only passes `seen` when a ray to the mime is clear.
 
 ## Suspicion per second while seen at the cone's far edge, and the extra per second at
