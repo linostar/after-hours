@@ -1,8 +1,9 @@
 class_name Room
 extends Node2D
 ## A gallery room, seen 3/4 top-down. scenes/room_base.tscn holds what every room shares;
-## each room scene inherits it and adds its walls, navmesh, partitions (the mime walks
-## around them, guards cannot see through them), guards (the Guard children of Actors),
+## each room scene inherits it (with its walls, floor and navmesh outline) and adds its
+## partitions (StaticBody2D in the nav_obstacles group: the navmesh is baked around them on
+## load; guards cannot see through them), guards (the Guard children of Actors),
 ## frames, portraits, doors and, optionally, the Easel and the Masterpiece. The mime starts
 ## at the Entrance marker. A tap on the floor walks the mime there. A tap on the glowing
 ## easel (Easel.rect) walks it to Easel.spot, where the forgery canvas opens over the
@@ -30,6 +31,13 @@ extends Node2D
 ## route again (a mime carrying the fake or the original keeps it: only the guards reset).
 ## The timer (elapsed) keeps running through it all, but not while a screen change fades
 ## (the player cannot act then); ever_seen records whether any guard ever spotted the mime.
+## A room is one of its wing's rooms (Game.run, a WingRun; a room loaded on its own makes a
+## one-room run of itself): it takes the wing's painting, ghost strokes and par time, and the
+## run's timer, sightings, catches, fake and original. A tap on a door to another room
+## (a Door whose to_room is a room index) walks the mime through it: the room hands its
+## state back to the run (with the hung fake's state there, which it finds again on a later
+## visit) and Game.enter_room changes to that room, where the mime comes in at the door
+## leading back (Door.arrival_point; the toss lands there too).
 
 ## Where the mime stands to swap the masterpiece (below it), and where a guard looks to
 ## inspect the hung fake: the floor at the painting's foot (sight rays to the painting
@@ -76,6 +84,10 @@ var inspections := 0
 var found_out := false
 var finished := false
 var stars: Array[bool] = []
+## The wing play this room belongs to.
+var run: WingRun
+## Whether the mime is going through a door to another room (the room stops).
+var leaving := false
 ## The layout, read from the room's nodes: where the mime starts (Entrance), the forgery
 ## kit and the masterpiece (null in a room without them), and the doors (Doors), the exit
 ## among them (null in a room without one).
@@ -102,21 +114,43 @@ var _portraits: Array[HidingPortrait] = []
 
 
 func _ready() -> void:
+	# The navmesh: the floor outline less every partition (the nav_obstacles group), baked
+	# now so each room scene only places its partitions.
+	($Navigation as NavigationRegion2D).bake_navigation_polygon(false)
 	entrance = ($Entrance as Node2D).position
 	easel = get_node_or_null("Actors/Easel") as Easel
 	masterpiece = get_node_or_null("Masterpiece") as FramedPainting
+	run = _game.run
+	var on_its_own := run == null or run.room >= run.wing.rooms.size() or run.wing.rooms[run.room] != scene_file_path
+	if on_its_own:
+		run = WingRun.new(_own_wing())
+		_game.run = run
 	for child in $Doors.get_children():
-		if child is Door:
+		if not child is Door:
+			_game.report_error("Room '%s': Doors child '%s' is a %s, not a Door" % [scene_file_path, child.name, child.get_class()])
+		elif (child.to_room >= run.wing.rooms.size() or child.to_room < Door.EXIT) and on_its_own:
+			# Loaded outside its wing, the room cannot know the room a door leads to.
+			print("[Room] %s on its own: door %s to room %d leads nowhere" % [scene_file_path, child.name, child.to_room])
+		elif child.to_room >= run.wing.rooms.size() or child.to_room < Door.EXIT:
+			_game.report_error("Room '%s': door '%s' leads to room %d, but the wing has %d room(s)" % [scene_file_path, child.name, child.to_room, run.wing.rooms.size()])
+		else:
 			doors.append(child)
 			if child.to_room == Door.EXIT and exit_door == null:
 				exit_door = child
+	if run.came_from != WingRun.START:
+		var back := _door_to(run.came_from)
+		if back != null:
+			entrance = back.arrival_point()
 		else:
-			_game.report_error("Room '%s': Doors child '%s' is a %s, not a Door" % [scene_file_path, child.name, child.get_class()])
+			_game.report_error("Room '%s': no door leads back to room %d, where the mime came from" % [scene_file_path, run.came_from])
+	_take_run()
 	mime.place_at(entrance)
 	if masterpiece != null:
-		mime.painting = masterpiece.painting
-		_canvas.painting = masterpiece.painting
+		masterpiece.painting = run.wing.painting
 		_fake_icon.position = masterpiece.position
+	mime.painting = run.wing.painting
+	_canvas.painting = run.wing.painting
+	_canvas.ghosts = run.wing.ghosts
 	for child in $Actors.get_children():
 		if child is Guard:
 			guards.append(child)
@@ -143,6 +177,12 @@ func _ready() -> void:
 			_game.report_error("Room '%s': Portraits child '%s' is a %s, not a HidingPortrait" % [scene_file_path, child.name, child.get_class()])
 	_canvas.watchers = guards
 	_canvas.painted.connect(_on_painted)
+	if fake_hung:
+		for each in guards:
+			each.fake_point = fake_view_point()
+			each.watches_fake = not found_out
+		_fake_icon.texture = ALARM_ICON if found_out else QUERY_ICON
+		_fake_icon.visible = found_out
 	if DebugOverlay.wanted():
 		add_debug_overlay()
 	_game.arrive(GameState.Flow.ROOM)
@@ -150,6 +190,55 @@ func _ready() -> void:
 		print("[Room] Masterpiece at %s, exit at %s" % [painting_rect(), exit_door.position])
 	if easel != null:
 		print("[Room] Easel at %s" % easel.rect())
+
+
+## This room as a one-room wing (when it is loaded on its own): its own painting, ghost
+## strokes and par time.
+func _own_wing() -> WingData:
+	var wing := WingData.new()
+	wing.painting = masterpiece.painting if masterpiece != null else _canvas.painting
+	wing.rooms = [scene_file_path]
+	wing.par_time = par_time
+	wing.ghosts = _canvas.ghosts
+	return wing
+
+
+## The run's state, into this room (and the mime).
+func _take_run() -> void:
+	par_time = run.wing.par_time
+	elapsed = run.elapsed
+	ever_seen = run.ever_seen
+	catches = run.catches
+	fake_quality = run.fake_quality
+	mime.has_fake = run.has_fake
+	mime.carrying = run.carrying
+	var memory: Dictionary = run.hung.get(run.room, {})
+	fake_hung = memory.get("fake_hung", false)
+	inspections = memory.get("inspections", 0)
+	found_out = memory.get("found_out", false)
+	if easel != null and (mime.has_fake or mime.carrying):
+		easel.glowing = false
+	if exit_door != null and mime.carrying:
+		exit_door.glowing = true
+
+
+## This room's state, back into the run.
+func _give_run() -> void:
+	run.elapsed = elapsed
+	run.ever_seen = ever_seen
+	run.catches = catches
+	run.fake_quality = fake_quality
+	run.has_fake = mime.has_fake
+	run.carrying = mime.carrying
+	run.hung[run.room] = {"fake_hung": fake_hung, "inspections": inspections, "found_out": found_out}
+
+
+## The door leading to room `index`, or null.
+func _door_to(index: int) -> Door:
+	for door in doors:
+		if door.to_room == index:
+			return door
+	return null
 
 
 ## Where a tap means the masterpiece (an empty rect in a room without one).
@@ -179,7 +268,7 @@ func add_debug_overlay() -> DebugOverlay:
 
 
 func _physics_process(delta: float) -> void:
-	if finished or _game.is_transitioning():
+	if finished or leaving or _game.is_transitioning():
 		return
 	elapsed += delta
 	var walk := _keys.direction()
@@ -206,10 +295,29 @@ func _physics_process(delta: float) -> void:
 			_swap()
 	if mime.carrying and not tossing and exit_door != null and mime.position.distance_to(exit_door.position) <= Door.REACH:
 		_escape()
+		return
+	for door in doors:
+		if door.to_room != Door.EXIT and not tossing and mime.position.distance_to(door.position) <= Door.REACH:
+			_leave(door)
+			return
+
+
+## Goes through `door` to its room: the room stops and hands its state back to the run.
+func _leave(door: Door) -> void:
+	leaving = true
+	if hidden_in != null:
+		_step_out()
+	_canvas.close()
+	for each in guards:
+		each.active = false
+	mime.place_at(mime.position)
+	_give_run()
+	print("[Room] Through the door to room %d at t %.2f" % [door.to_room, elapsed])
+	_game.enter_room(door.to_room)
 
 
 func _on_floor_tapped(at: Vector2) -> void:
-	if tossing or finished:
+	if tossing or finished or leaving:
 		return
 	if hidden_in != null:
 		if hidden_in.rect().has_point(at):
@@ -241,12 +349,16 @@ func _on_floor_tapped(at: Vector2) -> void:
 		swap_intent = true
 		mime.walk_to(swap_spot())
 		return
+	for door in doors:
+		if door.rect().has_point(at):
+			mime.walk_to(door.position)
+			return
 	mime.walk_to(at)
 
 
 ## Whether the player can act in the room now (not tossed, painting or finished).
 func _accepts_input() -> bool:
-	return not tossing and not finished and not _canvas.visible
+	return not tossing and not finished and not leaving and not _canvas.visible
 
 
 ## E: steps out of a portrait, or taps the nearest usable thing within INTERACT_REACH of
@@ -280,6 +392,9 @@ func _usables() -> Array[Array]:
 			usables.append([frame.spot(), frame.position] as Array[Vector2])
 	for portrait in _portraits:
 		usables.append([portrait.spot(), portrait.position] as Array[Vector2])
+	for door in doors:
+		if door.to_room != Door.EXIT or mime.carrying:
+			usables.append([door.position, door.position] as Array[Vector2])
 	return usables
 
 

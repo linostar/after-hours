@@ -1,7 +1,9 @@
 class_name GameState
 extends Node
 ## The one autoload (Game): the flow state, screen changes (goto: a fade to the museum's
-## dark that blocks touches while it runs) and wordless error reporting.
+## dark that blocks touches while it runs), the wing being played (run: play_wing starts
+## one in its room 0, enter_room moves to another of its rooms; ROOM's scene is the run's
+## current room) and wordless error reporting.
 ## Every error goes to the log (push_error) and shows the cracked-frame ErrorBadge,
 ## never text (CLAUDE.md, "Errors are visible without words").
 
@@ -25,6 +27,8 @@ var scene_paths: Dictionary[Flow, String] = {
 	Flow.ROOM: "res://scenes/room.tscn",
 }
 var state := Flow.TITLE
+## The wing being played (null before any; a room loaded on its own makes a one-room run).
+var run: WingRun
 ## Every error reported this run, oldest first.
 var errors: Array[String] = []
 ## While true, report_error logs with print instead of push_error, so a test that
@@ -83,6 +87,37 @@ func goto(flow: Flow) -> void:
 	_transitioning = false
 	if error == OK:
 		transition_finished.emit(flow)
+
+
+## Starts `wing` afresh in its room 0. Ignored while a screen change runs.
+func play_wing(wing: WingData) -> void:
+	if _transitioning:
+		print("[Game] Ignored play_wing while a transition is running")
+		return
+	run = WingRun.new(wing)
+	scene_paths[Flow.ROOM] = wing.rooms[0]
+	print("[Game] Playing the %s wing" % wing.painting)
+	goto(Flow.ROOM)
+
+
+## Moves the run to its room `index`, coming from the room it is in. Ignored while a screen
+## change runs.
+func enter_room(index: int) -> void:
+	if _transitioning:
+		print("[Game] Ignored enter_room %d while a transition is running" % index)
+		return
+	run.came_from = run.room
+	run.room = index
+	scene_paths[Flow.ROOM] = run.wing.rooms[index]
+	goto(Flow.ROOM)
+
+
+## Plays the run's wing again from its start (the results' replay).
+func replay() -> void:
+	if run == null:
+		goto(Flow.ROOM)
+	else:
+		play_wing(run.wing)
 
 
 func is_transitioning() -> bool:

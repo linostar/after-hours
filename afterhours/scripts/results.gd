@@ -2,7 +2,7 @@ class_name Results
 extends Control
 ## The end-of-wing overlay, wordless: three stars over their legend icons (swap, unseen,
 ## par clock), each popping in STAR_GAP after the last, gold when earned and dark when
-## missed; then replay (the room again) and home (the title) icon buttons. While shown it
+## missed; then replay (the wing again, from its start) and home (the title) icon buttons. While shown it
 ## takes every touch, so the room below gets none.
 
 const STAR_GAP := 0.35
@@ -17,7 +17,7 @@ const STAR_MISSED := preload("res://art/svg/star_empty.svg")
 
 func _ready() -> void:
 	var game := get_node(GameState.AUTOLOAD_PATH) as GameState
-	_replay.pressed.connect(game.goto.bind(GameState.Flow.ROOM))
+	_replay.pressed.connect(game.replay)
 	_home.pressed.connect(game.goto.bind(GameState.Flow.TITLE))
 	hide()
 

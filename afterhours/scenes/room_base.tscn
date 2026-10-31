@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/room.gd" id="1_room"]
 [ext_resource type="PackedScene" path="res://scenes/mime.tscn" id="2_mime"]
@@ -7,8 +7,47 @@
 [ext_resource type="PackedScene" path="res://scenes/forgery_canvas.tscn" id="5_canvas"]
 [ext_resource type="Script" path="res://scripts/ui/keyboard_input.gd" id="6_keys"]
 
+[sub_resource type="NavigationPolygon" id="NavigationPolygon_floor"]
+outlines = Array[PackedVector2Array]([PackedVector2Array(32, 172, 928, 172, 928, 508, 32, 508)])
+parsed_geometry_type = 1
+source_geometry_mode = 1
+source_geometry_group_name = &"nav_obstacles"
+agent_radius = 8.0
+
 [node name="Room" type="Node2D"]
 script = ExtResource("1_room")
+
+[node name="BackWall" type="Polygon2D" parent="."]
+z_index = -10
+color = Color(0.29, 0.12, 0.16, 1)
+polygon = PackedVector2Array(0, 0, 960, 0, 960, 170, 0, 170)
+
+[node name="Wainscot" type="Polygon2D" parent="."]
+z_index = -10
+color = Color(0.2, 0.08, 0.11, 1)
+polygon = PackedVector2Array(0, 130, 960, 130, 960, 170, 0, 170)
+
+[node name="Floor" type="Polygon2D" parent="."]
+z_index = -10
+color = Color(0.36, 0.25, 0.17, 1)
+polygon = PackedVector2Array(0, 170, 960, 170, 960, 540, 0, 540)
+
+[node name="Walls" type="StaticBody2D" parent="."]
+
+[node name="Back" type="CollisionPolygon2D" parent="Walls"]
+polygon = PackedVector2Array(0, 150, 960, 150, 960, 172, 0, 172)
+
+[node name="Left" type="CollisionPolygon2D" parent="Walls"]
+polygon = PackedVector2Array(-20, 150, 2, 150, 2, 560, -20, 560)
+
+[node name="Right" type="CollisionPolygon2D" parent="Walls"]
+polygon = PackedVector2Array(958, 150, 980, 150, 980, 560, 958, 560)
+
+[node name="Front" type="CollisionPolygon2D" parent="Walls"]
+polygon = PackedVector2Array(-20, 538, 980, 538, 980, 560, -20, 560)
+
+[node name="Navigation" type="NavigationRegion2D" parent="."]
+navigation_polygon = SubResource("NavigationPolygon_floor")
 
 [node name="Entrance" type="Marker2D" parent="."]
 

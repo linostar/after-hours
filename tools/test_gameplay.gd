@@ -125,6 +125,9 @@ func _tests() -> Array[Callable]:
 		_test_mime_carrying_before_ready,
 		_test_room_paintings_framed,
 		_test_room_layout_optional_and_checked,
+		_test_navmesh_baked_around_partitions,
+		_test_content_validates_wings,
+		_test_wing_doors_carry_the_run,
 		_test_unknown_painting_reports,
 	]
 
@@ -1639,6 +1642,116 @@ func _test_room_layout_optional_and_checked() -> void:
 	room.mime.place_at(Vector2(230, 372))
 	room._on_interacted()
 	_check(not room.paint_intent and not room.swap_intent, name, "E found something to use in an empty room")
+
+
+## The room bakes its navmesh from the floor outline less its partitions: the walkable
+## floor ends 8 units inside the outline and around the partition's footprint.
+func _test_navmesh_baked_around_partitions() -> void:
+	var name := "navmesh_baked_around_partitions"
+	var room := await _load_room()
+	if room == null:
+		return
+	var map := room.get_world_2d().navigation_map
+	var corner := NavigationServer2D.map_get_closest_point(map, Vector2(0, 0))
+	_check(corner.is_equal_approx(Vector2(40, 180)), name, "the walkable floor's corner is %s, not (40, 180)" % corner)
+	var footprint := Rect2(400, 300, 160, 60)
+	var inside := NavigationServer2D.map_get_closest_point(map, footprint.get_center())
+	_check(not footprint.has_point(inside), name, "the navmesh reaches %s inside the partition's footprint %s" % [inside, footprint])
+
+
+## A wing's data passes Content.validate, and each broken field is named in a problem.
+func _test_content_validates_wings() -> void:
+	var name := "content_validates_wings"
+	var good := _test_wing()
+	_check(Content.validate(good, "good.tres").is_empty(), name, "a valid wing has problems: %s" % [Content.validate(good, "good.tres")])
+	var cases: Dictionary[String, Callable] = {
+		"painting": func(w: WingData) -> void: w.painting = "no_such_painting",
+		"rooms is empty": func(w: WingData) -> void: w.rooms = [],
+		"rooms[1]": func(w: WingData) -> void: w.rooms = [w.rooms[0], "res://scenes/test/missing.tscn"],
+		"par_time": func(w: WingData) -> void: w.par_time = 0.0,
+		"ghosts is empty": func(w: WingData) -> void: w.ghosts = [],
+		"ghosts[0] has no points": func(w: WingData) -> void: w.ghosts = [PackedVector2Array()],
+		"off the canvas": func(w: WingData) -> void: w.ghosts = [PackedVector2Array([Vector2(321, 10)])],
+	}
+	for field in cases:
+		var wing := _test_wing()
+		cases[field].call(wing)
+		var found := Content.validate(wing, "bad.tres")
+		_check(found.size() == 1 and field in found[0] and "bad.tres" in found[0], name, "breaking %s gave %s" % [field, found])
+	var edge := _test_wing()
+	edge.ghosts = [PackedVector2Array([Vector2(0, 0), Vector2(320, 240)])]
+	_check(Content.validate(edge, "edge.tres").is_empty(), name, "ghost points on the canvas's edges are refused")
+	var problems: Array[String] = []
+	_check(Content.load_wing("res://data/wings/missing.tres", problems) == null and problems.size() == 1, name, "a missing wing file loaded or was not reported: %s" % [problems])
+	_check(Content.validate(null, "x.tres") == (["x.tres: is not a WingData"] as Array[String]), name, "a missing WingData was not reported")
+
+
+## A valid two-room wing on the test halls (scenes/test): the easel and the exit in hall A,
+## the masterpiece in hall B.
+func _test_wing() -> WingData:
+	var wing := WingData.new()
+	wing.painting = "great_wave"
+	wing.rooms = ["res://scenes/test/hall_a.tscn", "res://scenes/test/hall_b.tscn"]
+	wing.par_time = 60.0
+	wing.ghosts = [PackedVector2Array([Vector2(160, 120)])]
+	return wing
+
+
+## A wing plays across its rooms: the mime goes through a door (a tap on it) to the next
+## room, coming in at the door that leads back; the timer, the fake and the original go
+## with it; the hung fake is still there on a later visit; the exit ends the wing; replay
+## starts it again from room 0.
+func _test_wing_doors_carry_the_run() -> void:
+	var name := "wing_doors_carry_the_run"
+	var wing := _test_wing()
+	_game.play_wing(wing)
+	await _wait_until(func() -> bool: return not _game.is_transitioning() and current_scene is Room, 120)
+	var hall_a := current_scene as Room
+	_check(hall_a.scene_file_path == wing.rooms[0] and hall_a.run == _game.run and hall_a.mime.position == hall_a.entrance, name, "the wing did not start in room 0 at its entrance")
+	_check((hall_a.get_node("EaselLayer/ForgeryCanvas") as ForgeryCanvas).ghosts == wing.ghosts, name, "the canvas does not trace the wing's ghosts")
+	hall_a._on_painted(0.9)
+	var to_b := hall_a.get_node("Doors/ToHallB") as Door
+	await _wait_navmesh(hall_a)
+	await _tap_at(to_b.position)
+	var hall_b := await _wait_for_room(wing.rooms[1], 900) as Room
+	if hall_b == null:
+		_check(false, name, "the mime never went through to room 1 (at %s)" % hall_a.mime.position)
+		return
+	var back := hall_b.get_node("Doors/ToHallA") as Door
+	_check(hall_b.mime.position.is_equal_approx(back.arrival_point()), name, "in room 1 the mime is at %s, not inside the door back (%s)" % [hall_b.mime.position, back.arrival_point()])
+	_check(hall_b.elapsed > 0.5 and hall_b.mime.has_fake and is_equal_approx(hall_b.fake_quality, 0.9), name, "the timer or the fake did not come along (t %.2f, fake %s)" % [hall_b.elapsed, hall_b.mime.has_fake])
+	_check(hall_b.masterpiece.painting == "great_wave" and hall_b.mime.painting == "great_wave", name, "room 1 does not hang the wing's painting")
+	hall_b._swap()
+	await _wait_navmesh(hall_b)
+	await _tap_at(back.position)
+	hall_a = await _wait_for_room(wing.rooms[0], 900) as Room
+	if hall_a == null:
+		_check(false, name, "the mime never went back to room 0")
+		return
+	_check(hall_a.mime.carrying and hall_a.exit_door.glowing and not hall_a.easel.glowing, name, "back in room 0 the original, the exit's glow or the spent easel is wrong")
+	_check(_game.run.hung[1]["fake_hung"] == true, name, "room 1 did not remember its hung fake")
+	await _wait_navmesh(hall_a)
+	await _tap_at(hall_a.exit_door.position)
+	_check(await _wait_until(func() -> bool: return hall_a.finished, 900), name, "the mime never escaped through room 0's exit")
+	_check(hall_a.stars[Stars.Star.SWAP], name, "the escape did not earn the swap star")
+	_game.replay()
+	var again := await _wait_for_room(wing.rooms[0], 120) as Room
+	_check(again != null and again != hall_a and again.elapsed < 1.0 and not again.mime.carrying, name, "replay did not start the wing afresh in room 0")
+	_game.run = null
+	_game.scene_paths[GameState.Flow.ROOM] = ROOM_PATH
+
+
+## Waits (at most `max_frames` physics frames) until the current scene is a ready room
+## loaded from `path` and no screen change runs; returns it, or null.
+func _wait_for_room(path: String, max_frames: int) -> Room:
+	var arrived := await _wait_until(func() -> bool: return current_scene is Room and current_scene.scene_file_path == path and current_scene.is_node_ready() and not _game.is_transitioning(), max_frames)
+	return current_scene as Room if arrived else null
+
+
+## Waits until `room`'s navigation map holds its navmesh.
+func _wait_navmesh(room: Room) -> void:
+	var map := room.get_world_2d().navigation_map
+	await _wait_until(func() -> bool: return NavigationServer2D.map_get_closest_point_owner(map, room.mime.position).is_valid(), 60)
 
 
 ## A frame naming an unknown painting is reported and stays empty.
