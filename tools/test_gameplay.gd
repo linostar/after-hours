@@ -78,6 +78,7 @@ func _tests() -> Array[Callable]:
 		_test_guard_brain_chase_and_noise,
 		_test_forgery_scoring,
 		_test_forgery_grades,
+		_test_paintings_registry,
 		_test_canvas_traces_and_grades,
 		_test_canvas_close_keeps_strokes,
 		_test_canvas_assist_paints_good,
@@ -367,6 +368,21 @@ func _test_forgery_grades() -> void:
 	_check(not Forgery.is_noticed(Forgery.Grade.GOOD, 1) and Forgery.is_noticed(Forgery.Grade.GOOD, 2), name, "a Good fake does not survive exactly one inspection")
 	_check(not Forgery.is_noticed(Forgery.Grade.PERFECT, 99), name, "a Perfect fake is noticed")
 
+
+## Every painting id has its scan, credited in SOURCES.json, and its style shader; the
+## registry and the credits list the same six ids; an unknown id has no style.
+func _test_paintings_registry() -> void:
+	var name := "paintings_registry"
+	var credited: Array[StringName] = []
+	for entry: Dictionary in JSON.parse_string(FileAccess.get_file_as_string("res://art/scans/SOURCES.json")):
+		credited.append(StringName(entry["id"]))
+		_check(entry["file"] == "%s.webp" % entry["id"], name, "credit '%s' names file '%s'" % [entry["id"], entry["file"]])
+	_check(credited == Paintings.IDS, name, "SOURCES.json ids %s are not Paintings.IDS %s" % [credited, Paintings.IDS])
+	for id in Paintings.IDS:
+		_check(Paintings.SCANS.get(id) != null, name, "%s has no scan" % id)
+		var material := Paintings.style(id, true)
+		_check(material != null and material.shader == Paintings.STYLES[id] and material.get_shader_parameter(&"use_screen") == true, name, "%s's screen style is not its shader reading the screen" % id)
+	_check(Paintings.style(&"no_such_painting") == null, name, "an unknown id has a style")
 
 ## A finger pressed at the first of `points` (canvas base units), dragged through the
 ## rest and lifted at the last, one event a frame.
