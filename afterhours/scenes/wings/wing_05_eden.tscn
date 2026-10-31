@@ -47,6 +47,9 @@ position = Vector2(560, 250)
 [node name="Guard" parent="Actors" instance=ExtResource("guard")]
 route = PackedVector2Array(160, 470, 820, 470)
 
+[node name="Guard2" parent="Actors" instance=ExtResource("guard")]
+route = PackedVector2Array(200, 320, 200, 440, 480, 440, 480, 320)
+
 [node name="ToGarden" parent="Doors" instance=ExtResource("door")]
 position = Vector2(925, 330)
 to_room = 1

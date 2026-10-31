@@ -1,7 +1,7 @@
 # Wing 3 brief: A Sunday on La Grande Jatte (Seurat)
 
 ## Constraints
-- Two rooms; 3 to 6 minutes; every star reachable (bot-proved).
+- Three rooms (lengthened from two after the first playtest); 3 to 6 minutes; every star reachable (bot-proved).
 - New idea: the mime leaves traces. Guards are no longer only eyes and ears; they read the
   ground.
 - Gimmick: a dotted lawn under parasols. Every 26 units the walking mime leaves footprints
@@ -25,7 +25,9 @@
    right door, facing it, so the mime coming back into room 0 was seen on arrival (guards
    restart their routes when the mime enters a room). The route now starts at the far left.
 
+## Lengthening pass
+Lengthening pass: a hall, a second lawn guard and a longer gallery loop. The bot found a
+way through on the first recording.
+
 ## Bot result
-`tools/bot.gd --record`: 25 plays; the easel waits 5 s for the lawn guard to walk off; the
-run takes 24.9 s, par 75 s. The gallery's second guard follows the trail after the swap
-and the mime outruns it.
+`tools/bot.gd --record`: the easel waits 5.75 s, the hall crossing 5.75 s and the way back 4 s; the run takes 45 s, par 100 s.

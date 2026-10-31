@@ -1,0 +1,71 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/room_base.tscn" id="base"]
+[ext_resource type="Script" path="res://scripts/gimmicks/footprints.gd" id="gimmick"]
+[ext_resource type="PackedScene" path="res://scenes/tilt_frame.tscn" id="frame"]
+[ext_resource type="PackedScene" path="res://scenes/hiding_portrait.tscn" id="portrait"]
+[ext_resource type="Script" path="res://scripts/partition.gd" id="partition"]
+[ext_resource type="PackedScene" path="res://scenes/guard.tscn" id="guard"]
+[ext_resource type="PackedScene" path="res://scenes/door.tscn" id="door"]
+
+[node name="Room" instance=ExtResource("base")]
+
+[node name="Entrance" parent="."]
+position = Vector2(100, 330)
+
+[node name="BackWall" parent="."]
+color = Color(0.62, 0.75, 0.82, 1)
+
+[node name="Wainscot" parent="."]
+color = Color(0.3, 0.42, 0.3, 1)
+
+[node name="Floor" parent="."]
+color = Color(0.42, 0.55, 0.3, 1)
+
+[node name="Gimmick" type="Node2D" parent="."]
+z_index = -9
+script = ExtResource("gimmick")
+parasols = PackedVector3Array(480, 330, 60, 760, 460, 50)
+
+[node name="FrameA" parent="Frames" instance=ExtResource("frame")]
+position = Vector2(260, 75)
+painting = "pearl_earring"
+
+[node name="FrameB" parent="Frames" instance=ExtResource("frame")]
+position = Vector2(700, 75)
+painting = "starry_night"
+
+[node name="PortraitA" parent="Portraits" instance=ExtResource("portrait")]
+position = Vector2(480, 105)
+painting = "mona_lisa"
+face = Vector2(0, -24)
+
+[node name="Partition0" type="StaticBody2D" parent="Actors"]
+position = Vector2(330, 440)
+script = ExtResource("partition")
+width = 120
+depth = 50
+height = 80
+
+[node name="Partition1" type="StaticBody2D" parent="Actors"]
+position = Vector2(640, 280)
+script = ExtResource("partition")
+width = 120
+depth = 50
+height = 80
+
+[node name="Guard" parent="Actors" instance=ExtResource("guard")]
+route = PackedVector2Array(480, 250, 700, 250, 700, 480, 260, 480, 260, 250)
+
+[node name="Guard2" parent="Actors" instance=ExtResource("guard")]
+route = PackedVector2Array(580, 470, 580, 330, 380, 330)
+
+[node name="ToFirst" parent="Doors" instance=ExtResource("door")]
+position = Vector2(45, 330)
+to_room = 0
+opening = Rect2(-45, -40, 24, 80)
+arrival = Vector2(60, 0)
+
+[node name="ToLast" parent="Doors" instance=ExtResource("door")]
+position = Vector2(925, 330)
+to_room = 2

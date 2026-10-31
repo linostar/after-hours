@@ -54,7 +54,7 @@ height = 80
 route = PackedVector2Array(640, 240, 880, 240)
 
 [node name="Guard2" parent="Actors" instance=ExtResource("guard")]
-route = PackedVector2Array(200, 480, 760, 480)
+route = PackedVector2Array(480, 480, 760, 480, 760, 380, 200, 380, 200, 480)
 
 [node name="ToGarden" parent="Doors" instance=ExtResource("door")]
 position = Vector2(45, 330)

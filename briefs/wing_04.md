@@ -1,7 +1,7 @@
 # Wing 4 brief: The Starry Night (Van Gogh)
 
 ## Constraints
-- Two rooms; 3 to 6 minutes; every star reachable (bot-proved).
+- Three rooms (lengthened from two after the first playtest); 3 to 6 minutes; every star reachable (bot-proved).
 - New idea: the room itself watches. Light is no longer a slow drift (wing 1) but moving
   hazards to dodge in the dark.
 - Gimmick: swirling searchlights. Night lies over the floor (guards notice the mime at half
@@ -18,6 +18,11 @@
   right half of the back row, another the front row; a partition breaks the front guard's
   view.
 
+- Room 1, the hall (new): two pools of light; one partition across the middle; a guard
+  loops around it, another paces below it.
+- The terrace has a second guard pacing the right side; the gallery's front guard now
+  loops the lower floor.
+
 ## Intended route
 Wait behind the partition for a gap in the pools and the guard's loop; paint; through the
 right door; swap between the pools' passes; back and out low on the left.
@@ -25,6 +30,9 @@ right door; swap between the pools' passes; back and out low on the left.
 ## Design loop
 The first draft passed: the bot found a wait for every leg on its first recording.
 
+## Lengthening pass
+Lengthening pass: a hall, a second terrace guard and a longer gallery loop. The bot found
+a way through on the first recording (123 plays).
+
 ## Bot result
-`tools/bot.gd --record`: 40 plays; the easel waits 8 s for the pools and the guard; the run
-takes 28.3 s, par 80 s.
+`tools/bot.gd --record`: 123 plays; waits of 8, 3 and 9.5 s on the way in and 5.25 and 3.25 s on the way out; the run takes 58 s, par 115 s.

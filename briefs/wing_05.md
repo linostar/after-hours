@@ -1,7 +1,7 @@
 # Wing 5 brief: The Garden of Earthly Delights (Bosch)
 
 ## Constraints
-- Three linked rooms, the triptych: Eden, the Garden, Hell. 3 to 6 minutes; every star
+- Three linked rooms, the triptych: Eden, the Garden, Hell. Lengthened with more guards after the first playtest. 3 to 6 minutes; every star
   reachable (bot-proved).
 - New idea: distance. The masterpiece is two rooms away, so the run is long and the way
   back passes every hazard again with the original.
@@ -19,6 +19,9 @@
 - Room 2, Hell (dark red): the triptych hangs right of centre; a guard paces the right of the
   back row beside it, another the front; a partition to wait behind; two creatures.
 
+- Lengthening pass: Eden has a second guard looping its left side; the Garden a third,
+  pacing the lower right; Hell's front guard loops the lower floor.
+
 ## Intended route
 Paint in Eden; cross the Garden between the creatures' loops and the guards' turns; swap in
 Hell; come back the same way, now carrying the original past the same creatures, and leave
@@ -27,6 +30,15 @@ Eden low on the left.
 ## Design loop
 The first draft passed: the bot found a wait for every leg on its first recording.
 
+## Lengthening pass
+Lengthening pass (more guards; the wing already had three rooms):
+1. The Garden's third guard first paced at x 500, across the line between its doors: no
+   wait got the mime across. It moved to the lower right.
+2. Eden's new loop first reached x 760 facing right, in view of the mime coming back in
+   (moved in to x 640), then ran through the easel spot (moved to the left side).
+3. Even so, the straight line from Eden's right door to the exit crossed both Eden guards'
+   beats. The route now goes along the top of the room first (a waypoint at (300, 215)), as
+   a player would.
+
 ## Bot result
-`tools/bot.gd --record`: 50 plays; the first door waits 4.25 s and the Garden crossing 4 s
-for the creatures and guards, the exit 2.25 s; the run takes 40.6 s, par 95 s.
+`tools/bot.gd --record`: 42 plays; the doors in wait 4.25 and 4 s; the run takes 39 s, par 90 s (the bot threads the extra guards; a person will be slower).

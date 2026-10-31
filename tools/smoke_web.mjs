@@ -9,13 +9,13 @@
 // Masterpiece at ...", "[Room] Door to N at ...", N -1 for the exit): tap the title's play
 // button where it logs itself ("[Title] Play button at ..."), require "[Game] Arrived at
 // ROOM" (the foyer, no guard), tap the easel and drag along every ghost stroke the canvas
-// logs ("[Forgery] Ghosts in base units ...") until "[Room] Fake ready"; tap the door to
-// room 1 until the gallery arrives; there wait until the guard reaches its bottom-right
-// corner ("[Guard] Guard reaches waypoint 2", from where it walks the bottom leg facing
-// away from the painting) and tap the masterpiece until "[Room] Swapped" (a catch, "[Room]
-// Caught", is waited out until the mime is back at the entrance, then the tap is repeated,
-// at most ATTEMPTS times); tap the door back to room 0, then the foyer's exit until
-// "[Room] Escaped", and require "[Results] Stars".
+// logs ("[Forgery] Ghosts in base units ...") until "[Room] Fake ready"; through the door
+// to room 1 (the hall) and on through its door to room 2 (the gallery); there wait until
+// the guard reaches its bottom-right corner ("[Guard] Guard reaches waypoint 2", from where
+// it walks the bottom leg facing away from the painting) and tap the masterpiece until
+// "[Room] Swapped"; back through the hall to the foyer and tap its exit until "[Room]
+// Escaped", and require "[Results] Stars". A catch ("[Room] Caught") is waited out until
+// the mime is back at the entrance, then the tap is repeated, at most ATTEMPTS times.
 // Usage: node tools/smoke_web.mjs [buildDir]   (default: build/web)
 // Env:   SMOKE_BOOT_TIMEOUT_MS (default 30000), SMOKE_SETTLE_MS (default 2000),
 //        SMOKE_STEP_TIMEOUT_MS (each waited-for log line, default 20000)
@@ -171,8 +171,8 @@ async function doorAt(page, logs, to, from) {
   return { x: Number(door[1]), y: Number(door[2]) };
 }
 
-// Wing 1 end to end: play, paint the fake in the foyer, through to the gallery, swap the
-// masterpiece, back to the foyer, escape, the results.
+// Wing 1 end to end: play, paint the fake in the foyer, through the hall to the gallery,
+// swap the masterpiece, back through the hall to the foyer, escape, the results.
 async function playWing1(page, logs, pointer, run) {
   const arrived = /^\[Game\] Arrived at ROOM/;
   const play = await waitForLog(page, logs, PLAY_RECT, 'the play button\'s rect');
@@ -182,17 +182,25 @@ async function playWing1(page, logs, pointer, run) {
   await waitForLog(page, logs, arrived, 'the foyer after tapping play', from);
   const easel = await waitForLog(page, logs, EASEL_RECT, 'the easel', from);
   const [ax, ay, aw, ah] = easel.slice(1).map(Number);
-  const toGallery = await doorAt(page, logs, 1, from);
+  const toHall = await doorAt(page, logs, 1, from);
   await page.waitForTimeout(FADE_WAIT_MS);
   const paints = await paintFake(page, logs, pointer, { x: ax + aw / 2, y: ay + ah / 2 });
   const fake = logs.find((line) => line.startsWith('[Room] Fake ready'));
   from = logs.length;
+  await tapUntil(page, logs, pointer, toHall, arrived, 'the hall');
+  const toGallery = await doorAt(page, logs, 2, from);
+  await page.waitForTimeout(FADE_WAIT_MS);
+  from = logs.length;
   await tapUntil(page, logs, pointer, toGallery, arrived, 'the gallery');
   const masterpiece = await waitForLog(page, logs, MASTERPIECE_RECT, 'the masterpiece', from);
   const [rx, ry, rw, rh] = masterpiece.slice(1).map(Number);
-  const toFoyer = await doorAt(page, logs, 0, from);
+  const backToHall = await doorAt(page, logs, 1, from);
   await page.waitForTimeout(FADE_WAIT_MS);
   const swaps = await tapUntil(page, logs, pointer, { x: rx + rw / 2, y: ry + rh / 2 }, /^\[Room\] Swapped/, 'the swap', GUARD_SAFE);
+  from = logs.length;
+  await tapUntil(page, logs, pointer, backToHall, arrived, 'the hall again');
+  const toFoyer = await doorAt(page, logs, 0, from);
+  await page.waitForTimeout(FADE_WAIT_MS);
   from = logs.length;
   await tapUntil(page, logs, pointer, toFoyer, arrived, 'the foyer again');
   const exit = await doorAt(page, logs, -1, from);

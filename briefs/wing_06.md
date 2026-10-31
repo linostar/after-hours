@@ -1,7 +1,7 @@
 # Wing 6 brief: Mona Lisa (Leonardo), the finale
 
 ## Constraints
-- Two rooms; 3 to 6 minutes; every star reachable (bot-proved).
+- Three rooms (lengthened from two after the first playtest); 3 to 6 minutes; every star reachable (bot-proved).
 - New idea: everything at once. Every earlier wing's gimmick returns, two per room in the
   salon and three in the Salle; the Mona Lisa hangs under glass (a sheen and a glint).
 - Gimmick: GimmickMix, the earlier gimmicks combined: light multiplies (any shade still
@@ -27,6 +27,10 @@
    shaded the swap and the back-row guard started walking away. The parasol went and the
    guard now starts at the right, walking towards the painting.
 
+## Lengthening pass
+Lengthening pass: a middle gallery and more guards.
+4. The grand gallery's second guard first paced up and down at x 500, facing up across the
+   line between its doors: no wait got the mime across. It now walks the bottom wall.
+
 ## Bot result
-`tools/bot.gd --record`: 37 plays; the swap waits for the back-row guard to pass and turn;
-the run takes 27.3 s, par 75 s.
+`tools/bot.gd --record`: 74 plays; the swap waits 8 s; the run takes 45.5 s, par 100 s.

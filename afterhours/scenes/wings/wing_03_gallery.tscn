@@ -61,10 +61,10 @@ height = 80
 route = PackedVector2Array(620, 230, 880, 230)
 
 [node name="Guard2" parent="Actors" instance=ExtResource("guard")]
-route = PackedVector2Array(880, 480, 560, 480, 560, 330, 880, 330)
+route = PackedVector2Array(700, 480, 300, 480, 300, 330, 700, 330)
 
-[node name="ToLawn" parent="Doors" instance=ExtResource("door")]
+[node name="ToHall" parent="Doors" instance=ExtResource("door")]
 position = Vector2(45, 330)
-to_room = 0
+to_room = 1
 opening = Rect2(-45, -40, 24, 80)
 arrival = Vector2(60, 0)
