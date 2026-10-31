@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://scripts/room.gd" id="1_room"]
 [ext_resource type="PackedScene" path="res://scenes/mime.tscn" id="2_mime"]
@@ -8,6 +8,7 @@
 [ext_resource type="PackedScene" path="res://scenes/results.tscn" id="6_results"]
 [ext_resource type="PackedScene" path="res://scenes/forgery_canvas.tscn" id="7_canvas"]
 [ext_resource type="Texture2D" path="res://art/svg/easel.svg" id="8_easel"]
+[ext_resource type="PackedScene" path="res://scenes/tilt_frame.tscn" id="9_frame"]
 
 [sub_resource type="NavigationPolygon" id="NavigationPolygon_floor"]
 vertices = PackedVector2Array(40, 180, 920, 180, 920, 500, 40, 500, 392, 292, 568, 292, 568, 368, 392, 368)
@@ -56,6 +57,14 @@ polygon = PackedVector2Array(232, 368, 228.2, 374.9, 217.4, 380.7, 201.1, 384.6,
 z_index = -9
 position = Vector2(780, 75)
 texture = ExtResource("5_painting")
+
+[node name="Frames" type="Node2D" parent="."]
+
+[node name="FrameA" parent="Frames" instance=ExtResource("9_frame")]
+position = Vector2(290, 75)
+
+[node name="FrameB" parent="Frames" instance=ExtResource("9_frame")]
+position = Vector2(610, 75)
 
 [node name="FakeIcon" type="Sprite2D" parent="."]
 visible = false

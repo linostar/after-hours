@@ -1,0 +1,13 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/tilt_frame.gd" id="1_frame"]
+[ext_resource type="Texture2D" path="res://art/svg/small_frame.svg" id="2_sprite"]
+
+[node name="TiltFrame" type="Node2D"]
+z_index = -9
+script = ExtResource("1_frame")
+
+[node name="Sprite" type="Sprite2D" parent="."]
+texture = ExtResource("2_sprite")
+position = Vector2(0, -25)
+offset = Vector2(0, 25)

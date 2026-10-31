@@ -88,6 +88,8 @@ func _tests() -> Array[Callable]:
 		_test_guard_partition_blocks_sight,
 		_test_guard_ignores_behind,
 		_test_guard_chase_search_return,
+		_test_tilt_decoy_investigated,
+		_test_tilted_frame_seen_and_straightened,
 		_test_guard_pauses_facing_its_leg,
 		_test_catches_during_swap_and_while_carrying,
 		_test_title_play_starts_room,
@@ -733,6 +735,45 @@ func _test_guard_chase_search_return() -> void:
 	var next_waypoint := room.guard.route[1]
 	var back := await _wait_until(func() -> bool: return room.guard.position.is_equal_approx(next_waypoint), 600)
 	_check(back, name, "the guard did not walk back to its next waypoint %s (at %s)" % [next_waypoint, room.guard.position])
+
+
+## Tapping a frame walks the mime under it and tilts it; a guard in earshot investigates,
+## straightens it and goes back to patrolling; one out of earshot hears nothing, and a
+## tilted frame is not a tilt target.
+func _test_tilt_decoy_investigated() -> void:
+	var name := "tilt_decoy_investigated"
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.target = null
+	_stage_guard(room, Vector2(660, 430), Vector2.LEFT, Room.ENTRANCE)
+	var frame := room.get_node("Frames/FrameB") as TiltFrame
+	await _tap_at(frame.position)
+	_check(room.tilt_target == frame, name, "a tap on the frame did not make it the tilt target")
+	_check(await _wait_until(func() -> bool: return frame.tilted, 600), name, "the mime never tilted the frame (at %s)" % room.mime.position)
+	_check(await _wait_until(func() -> bool: return room.guard.intent == GuardBrain.Intent.INVESTIGATE, 10), name, "the guard in earshot did not investigate (intent %s)" % _intent_name(room.guard.intent))
+	await _tap_at(frame.position)
+	_check(room.tilt_target == null, name, "a tilted frame became a tilt target")
+	_check(await _wait_until(func() -> bool: return not frame.tilted, 900), name, "the guard never straightened the frame (intent %s, at %s)" % [_intent_name(room.guard.intent), room.guard.position])
+	await physics_frame
+	_check(room.guard.intent == GuardBrain.Intent.PATROL, name, "after straightening the guard is %s, not patrolling" % _intent_name(room.guard.intent))
+	room.guard.position = Vector2(900, 500)
+	_check(not room.guard.hear(Vector2(100, 180)), name, "a guard %.0f away heard a noise (range %.0f)" % [Vector2(900, 500).distance_to(Vector2(100, 180)), GuardBrain.HEARING_RANGE])
+
+
+## A guard that sees a tilted frame without hearing it walks over and straightens it.
+func _test_tilted_frame_seen_and_straightened() -> void:
+	var name := "tilted_frame_seen_and_straightened"
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.target = null
+	var frame := room.get_node("Frames/FrameA") as TiltFrame
+	frame.tilt()
+	_stage_guard(room, Vector2(frame.position.x, 260), Vector2.UP, Room.ENTRANCE)
+	_check(await _wait_until(func() -> bool: return room.guard.intent == GuardBrain.Intent.STRAIGHTEN, 10), name, "a guard facing a tilted frame did not go to straighten it (intent %s)" % _intent_name(room.guard.intent))
+	var straightened := await _wait_until(func() -> bool: return not frame.tilted, ceili(Guard.STRAIGHTEN_TIME * 60.0) + 120)
+	_check(straightened and not room.guard.senses.tilted_frame_known, name, "the seen frame was not straightened")
 
 
 ## Taps the centre of `control`, as a finger would.

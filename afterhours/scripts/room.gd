@@ -8,7 +8,9 @@ extends Node2D
 ## puts the glow out (tapping the easel again repaints it). With a fake, a tap on the
 ## masterpiece (PAINTING_RECT) walks the mime to SWAP_SPOT below it, where standing still
 ## for SWAP_TIME swaps the fake for the original (tapping elsewhere cancels the swap); a
-## tap there without one is a tap on the floor. Carrying the original, the exit door
+## tap there without one is a tap on the floor. A tap on a straight small frame (a
+## TiltFrame under Frames) walks the mime under it and tilts it: a noise every guard in
+## earshot hears (Guard.hear). Carrying the original, the exit door
 ## glows, and the fake hangs in the original's place: the guard watches it (FAKE_VIEW_POINT,
 ## the floor at its foot) and inspects it once per pass, a "?" over the painting while it
 ## does; a fake found out (Forgery.is_noticed) turns the "?" into "!" for good, and the guard
@@ -59,6 +61,8 @@ var tossing := false
 var swap_intent := false
 ## Whether the mime is heading to the easel to paint.
 var paint_intent := false
+## The frame the mime is heading to tilt, if any.
+var tilt_target: TiltFrame
 ## The quality (Forgery) of the fake the mime carries, or of the one hung by the swap.
 var fake_quality := 0.0
 ## Whether the swap has hung the fake, how many inspections it has had, and whether one
@@ -76,6 +80,7 @@ var stars: Array[bool] = []
 @onready var _easel_glow: Polygon2D = $EaselGlow
 @onready var _canvas: ForgeryCanvas = $EaselLayer/ForgeryCanvas
 @onready var _fake_icon: Sprite2D = $FakeIcon
+var _frames: Array[TiltFrame] = []
 @onready var _results: Results = $ResultsLayer/Results
 @onready var _game := get_node(GameState.AUTOLOAD_PATH) as GameState
 
@@ -88,6 +93,9 @@ func _ready() -> void:
 	guard.caught.connect(_on_caught)
 	guard.inspected.connect(_on_inspected)
 	_floor.tapped.connect(_on_floor_tapped)
+	for frame in $Frames.get_children():
+		_frames.append(frame as TiltFrame)
+	guard.frames = _frames
 	_canvas.watcher = guard
 	_canvas.painted.connect(_on_painted)
 	_game.arrive(GameState.Flow.ROOM)
@@ -102,6 +110,8 @@ func _physics_process(delta: float) -> void:
 	if paint_intent and not tossing and not mime.walking and mime.position.distance_to(EASEL_SPOT) <= SWAP_REACH:
 		paint_intent = false
 		_canvas.open()
+	if tilt_target != null and not tossing and not mime.walking and mime.position.distance_to(tilt_target.spot()) <= SWAP_REACH:
+		_tilt(tilt_target)
 	if fake_hung and not found_out:
 		_fake_icon.visible = guard.inspecting
 	if swap_intent and not tossing and not mime.walking and mime.position.distance_to(SWAP_SPOT) <= SWAP_REACH:
@@ -121,6 +131,12 @@ func _on_floor_tapped(at: Vector2) -> void:
 		return
 	_cancel_swap()
 	paint_intent = false
+	tilt_target = null
+	for frame in _frames:
+		if frame.rect().has_point(at) and not frame.tilted:
+			tilt_target = frame
+			mime.walk_to(frame.spot())
+			return
 	if EASEL_RECT.has_point(at) and not mime.carrying:
 		paint_intent = true
 		mime.walk_to(EASEL_SPOT)
@@ -137,6 +153,13 @@ func _cancel_swap() -> void:
 		print("[Room] Swap cancelled at %d%%" % roundi(mime.swap_progress * 100.0))
 	swap_intent = false
 	mime.swap_progress = 0.0
+
+
+func _tilt(frame: TiltFrame) -> void:
+	tilt_target = null
+	frame.tilt()
+	var heard := guard.hear(frame.view_point())
+	print("[Room] Tilted the frame at %s at t %.2f (heard: %s)" % [frame.position.round(), elapsed, heard])
 
 
 func _on_painted(quality: float) -> void:
@@ -191,6 +214,7 @@ func _on_caught() -> void:
 	tossing = true
 	_cancel_swap()
 	paint_intent = false
+	tilt_target = null
 	_canvas.close()
 	var from := mime.position
 	mime.place_at(from)

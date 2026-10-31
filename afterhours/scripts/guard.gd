@@ -8,6 +8,10 @@ extends Node2D
 ##   the navmesh back to its next waypoint.
 ## - INSPECT: once per pass (re-armed when it no longer sees it), stands facing the hung
 ##   fake (fake_point, while watches_fake) for INSPECT_TIME, then emits inspected.
+## - INVESTIGATE: walks to a noise it heard (hear, within GuardBrain.HEARING_RANGE) at
+##   INVESTIGATE_SPEED and looks at where it came from.
+## - STRAIGHTEN: a tilted frame it sees (one of frames) gets walked to and, after
+##   STRAIGHTEN_TIME, straightened (which also settles a noise that came from it).
 ## - SEARCH: walks to search_point at SEARCH_SPEED and looks around for SEARCH_TIME.
 ## - CHASE: from full suspicion, runs at the mime at CHASE_SPEED (to where it last saw it
 ##   while it cannot see it); within CATCH_REACH it emits caught and stops until the room
@@ -17,6 +21,10 @@ extends Node2D
 
 const PATROL_SPEED := 70.0
 const SEARCH_SPEED := 100.0
+const INVESTIGATE_SPEED := 90.0
+const STRAIGHTEN_TIME := 1.0
+## A noise this close to a frame it straightens is that frame's (no longer to investigate).
+const NOISE_EXPLAINED := 40.0
 ## Below the mime's speed (Mime.SPEED): a mime that runs at once gets away.
 const CHASE_SPEED := 150.0
 ## How close a chasing guard must get to catch the mime.
@@ -66,6 +74,10 @@ var suspicion := 0.0
 var watches_fake := false
 var fake_point := Vector2.ZERO
 var inspecting := false
+## The room's tilt decoys, which it straightens when it sees them tilted.
+var frames: Array[TiltFrame] = []
+## Where the noise it is investigating came from.
+var noise_point := Vector2.ZERO
 var intent := GuardBrain.Intent.PATROL
 var scores: Dictionary[GuardBrain.Intent, float] = {}
 var senses := GuardBrain.Senses.new()
@@ -76,6 +88,8 @@ var _inspect_left := 0.0
 var _fake_armed := true
 ## Whether it left its route and walks the navmesh back to it.
 var _returning := false
+var _straighten_frame: TiltFrame
+var _straighten_left := 0.0
 var _next := 0
 var _pause := 0.0
 
@@ -93,6 +107,8 @@ func reset() -> void:
 	_inspect_left = 0.0
 	_fake_armed = true
 	_returning = false
+	_straighten_frame = null
+	_straighten_left = 0.0
 	senses = GuardBrain.Senses.new()
 	intent = GuardBrain.Intent.PATROL
 	active = true
@@ -116,6 +132,19 @@ func search(point: Vector2) -> void:
 	print("[Guard] %s searches around %s" % [name, point.round()])
 
 
+## Hears a noise at `point` (room coordinates) if it is within HEARING_RANGE; returns
+## whether it did.
+func hear(point: Vector2) -> bool:
+	var distance := position.distance_to(point)
+	if distance >= GuardBrain.HEARING_RANGE:
+		return false
+	noise_point = point
+	senses.noise_heard = true
+	senses.noise_distance = distance
+	print("[Guard] %s hears a noise at %s" % [name, point.round()])
+	return true
+
+
 ## Whether the guard sees `point` (global): inside its cone and no wall in between.
 func can_see(point: Vector2) -> bool:
 	if not Detection.in_cone(global_position, facing, point, CONE_RANGE, CONE_HALF_ANGLE):
@@ -129,6 +158,7 @@ func _physics_process(delta: float) -> void:
 		return
 	_look(delta)
 	_sense_fake()
+	_sense_frames()
 	if senses.chasing and senses.lost_sight_for >= GuardBrain.CHASE_MEMORY and not Detection.is_full(suspicion):
 		senses.chasing = false
 		print("[Guard] %s loses the mime" % name)
@@ -146,7 +176,11 @@ func _physics_process(delta: float) -> void:
 			_search(delta)
 		GuardBrain.Intent.INSPECT:
 			_inspect(delta)
-		_:
+		GuardBrain.Intent.INVESTIGATE:
+			_investigate(delta)
+		GuardBrain.Intent.STRAIGHTEN:
+			_straighten(delta)
+		GuardBrain.Intent.PATROL:
 			_patrol(delta)
 	_update_cone()
 
@@ -204,6 +238,30 @@ func _chase(delta: float) -> void:
 		caught.emit()
 
 
+func _investigate(delta: float) -> void:
+	if not _travel(noise_point, INVESTIGATE_SPEED, delta):
+		return
+	senses.noise_heard = false
+	facing = (noise_point - position).normalized() if not noise_point.is_equal_approx(position) else Vector2.UP
+	print("[Guard] %s investigated the noise at %s" % [name, noise_point.round()])
+
+
+func _straighten(delta: float) -> void:
+	if not _travel(_straighten_frame.view_point(), INVESTIGATE_SPEED, delta):
+		_straighten_left = STRAIGHTEN_TIME
+		return
+	facing = Vector2.UP
+	_straighten_left -= delta
+	if _straighten_left > 0.0:
+		return
+	_straighten_frame.straighten()
+	if senses.noise_heard and noise_point.distance_to(_straighten_frame.view_point()) < NOISE_EXPLAINED:
+		senses.noise_heard = false
+	print("[Guard] %s straightens the frame at %s" % [name, _straighten_frame.position.round()])
+	_straighten_frame = null
+	senses.tilted_frame_known = false
+
+
 func _search(delta: float) -> void:
 	if not _travel(search_point, SEARCH_SPEED, delta):
 		return
@@ -236,6 +294,19 @@ func _sense_fake() -> void:
 	if not sees and not inspecting:
 		_fake_armed = true
 	senses.fake_in_view = inspecting or (_fake_armed and sees)
+
+
+## Keeps the tilted frame it means to straighten, or picks one it sees.
+func _sense_frames() -> void:
+	if _straighten_frame != null and not _straighten_frame.tilted:
+		_straighten_frame = null
+	if _straighten_frame == null:
+		for frame in frames:
+			if frame.tilted and can_see(frame.view_point()):
+				_straighten_frame = frame
+				print("[Guard] %s sees a tilted frame at %s" % [name, frame.position.round()])
+				break
+	senses.tilted_frame_known = _straighten_frame != null
 
 
 func _look(delta: float) -> void:
