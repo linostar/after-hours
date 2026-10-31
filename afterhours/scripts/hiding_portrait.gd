@@ -8,8 +8,13 @@ const SIZE := Vector2(70, 130)
 ## Where the mime stands to step in (the floor at the wall's foot below it).
 const STAND_Y := 195.0
 
-## Its painting (a Paintings id): the room is seen in its style from inside.
-@export var painting := "mona_lisa"
+## Its painting (a Paintings id; the enum lists Paintings.IDS): the room is seen in its
+## style from inside.
+@export_enum("pearl_earring", "great_wave", "grande_jatte", "starry_night", "earthly_delights", "mona_lisa") var painting := "mona_lisa":
+	set(value):
+		painting = value
+		if is_node_ready():
+			($Picture as FramedPainting).painting = value
 ## Where the mime's face covers the sitter's (portrait-relative).
 @export var face := Vector2(0, -23)
 

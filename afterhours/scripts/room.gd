@@ -264,8 +264,12 @@ func _hide_in(portrait: HidingPortrait) -> void:
 	hidden_in = portrait
 	portrait.occupied = true
 	mime.visible = false
+	# The view's white rect only shows through a style: without one it would cover the room.
 	_style_view.material = Paintings.style(StringName(portrait.painting), true)
-	_style_view.show()
+	if _style_view.material == null:
+		_game.report_error("Room '%s': portrait %s has no style for painting '%s'" % [scene_file_path, portrait.name, portrait.painting])
+	else:
+		_style_view.show()
 	print("[Room] Hid in the portrait at %s at t %.2f (seen going in: %s)" % [portrait.position.round(), elapsed, seen])
 
 

@@ -16,8 +16,12 @@ const RIPPLE_COLOR := Color(0.95, 0.85, 0.4, 0.8)
 const STAND_Y := 195.0
 const VIEW_Y := 180.0
 
-## Its picture (a Paintings id).
-@export var painting := "great_wave"
+## Its picture (a Paintings id; the enum lists Paintings.IDS).
+@export_enum("pearl_earring", "great_wave", "grande_jatte", "starry_night", "earthly_delights", "mona_lisa") var painting := "great_wave":
+	set(value):
+		painting = value
+		if is_node_ready():
+			($Swing/Picture as FramedPainting).painting = value
 
 var tilted := false
 ## The ripple's progress, 0 (just tilted) to 1 (gone).

@@ -92,6 +92,8 @@ func _tests() -> Array[Callable]:
 		_test_tilt_decoy_investigated,
 		_test_tilted_frame_seen_and_straightened,
 		_test_hide_unseen_and_step_out,
+		_test_hide_view_fills_screen,
+		_test_hide_unknown_painting_reports,
 		_test_guard_saw_hiding_pulls_out,
 		_test_guard_loses_mime_after_hiding,
 		_test_guard_ignores_unseen_hiding,
@@ -385,6 +387,15 @@ func _test_paintings_registry() -> void:
 		var material := Paintings.style(id, true)
 		_check(material != null and material.shader == Paintings.STYLES[id] and material.get_shader_parameter(&"use_screen") == true, name, "%s's screen style is not its shader reading the screen" % id)
 	_check(Paintings.style(&"no_such_painting") == null, name, "an unknown id has a style")
+	for script: Script in [FramedPainting, TiltFrame, HidingPortrait]:
+		var hint := ""
+		for property in script.get_script_property_list():
+			if property["name"] == "painting":
+				hint = property["hint_string"]
+		var listed: Array[StringName] = []
+		for id in hint.split(","):
+			listed.append(StringName(id))
+		_check(listed == Paintings.IDS, name, "%s's painting choices %s are not Paintings.IDS" % [script.resource_path, hint])
 
 ## A finger pressed at the first of `points` (canvas base units), dragged through the
 ## rest and lifted at the last, one event a frame.
@@ -838,6 +849,44 @@ func _test_hide_unseen_and_step_out() -> void:
 	room.guard.facing = Vector2.RIGHT
 	await _tap_at(Vector2(300, 480))
 	_check(room.hidden_in == null and room.mime.visible and not portrait.occupied and room.mime.walking and not view.visible, name, "a floor tap did not step the mime out (and out of the style view) and walk it")
+
+
+## The view from inside a portrait covers the whole visible screen, not just the 960x540
+## base (expand aspect shows more on wide phones).
+func _test_hide_view_fills_screen() -> void:
+	var name := "hide_view_fills_screen"
+	var room := await _load_room()
+	if room == null:
+		return
+	var view := room.get_node("StyleLayer/StyleView") as ColorRect
+	root.size = Vector2i(1170, 540)
+	await process_frame
+	var visible_rect := room.get_viewport().get_visible_rect()
+	_check(view.get_global_rect().is_equal_approx(visible_rect), name, "on a 19.5:9 screen the view is %s, not the visible %s" % [view.get_global_rect(), visible_rect])
+	root.size = BASE_WINDOW
+	await process_frame
+
+
+## A portrait naming an unknown painting still hides the mime, but reports the painting and
+## never covers the room with the view's bare rect.
+func _test_hide_unknown_painting_reports() -> void:
+	var name := "hide_unknown_painting_reports"
+	var room := await _load_room()
+	if room == null:
+		return
+	_stage_guard(room, Vector2(500, 430), Vector2.RIGHT, Room.ENTRANCE)
+	var portrait := room.get_node("Portraits/PortraitA") as HidingPortrait
+	var errors_before := _game.errors.size()
+	_game.quiet_errors = true
+	portrait.painting = "no_such_painting"
+	await _tap_at(portrait.position)
+	var hid := await _wait_until(func() -> bool: return room.hidden_in == portrait, 600)
+	_game.quiet_errors = false
+	var reported := _game.errors.slice(errors_before).any(func(e: String) -> bool: return "has no style" in e and "no_such_painting" in e)
+	_check(hid and reported, name, "hiding in a portrait with an unknown painting was not reported (hid %s, errors %s)" % [hid, _game.errors.slice(errors_before)])
+	_check(not (room.get_node("StyleLayer/StyleView") as ColorRect).visible, name, "the style view covers the room without a style")
+	_game.errors.resize(errors_before)
+	(_game.get_node("ErrorLayer/ErrorBadge") as TextureRect).visible = false
 
 
 ## A guard who sees the mime step into a portrait chases it there and pulls it out (a
@@ -1429,6 +1478,11 @@ func _test_room_paintings_framed() -> void:
 		var shown := sprite.region_rect.size * sprite.scale
 		_check(shown.is_equal_approx(picture.size - Vector2.ONE * picture.moulding * 2.0), name, "%s's picture is %s, not its frame's inside" % [picture.get_path(), shown])
 	_check((room.mime.get_node("Carried") as FramedPainting).painting == "starry_night", name, "the mime does not carry the room's masterpiece")
+	var frame := room.get_node("Frames/FrameA") as TiltFrame
+	var portrait := room.get_node("Portraits/PortraitB") as HidingPortrait
+	frame.painting = "earthly_delights"
+	portrait.painting = "pearl_earring"
+	_check(pictures["great_wave"].painting == "earthly_delights" and pictures["mona_lisa"].painting == "pearl_earring", name, "a frame or portrait given a new painting after _ready still shows the old one")
 	var reference := room.get_node("EaselLayer/ForgeryCanvas/Reference") as TextureRect
 	var reference_style := reference.material as ShaderMaterial
 	_check(reference.texture == Paintings.SCANS[&"starry_night"] and reference_style != null and reference_style.shader == Paintings.STYLES[&"starry_night"], name, "the forgery canvas does not show the masterpiece in its style")
