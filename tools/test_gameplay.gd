@@ -90,6 +90,8 @@ func _tests() -> Array[Callable]:
 		_test_guard_chase_search_return,
 		_test_tilt_decoy_investigated,
 		_test_tilted_frame_seen_and_straightened,
+		_test_hide_unseen_and_step_out,
+		_test_guard_saw_hiding_pulls_out,
 		_test_guard_pauses_facing_its_leg,
 		_test_catches_during_swap_and_while_carrying,
 		_test_title_play_starts_room,
@@ -774,6 +776,46 @@ func _test_tilted_frame_seen_and_straightened() -> void:
 	_check(await _wait_until(func() -> bool: return room.guard.intent == GuardBrain.Intent.STRAIGHTEN, 10), name, "a guard facing a tilted frame did not go to straighten it (intent %s)" % _intent_name(room.guard.intent))
 	var straightened := await _wait_until(func() -> bool: return not frame.tilted, ceili(Guard.STRAIGHTEN_TIME * 60.0) + 120)
 	_check(straightened and not room.guard.senses.tilted_frame_known, name, "the seen frame was not straightened")
+
+
+## Hiding unseen: the mime steps into the portrait (gone, its face on the sitter) and a
+## guard staring at it from close by builds no suspicion; a floor tap steps it out.
+func _test_hide_unseen_and_step_out() -> void:
+	var name := "hide_unseen_and_step_out"
+	var room := await _load_room()
+	if room == null:
+		return
+	_stage_guard(room, Vector2(500, 430), Vector2.RIGHT, Room.ENTRANCE)
+	var portrait := room.get_node("Portraits/PortraitA") as HidingPortrait
+	await _tap_at(portrait.position)
+	var hid := await _wait_until(func() -> bool: return room.hidden_in == portrait, 600)
+	_check(hid and not room.mime.visible and portrait.occupied and (portrait.get_node("MimeFace") as Sprite2D).visible, name, "tapping the portrait did not hide the mime in it (hidden in %s, visible %s)" % [room.hidden_in, room.mime.visible])
+	room.guard.position = portrait.spot() + Vector2(100, 0)
+	room.guard.facing = Vector2.LEFT
+	for i in 60:
+		await physics_frame
+	_check(room.guard.suspicion == 0.0 and not room.guard.senses.chasing, name, "a guard facing the hidden mime from 100 away grew suspicious (%.2f)" % room.guard.suspicion)
+	room.guard.position = Vector2(500, 430)
+	room.guard.facing = Vector2.RIGHT
+	await _tap_at(Vector2(300, 480))
+	_check(room.hidden_in == null and room.mime.visible and not portrait.occupied and room.mime.walking, name, "a floor tap did not step the mime out and walk it")
+
+
+## A guard who sees the mime step into a portrait chases it there and pulls it out (a
+## catch); after the toss the mime is out and visible.
+func _test_guard_saw_hiding_pulls_out() -> void:
+	var name := "guard_saw_hiding_pulls_out"
+	var room := await _load_room()
+	if room == null:
+		return
+	var portrait := room.get_node("Portraits/PortraitA") as HidingPortrait
+	_stage_guard(room, portrait.spot() + Vector2(110, 0), Vector2.LEFT, portrait.spot())
+	await _tap_at(portrait.position)
+	_check(await _wait_until(func() -> bool: return room.hidden_in == portrait, 30), name, "the mime did not hide")
+	_check(room.guard.senses.chasing, name, "the guard that watched the mime hide did not give chase")
+	_check(await _wait_until(func() -> bool: return room.tossing, 240), name, "the guard never pulled the hidden mime out (intent %s, at %s)" % [_intent_name(room.guard.intent), room.guard.position])
+	await _wait_until(func() -> bool: return not room.tossing, 180)
+	_check(room.mime.visible and room.hidden_in == null and not portrait.occupied, name, "after the toss the mime is still hidden")
 
 
 ## Taps the centre of `control`, as a finger would.

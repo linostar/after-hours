@@ -10,7 +10,10 @@ extends Node2D
 ## for SWAP_TIME swaps the fake for the original (tapping elsewhere cancels the swap); a
 ## tap there without one is a tap on the floor. A tap on a straight small frame (a
 ## TiltFrame under Frames) walks the mime under it and tilts it: a noise every guard in
-## earshot hears (Guard.hear). Carrying the original, the exit door
+## earshot hears (Guard.hear). A tap on a tall portrait (a HidingPortrait under
+## Portraits) walks the mime there and it steps in, out of every guard's sight (a guard
+## who sees it step in chases it there and pulls it out); the next tap steps it out and
+## goes on as that tap. Carrying the original, the exit door
 ## glows, and the fake hangs in the original's place: the guard watches it (FAKE_VIEW_POINT,
 ## the floor at its foot) and inspects it once per pass, a "?" over the painting while it
 ## does; a fake found out (Forgery.is_noticed) turns the "?" into "!" for good, and the guard
@@ -63,6 +66,9 @@ var swap_intent := false
 var paint_intent := false
 ## The frame the mime is heading to tilt, if any.
 var tilt_target: TiltFrame
+## The portrait the mime is heading to hide in, and the one it hides in.
+var hide_target: HidingPortrait
+var hidden_in: HidingPortrait
 ## The quality (Forgery) of the fake the mime carries, or of the one hung by the swap.
 var fake_quality := 0.0
 ## Whether the swap has hung the fake, how many inspections it has had, and whether one
@@ -81,6 +87,7 @@ var stars: Array[bool] = []
 @onready var _canvas: ForgeryCanvas = $EaselLayer/ForgeryCanvas
 @onready var _fake_icon: Sprite2D = $FakeIcon
 var _frames: Array[TiltFrame] = []
+var _portraits: Array[HidingPortrait] = []
 @onready var _results: Results = $ResultsLayer/Results
 @onready var _game := get_node(GameState.AUTOLOAD_PATH) as GameState
 
@@ -96,6 +103,8 @@ func _ready() -> void:
 	for frame in $Frames.get_children():
 		_frames.append(frame as TiltFrame)
 	guard.frames = _frames
+	for portrait in $Portraits.get_children():
+		_portraits.append(portrait as HidingPortrait)
 	_canvas.watcher = guard
 	_canvas.painted.connect(_on_painted)
 	_game.arrive(GameState.Flow.ROOM)
@@ -112,6 +121,8 @@ func _physics_process(delta: float) -> void:
 		_canvas.open()
 	if tilt_target != null and not tossing and not mime.walking and mime.position.distance_to(tilt_target.spot()) <= SWAP_REACH:
 		_tilt(tilt_target)
+	if hide_target != null and not tossing and not mime.walking and mime.position.distance_to(hide_target.spot()) <= SWAP_REACH:
+		_hide_in(hide_target)
 	if fake_hung and not found_out:
 		_fake_icon.visible = guard.inspecting
 	if swap_intent and not tossing and not mime.walking and mime.position.distance_to(SWAP_SPOT) <= SWAP_REACH:
@@ -125,6 +136,10 @@ func _physics_process(delta: float) -> void:
 func _on_floor_tapped(at: Vector2) -> void:
 	if tossing or finished:
 		return
+	if hidden_in != null:
+		if hidden_in.rect().has_point(at):
+			return
+		_step_out()
 	var on_painting := PAINTING_RECT.has_point(at) and mime.has_fake
 	if on_painting and swap_intent:
 		# Already heading there or swapping: a second tap keeps the progress.
@@ -132,6 +147,12 @@ func _on_floor_tapped(at: Vector2) -> void:
 	_cancel_swap()
 	paint_intent = false
 	tilt_target = null
+	hide_target = null
+	for portrait in _portraits:
+		if portrait.rect().has_point(at):
+			hide_target = portrait
+			mime.walk_to(portrait.spot())
+			return
 	for frame in _frames:
 		if frame.rect().has_point(at) and not frame.tilted:
 			tilt_target = frame
@@ -153,6 +174,24 @@ func _cancel_swap() -> void:
 		print("[Room] Swap cancelled at %d%%" % roundi(mime.swap_progress * 100.0))
 	swap_intent = false
 	mime.swap_progress = 0.0
+
+
+func _hide_in(portrait: HidingPortrait) -> void:
+	hide_target = null
+	var seen := guard.active and guard.can_see(mime.global_position)
+	if seen:
+		guard.saw_hiding()
+	hidden_in = portrait
+	portrait.occupied = true
+	mime.visible = false
+	print("[Room] Hid in the portrait at %s at t %.2f (seen going in: %s)" % [portrait.position.round(), elapsed, seen])
+
+
+func _step_out() -> void:
+	print("[Room] Stepped out of the portrait at %s at t %.2f" % [hidden_in.position.round(), elapsed])
+	hidden_in.occupied = false
+	hidden_in = null
+	mime.visible = true
 
 
 func _tilt(frame: TiltFrame) -> void:
@@ -215,6 +254,9 @@ func _on_caught() -> void:
 	_cancel_swap()
 	paint_intent = false
 	tilt_target = null
+	hide_target = null
+	if hidden_in != null:
+		_step_out()
 	_canvas.close()
 	var from := mime.position
 	mime.place_at(from)

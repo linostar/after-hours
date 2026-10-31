@@ -15,7 +15,9 @@ extends Node2D
 ## - SEARCH: walks to search_point at SEARCH_SPEED and looks around for SEARCH_TIME.
 ## - CHASE: from full suspicion, runs at the mime at CHASE_SPEED (to where it last saw it
 ##   while it cannot see it); within CATCH_REACH it emits caught and stops until the room
-##   resets it. Out of sight for CHASE_MEMORY, it searches the last-seen spot.
+##   resets it. Out of sight for CHASE_MEMORY, it searches the last-seen spot. A hidden
+##   target (not visible) is never seen, unless the guard saw it hide (saw_hiding): then
+##   it chases to the hiding place and pulls it out.
 ## It walks the room's navmesh (Agent). The cone is drawn on the floor (red while it
 ## chases or searches) and the suspicion as an eye above its head that fills and reddens.
 
@@ -89,6 +91,8 @@ var _fake_armed := true
 ## Whether it left its route and walks the navmesh back to it.
 var _returning := false
 var _straighten_frame: TiltFrame
+## Whether it saw its target step into a hiding place (the chase does not lose it).
+var _knows_hiding := false
 var _straighten_left := 0.0
 var _next := 0
 var _pause := 0.0
@@ -107,6 +111,7 @@ func reset() -> void:
 	_inspect_left = 0.0
 	_fake_armed = true
 	_returning = false
+	_knows_hiding = false
 	_straighten_frame = null
 	_straighten_left = 0.0
 	senses = GuardBrain.Senses.new()
@@ -130,6 +135,15 @@ func search(point: Vector2) -> void:
 	search_point = point
 	senses.search_left = SEARCH_TIME
 	print("[Guard] %s searches around %s" % [name, point.round()])
+
+
+## Saw its target step into a hiding place: it gives chase to it and pulls it out.
+func saw_hiding() -> void:
+	_knows_hiding = true
+	senses.chasing = true
+	senses.lost_sight_for = 0.0
+	last_seen = target.global_position
+	print("[Guard] %s saw the mime hide at %s" % [name, last_seen.round()])
 
 
 ## Hears a noise at `point` (room coordinates) if it is within HEARING_RANGE; returns
@@ -312,14 +326,14 @@ func _sense_frames() -> void:
 func _look(delta: float) -> void:
 	if target == null:
 		return
-	var seen := can_see(target.global_position)
+	var seen := target.visible and can_see(target.global_position)
 	var before := suspicion
 	suspicion = Detection.suspicion_after(suspicion, seen, global_position.distance_to(target.global_position), CONE_RANGE, delta)
 	senses.suspicion = suspicion
 	if seen:
 		last_seen = target.global_position
 		senses.lost_sight_for = 0.0
-	elif senses.chasing:
+	elif senses.chasing and not _knows_hiding:
 		senses.lost_sight_for += delta
 	if before == 0.0 and suspicion > 0.0:
 		print("[Guard] %s spots the mime at %s" % [name, target.global_position.round()])
