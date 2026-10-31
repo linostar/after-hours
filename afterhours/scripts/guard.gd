@@ -19,7 +19,9 @@ extends Node2D
 ##   target (not visible) is never seen, unless the guard saw it hide (saw_hiding): then
 ##   it chases to the hiding place and pulls it out.
 ## It walks the room's navmesh (Agent). The cone is drawn on the floor (red while it
-## chases or searches) and the suspicion as an eye above its head that fills and reddens.
+## chases or searches), the suspicion as an eye above its head that fills and reddens, and
+## the intent as an icon above that (INTENT_ICONS; none while patrolling) that pops in
+## when the intent changes.
 
 const PATROL_SPEED := 70.0
 const SEARCH_SPEED := 100.0
@@ -54,6 +56,15 @@ const EYE_WHITE := Color(1.0, 0.98, 0.92)
 const EYE_INK := Color(0.1, 0.08, 0.13)
 const EYE_CALM := Color(0.95, 0.75, 0.2)
 const EYE_ALARM := Color(0.85, 0.15, 0.12)
+const INTENT_ICONS: Dictionary[GuardBrain.Intent, Texture2D] = {
+	GuardBrain.Intent.INVESTIGATE: preload("res://art/svg/icon_ear.svg"),
+	GuardBrain.Intent.STRAIGHTEN: preload("res://art/svg/icon_straighten.svg"),
+	GuardBrain.Intent.INSPECT: preload("res://art/svg/icon_inspect.svg"),
+	GuardBrain.Intent.SEARCH: preload("res://art/svg/icon_query.svg"),
+	GuardBrain.Intent.CHASE: preload("res://art/svg/icon_alarm.svg"),
+}
+const ICON_SCALE := 0.6
+const ICON_POP := 0.2
 
 ## Emitted when the guard starts seeing its target (suspicion leaves 0).
 signal spotted
@@ -99,6 +110,7 @@ var _pause := 0.0
 
 @onready var _cone: Polygon2D = $Cone
 @onready var _agent: NavigationAgent2D = $Agent
+@onready var _icon: Sprite2D = $IntentIcon
 
 
 ## Back to the start of the route, calm, facing its first leg, its senses cleared. A
@@ -116,6 +128,7 @@ func reset() -> void:
 	_straighten_left = 0.0
 	senses = GuardBrain.Senses.new()
 	intent = GuardBrain.Intent.PATROL
+	_show_intent()
 	active = true
 	if route.size() < 2:
 		(get_node(GameState.AUTOLOAD_PATH) as GameState).report_error("Guard '%s' has a route of %d point(s) (%s); it needs at least 2 to patrol" % [get_path(), route.size(), route])
@@ -182,6 +195,7 @@ func _physics_process(delta: float) -> void:
 	if chosen != intent:
 		_leave(intent)
 		intent = chosen
+		_show_intent()
 		print("[Guard] %s now %s" % [name, GuardBrain.Intent.keys()[intent]])
 	match intent:
 		GuardBrain.Intent.CHASE:
@@ -197,6 +211,21 @@ func _physics_process(delta: float) -> void:
 		GuardBrain.Intent.PATROL:
 			_patrol(delta)
 	_update_cone()
+
+
+## The current path on the navmesh (room coordinates), for the debug overlay.
+func nav_path() -> PackedVector2Array:
+	return _agent.get_current_navigation_path()
+
+
+## Pops in the icon of the current intent (none while patrolling).
+func _show_intent() -> void:
+	_icon.visible = INTENT_ICONS.has(intent)
+	if not _icon.visible:
+		return
+	_icon.texture = INTENT_ICONS[intent]
+	_icon.scale = Vector2.ZERO
+	create_tween().tween_property(_icon, "scale", Vector2.ONE * ICON_SCALE, ICON_POP).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 ## Cleans up after `left`, which another intent has just replaced.

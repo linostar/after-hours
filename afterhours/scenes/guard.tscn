@@ -17,3 +17,8 @@ target_desired_distance = 4.0
 [node name="Sprite" type="Sprite2D" parent="."]
 texture = ExtResource("2_sprite")
 offset = Vector2(0, -46)
+
+[node name="IntentIcon" type="Sprite2D" parent="."]
+visible = false
+position = Vector2(0, -152)
+scale = Vector2(0.6, 0.6)

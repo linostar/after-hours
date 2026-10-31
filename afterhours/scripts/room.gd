@@ -107,9 +107,22 @@ func _ready() -> void:
 		_portraits.append(portrait as HidingPortrait)
 	_canvas.watcher = guard
 	_canvas.painted.connect(_on_painted)
+	if DebugOverlay.wanted():
+		add_debug_overlay()
 	_game.arrive(GameState.Flow.ROOM)
 	print("[Room] Masterpiece at %s, exit at %s" % [PAINTING_RECT, EXIT])
 	print("[Room] Easel at %s" % EASEL_RECT)
+
+
+## Adds the dev-only guard debug overlay (DebugOverlay) above the room.
+func add_debug_overlay() -> DebugOverlay:
+	var overlay := DebugOverlay.new()
+	overlay.name = "DebugOverlay"
+	overlay.z_index = 100
+	overlay.guards = [guard]
+	add_child(overlay)
+	print("[Room] Debug overlay on")
+	return overlay
 
 
 func _physics_process(delta: float) -> void:

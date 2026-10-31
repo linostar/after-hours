@@ -92,6 +92,7 @@ func _tests() -> Array[Callable]:
 		_test_tilted_frame_seen_and_straightened,
 		_test_hide_unseen_and_step_out,
 		_test_guard_saw_hiding_pulls_out,
+		_test_intent_icons_and_overlay,
 		_test_guard_pauses_facing_its_leg,
 		_test_catches_during_swap_and_while_carrying,
 		_test_title_play_starts_room,
@@ -816,6 +817,28 @@ func _test_guard_saw_hiding_pulls_out() -> void:
 	_check(await _wait_until(func() -> bool: return room.tossing, 240), name, "the guard never pulled the hidden mime out (intent %s, at %s)" % [_intent_name(room.guard.intent), room.guard.position])
 	await _wait_until(func() -> bool: return not room.tossing, 180)
 	_check(room.mime.visible and room.hidden_in == null and not portrait.occupied, name, "after the toss the mime is still hidden")
+
+
+## The guard's intent icon pops in for each intent but patrol; the debug overlay is off
+## unless asked for, and draws the guards' paths and scores without errors when on.
+func _test_intent_icons_and_overlay() -> void:
+	var name := "intent_icons_and_overlay"
+	var room := await _load_room()
+	if room == null:
+		return
+	var icon := room.guard.get_node("IntentIcon") as Sprite2D
+	_check(not icon.visible, name, "a patrolling guard shows an intent icon")
+	_check(room.get_node_or_null("DebugOverlay") == null, name, "the debug overlay is on without --debug-overlay")
+	var overlay := room.add_debug_overlay()
+	room.guard.target = null
+	room.guard.position = Vector2(660, 430)
+	room.guard.hear(Vector2(610, 180))
+	for i in 20:
+		await physics_frame
+	_check(room.guard.intent == GuardBrain.Intent.INVESTIGATE and icon.visible and icon.texture == Guard.INTENT_ICONS[GuardBrain.Intent.INVESTIGATE] and icon.scale.is_equal_approx(Vector2.ONE * Guard.ICON_SCALE), name, "an investigating guard does not show the ear icon at full size (intent %s)" % _intent_name(room.guard.intent))
+	_check(room.guard.nav_path().size() > 1 and overlay.guards == [room.guard], name, "the overlay has no guard path to draw")
+	await process_frame
+	_check(_game.errors.is_empty(), name, "drawing the overlay reported errors: %s" % [_game.errors])
 
 
 ## Taps the centre of `control`, as a finger would.
