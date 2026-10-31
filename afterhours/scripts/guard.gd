@@ -149,7 +149,7 @@ func _look(delta: float) -> void:
 		spotted.emit()
 	if suspicion != before:
 		queue_redraw()
-	if Detection.is_caught(suspicion):
+	if Detection.is_full(suspicion):
 		active = false
 		print("[Guard] %s catches the mime at %s" % [name, target.global_position.round()])
 		caught.emit()

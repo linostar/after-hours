@@ -35,5 +35,6 @@ static func suspicion_after(current: float, seen: bool, distance: float, cone_ra
 	return minf(current + (FILL_FAR + FILL_NEAR * closeness) * delta, 1.0)
 
 
-static func is_caught(suspicion: float) -> bool:
+## Full suspicion: the guard gives chase (GuardBrain).
+static func is_full(suspicion: float) -> bool:
 	return suspicion >= 1.0

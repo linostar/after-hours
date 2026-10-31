@@ -74,6 +74,8 @@ func _tests() -> Array[Callable]:
 		_test_detection_cone,
 		_test_detection_suspicion,
 		_test_stars,
+		_test_guard_brain_priorities,
+		_test_guard_brain_chase_and_noise,
 		_test_forgery_scoring,
 		_test_forgery_grades,
 		_test_canvas_traces_and_grades,
@@ -222,11 +224,11 @@ func _test_detection_suspicion() -> void:
 	_check(is_equal_approx(Detection.suspicion_after(0.5, false, 0.0, 150.0, 0.1), 0.5 - Detection.DRAIN * 0.1), name, "suspicion does not drain while unseen")
 	_check(Detection.suspicion_after(0.01, false, 0.0, 150.0, 1.0) == 0.0, name, "suspicion drains below 0")
 	_check(Detection.suspicion_after(0.99, true, 0.0, 150.0, 1.0) == 1.0, name, "suspicion fills above 1")
-	_check(Detection.is_caught(1.0) and not Detection.is_caught(0.999), name, "a catch is not exactly full suspicion")
+	_check(Detection.is_full(1.0) and not Detection.is_full(0.999), name, "full is not exactly suspicion 1")
 	# Seen point-blank from nothing, a catch takes 1 / (FILL_FAR + FILL_NEAR) seconds at 60 ticks per second.
 	var suspicion := 0.0
 	var ticks := 0
-	while not Detection.is_caught(suspicion) and ticks < 600:
+	while not Detection.is_full(suspicion) and ticks < 600:
 		suspicion = Detection.suspicion_after(suspicion, true, 0.0, 150.0, 1.0 / 60.0)
 		ticks += 1
 	var expected := ceili(60.0 / (Detection.FILL_FAR + Detection.FILL_NEAR))
@@ -257,6 +259,57 @@ func _arc(center: Vector2, radius: float) -> PackedVector2Array:
 	for i in 49:
 		points.append(center + Vector2.from_angle(PI + PI * i / 48.0) * radius)
 	return points
+
+
+## A GuardBrain.Senses with `fields` set (name: value).
+func _senses(fields: Dictionary) -> GuardBrain.Senses:
+	var senses := GuardBrain.Senses.new()
+	for field: String in fields:
+		senses.set(field, fields[field])
+	return senses
+
+
+func _intent_name(intent: GuardBrain.Intent) -> String:
+	return GuardBrain.Intent.keys()[intent]
+
+
+## Each intent wins alone, and the priority order holds when they compete.
+func _test_guard_brain_priorities() -> void:
+	var name := "guard_brain_priorities"
+	var cases := [
+		[{}, GuardBrain.Intent.PATROL],
+		[{"tilted_frame_known": true}, GuardBrain.Intent.STRAIGHTEN],
+		[{"noise_heard": true, "noise_distance": 0.0}, GuardBrain.Intent.INVESTIGATE],
+		[{"fake_in_view": true}, GuardBrain.Intent.INSPECT],
+		[{"search_left": 3.0}, GuardBrain.Intent.SEARCH],
+		[{"suspicion": 1.0}, GuardBrain.Intent.CHASE],
+		[{"tilted_frame_known": true, "noise_heard": true, "noise_distance": 10.0}, GuardBrain.Intent.INVESTIGATE],
+		[{"noise_heard": true, "fake_in_view": true}, GuardBrain.Intent.INSPECT],
+		[{"fake_in_view": true, "search_left": 1.0}, GuardBrain.Intent.SEARCH],
+		[{"search_left": 1.0, "suspicion": 1.0, "fake_in_view": true, "noise_heard": true, "tilted_frame_known": true}, GuardBrain.Intent.CHASE],
+	]
+	for case: Array in cases:
+		var scores := GuardBrain.scores(_senses(case[0]))
+		var chosen := GuardBrain.choose(scores)
+		_check(chosen == case[1], name, "senses %s chose %s, not %s (scores %s)" % [case[0], _intent_name(chosen), _intent_name(case[1]), scores])
+		for intent: GuardBrain.Intent in scores:
+			_check(scores[intent] >= 0.0 and scores[intent] <= 1.0, name, "%s scored %.2f, outside 0..1" % [_intent_name(intent), scores[intent]])
+	var tied: Dictionary[GuardBrain.Intent, float] = {GuardBrain.Intent.PATROL: 0.5, GuardBrain.Intent.SEARCH: 0.5, GuardBrain.Intent.INSPECT: 0.5}
+	_check(GuardBrain.choose(tied) == GuardBrain.Intent.PATROL, name, "a tie did not go to the earlier intent")
+
+
+## A chase outlasts a lost sight for CHASE_MEMORY; a nearer noise scores higher, one
+## beyond hearing scores nothing, and a far one loses to a known tilted frame.
+func _test_guard_brain_chase_and_noise() -> void:
+	var name := "guard_brain_chase_and_noise"
+	var memory := GuardBrain.CHASE_MEMORY
+	_check(GuardBrain.choose(GuardBrain.scores(_senses({"chasing": true, "lost_sight_for": memory - 0.01}))) == GuardBrain.Intent.CHASE, name, "a chase ended before CHASE_MEMORY")
+	_check(GuardBrain.choose(GuardBrain.scores(_senses({"chasing": true, "lost_sight_for": memory}))) == GuardBrain.Intent.PATROL, name, "a chase outlasted CHASE_MEMORY")
+	var near := GuardBrain.scores(_senses({"noise_heard": true, "noise_distance": 50.0}))[GuardBrain.Intent.INVESTIGATE]
+	var far := GuardBrain.scores(_senses({"noise_heard": true, "noise_distance": 400.0}))[GuardBrain.Intent.INVESTIGATE]
+	_check(near > far and far > 0.0, name, "a noise at 50 scored %.2f, at 400 %.2f (expected near > far > 0)" % [near, far])
+	_check(GuardBrain.scores(_senses({"noise_heard": true, "noise_distance": GuardBrain.HEARING_RANGE}))[GuardBrain.Intent.INVESTIGATE] == 0.0, name, "a noise at the edge of hearing was heard")
+	_check(GuardBrain.choose(GuardBrain.scores(_senses({"noise_heard": true, "noise_distance": 400.0, "tilted_frame_known": true}))) == GuardBrain.Intent.STRAIGHTEN, name, "a far noise beat a known tilted frame")
 
 
 func _test_forgery_scoring() -> void:
