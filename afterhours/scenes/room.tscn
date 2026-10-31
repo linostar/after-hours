@@ -141,6 +141,26 @@ script = ExtResource("3_floor")
 [node name="KeyboardInput" type="Node" parent="."]
 script = ExtResource("11_keys")
 
+[node name="StyleLayer" type="CanvasLayer" parent="."]
+
+[node name="StyleView" type="ColorRect" parent="StyleLayer"]
+visible = false
+offset_right = 960.0
+offset_bottom = 540.0
+mouse_filter = 2
+
+[node name="Frame" type="ReferenceRect" parent="StyleLayer/StyleView"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+border_color = Color(0.79, 0.64, 0.29, 1)
+border_width = 10.0
+editor_only = false
+
 [node name="EaselLayer" type="CanvasLayer" parent="."]
 layer = 5
 

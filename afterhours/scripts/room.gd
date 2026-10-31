@@ -93,6 +93,8 @@ var stars: Array[bool] = []
 @onready var _canvas: ForgeryCanvas = $EaselLayer/ForgeryCanvas
 @onready var _fake_icon: Sprite2D = $FakeIcon
 @onready var _masterpiece: FramedPainting = $Masterpiece
+## The view from inside a portrait: the room through that painting's style, in its frame.
+@onready var _style_view: Control = $StyleLayer/StyleView
 var _frames: Array[TiltFrame] = []
 var _portraits: Array[HidingPortrait] = []
 @onready var _results: Results = $ResultsLayer/Results
@@ -261,6 +263,8 @@ func _hide_in(portrait: HidingPortrait) -> void:
 	hidden_in = portrait
 	portrait.occupied = true
 	mime.visible = false
+	_style_view.material = Paintings.style(StringName(portrait.painting), true)
+	_style_view.show()
 	print("[Room] Hid in the portrait at %s at t %.2f (seen going in: %s)" % [portrait.position.round(), elapsed, seen])
 
 
@@ -269,6 +273,7 @@ func _step_out() -> void:
 	hidden_in.occupied = false
 	hidden_in = null
 	mime.visible = true
+	_style_view.hide()
 
 
 func _tilt(frame: TiltFrame) -> void:

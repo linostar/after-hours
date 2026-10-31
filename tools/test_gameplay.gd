@@ -826,6 +826,9 @@ func _test_hide_unseen_and_step_out() -> void:
 	await _tap_at(portrait.position)
 	var hid := await _wait_until(func() -> bool: return room.hidden_in == portrait, 600)
 	_check(hid and not room.mime.visible and portrait.occupied and (portrait.get_node("MimeFace") as Sprite2D).visible, name, "tapping the portrait did not hide the mime in it (hidden in %s, visible %s)" % [room.hidden_in, room.mime.visible])
+	var view := room.get_node("StyleLayer/StyleView") as ColorRect
+	var style := view.material as ShaderMaterial
+	_check(view.visible and style != null and style.shader == Paintings.STYLES[StringName(portrait.painting)] and style.get_shader_parameter(&"use_screen") == true, name, "inside the portrait the room is not seen in its %s style" % portrait.painting)
 	room.guard.position = portrait.spot() + Vector2(100, 0)
 	room.guard.facing = Vector2.LEFT
 	for i in 60:
@@ -834,7 +837,7 @@ func _test_hide_unseen_and_step_out() -> void:
 	room.guard.position = Vector2(500, 430)
 	room.guard.facing = Vector2.RIGHT
 	await _tap_at(Vector2(300, 480))
-	_check(room.hidden_in == null and room.mime.visible and not portrait.occupied and room.mime.walking, name, "a floor tap did not step the mime out and walk it")
+	_check(room.hidden_in == null and room.mime.visible and not portrait.occupied and room.mime.walking and not view.visible, name, "a floor tap did not step the mime out (and out of the style view) and walk it")
 
 
 ## A guard who sees the mime step into a portrait chases it there and pulls it out (a
@@ -852,7 +855,7 @@ func _test_guard_saw_hiding_pulls_out() -> void:
 	_check(room.ever_seen, name, "being seen going in did not cost the unseen star")
 	_check(await _wait_until(func() -> bool: return room.tossing, 240), name, "the guard never pulled the hidden mime out (intent %s, at %s)" % [_intent_name(room.guard.intent), room.guard.position])
 	await _wait_until(func() -> bool: return not room.tossing, 180)
-	_check(room.mime.visible and room.hidden_in == null and not portrait.occupied, name, "after the toss the mime is still hidden")
+	_check(room.mime.visible and room.hidden_in == null and not portrait.occupied and not (room.get_node("StyleLayer/StyleView") as ColorRect).visible, name, "after the toss the mime is still hidden")
 
 
 ## The guard's intent icon pops in for each intent but patrol; the debug overlay is off
