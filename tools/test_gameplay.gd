@@ -95,6 +95,7 @@ func _tests() -> Array[Callable]:
 		_test_guard_loses_mime_after_hiding,
 		_test_guard_ignores_unseen_hiding,
 		_test_investigate_without_frame,
+		_test_close_noise_straighten_takes_time,
 		_test_intent_icons_and_overlay,
 		_test_keyboard_walks_and_interacts,
 		_test_guard_pauses_facing_its_leg,
@@ -958,6 +959,27 @@ func _test_investigate_without_frame() -> void:
 	_check(await _wait_until(func() -> bool: return room.guard.intent == GuardBrain.Intent.INVESTIGATE, 10), name, "the guard did not investigate the noise")
 	var done := await _wait_until(func() -> bool: return room.guard.intent == GuardBrain.Intent.PATROL, 600)
 	_check(done and not room.guard.senses.noise_heard and room.guard.position.distance_to(Vector2(450, 200)) < 10.0, name, "the guard did not reach the noise and go back to patrolling (intent %s, at %s)" % [_intent_name(room.guard.intent), room.guard.position])
+
+
+## A tilt heard from close by (investigating beats straightening): the guard walks right
+## under the frame, and straightening there still takes STRAIGHTEN_TIME.
+func _test_close_noise_straighten_takes_time() -> void:
+	var name := "close_noise_straighten_takes_time"
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.target = null
+	var frame := room.get_node("Frames/FrameB") as TiltFrame
+	_stage_guard(room, frame.view_point() + Vector2(0, 150), Vector2.DOWN, Room.ENTRANCE)
+	frame.tilt()
+	room.guard.hear(frame.view_point())
+	_check(await _wait_until(func() -> bool: return room.guard.intent == GuardBrain.Intent.INVESTIGATE, 10), name, "a close noise did not start an investigation (intent %s)" % _intent_name(room.guard.intent))
+	_check(await _wait_until(func() -> bool: return room.guard.intent == GuardBrain.Intent.STRAIGHTEN, 600), name, "the guard never went to straighten the frame")
+	var frames := 0
+	while frame.tilted and frames < 600:
+		await physics_frame
+		frames += 1
+	_check(not frame.tilted and frames >= roundi(Guard.STRAIGHTEN_TIME * 60.0) - 2, name, "the frame was straightened %d frames after STRAIGHTEN began, under STRAIGHTEN_TIME" % frames)
 
 
 ## Taps the centre of `control`, as a finger would.
