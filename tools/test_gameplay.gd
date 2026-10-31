@@ -96,6 +96,8 @@ func _tests() -> Array[Callable]:
 		_test_guard_ignores_unseen_hiding,
 		_test_investigate_without_frame,
 		_test_close_noise_straighten_takes_time,
+		_test_guard_returns_to_reached_goals,
+		_test_off_mesh_noise_and_chase_repath,
 		_test_intent_icons_and_overlay,
 		_test_keyboard_walks_and_interacts,
 		_test_guard_pauses_facing_its_leg,
@@ -980,6 +982,56 @@ func _test_close_noise_straighten_takes_time() -> void:
 		await physics_frame
 		frames += 1
 	_check(not frame.tilted and frames >= roundi(Guard.STRAIGHTEN_TIME * 60.0) - 2, name, "the frame was straightened %d frames after STRAIGHTEN began, under STRAIGHTEN_TIME" % frames)
+
+
+## A goal reached once is walked to again, not "arrived at" on the spot: the same noise
+## investigated twice, and the same frame straightened twice, from across the room.
+func _test_guard_returns_to_reached_goals() -> void:
+	var name := "guard_returns_to_reached_goals"
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.target = null
+	room.guard.patrolling = false
+	var noise := Vector2(450, 200)
+	for visit in 2:
+		room.guard.position = Vector2(660, 430)
+		room.guard.hear(noise)
+		var reached := await _wait_until(func() -> bool: return not room.guard.senses.noise_heard, 600)
+		_check(reached and room.guard.position.distance_to(noise) < 10.0, name, "investigation %d ended at %s, not at the noise %s" % [visit + 1, room.guard.position, noise])
+	var frame := room.get_node("Frames/FrameA") as TiltFrame
+	for visit in 2:
+		frame.tilt()
+		room.guard.position = Vector2(frame.position.x, 340)
+		room.guard.facing = Vector2.UP
+		var straightened := await _wait_until(func() -> bool: return not frame.tilted, 600)
+		_check(straightened and room.guard.position.distance_to(frame.view_point()) < 10.0, name, "straighten %d happened with the guard at %s, not under the frame" % [visit + 1, room.guard.position])
+
+
+## A noise off the navmesh (on the wall) is investigated at the nearest floor point and
+## ends; a chase re-plans its path only as the mime moves CHASE_REPATH, not every tick.
+func _test_off_mesh_noise_and_chase_repath() -> void:
+	var name := "off_mesh_noise_and_chase_repath"
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.target = null
+	_stage_guard(room, Vector2(450, 260), Vector2.UP, Room.ENTRANCE)
+	room.guard.hear(Vector2(450, 100))
+	var done := await _wait_until(func() -> bool: return room.guard.intent == GuardBrain.Intent.PATROL and not room.guard.senses.noise_heard, 300)
+	_check(done and room.guard.position.y < 190.0, name, "a noise on the wall was not investigated at the wall's foot and ended (intent %s, at %s)" % [_intent_name(room.guard.intent), room.guard.position])
+	room.guard.target = room.mime
+	_stage_guard(room, Vector2(300, 460), Vector2.RIGHT, Vector2(400, 460))
+	await _wait_until(func() -> bool: return room.guard.intent == GuardBrain.Intent.CHASE, 120)
+	var agent := room.guard.get_node("Agent") as NavigationAgent2D
+	var paths: Array[int] = [0]
+	agent.path_changed.connect(func() -> void: paths[0] += 1)
+	room.mime.walk_to(Vector2(900, 460))
+	for i in 30:
+		await physics_frame
+	var expected := ceili(Mime.SPEED * 0.5 / Guard.CHASE_REPATH) + 2
+	_check(paths[0] > 0 and paths[0] <= expected, name, "the chase changed its path %d times in 30 ticks (expected 1..%d)" % [paths[0], expected])
+	room.mime.place_at(room.mime.position)
 
 
 ## Taps the centre of `control`, as a finger would.

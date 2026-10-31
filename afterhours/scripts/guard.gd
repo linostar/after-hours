@@ -38,6 +38,8 @@ const INSPECT_TIME := 1.2
 const SEARCH_TIME := 4.0
 ## How fast a searching guard turns to look around (radians per second).
 const SEARCH_TURN := 2.2
+## A chase re-plans its path only once the mime has moved this far from the path's goal.
+const CHASE_REPATH := 8.0
 ## Seconds the guard stands at each waypoint, still facing the leg it walked, before it
 ## turns to the next one (it always faces the way it walks).
 const WAYPOINT_PAUSE := 0.8
@@ -163,7 +165,7 @@ func saw_hiding() -> void:
 ## Hears a noise at `point` (room coordinates) if it is within HEARING_RANGE; returns
 ## whether it did.
 func hear(point: Vector2) -> bool:
-	var distance := position.distance_to(point)
+	var distance := global_position.distance_to(point)
 	if distance >= GuardBrain.HEARING_RANGE:
 		return false
 	noise_point = point
@@ -242,9 +244,14 @@ func _leave(left: GuardBrain.Intent) -> void:
 
 
 ## Walks the navmesh towards `goal` at `speed`, facing the way it walks; returns whether
-## it has arrived.
+## it has arrived (at the reachable point nearest `goal`).
 func _travel(goal: Vector2, speed: float, delta: float) -> bool:
-	if not _agent.target_position.is_equal_approx(goal):
+	# The agent stays "finished" until a target is submitted again, so a goal reached
+	# before must be resubmitted once the guard has walked off (straight patrol legs move
+	# it without the agent). Compared with where its last path ended, not with `goal`: a
+	# goal off the navmesh is reached at its nearest point.
+	var walked_off := _agent.is_navigation_finished() and position.distance_to(_agent.get_final_position()) > _agent.target_desired_distance
+	if walked_off or not _agent.target_position.is_equal_approx(goal):
 		_agent.target_position = goal
 	if _agent.is_navigation_finished():
 		return true
@@ -277,7 +284,9 @@ func _patrol(delta: float) -> void:
 
 
 func _chase(delta: float) -> void:
-	_travel(last_seen, CHASE_SPEED, delta)
+	# Re-plan only when the mime has moved CHASE_REPATH from the path's goal (not every tick).
+	var goal := last_seen if last_seen.distance_to(_agent.target_position) > CHASE_REPATH else _agent.target_position
+	_travel(goal, CHASE_SPEED, delta)
 	# A hidden target is caught only by a guard that saw it hide.
 	if target != null and (target.visible or _knows_hiding) and global_position.distance_to(target.global_position) <= CATCH_REACH:
 		active = false
