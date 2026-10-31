@@ -91,6 +91,10 @@ func _tests() -> Array[Callable]:
 		_test_guard_chase_search_return,
 		_test_tilt_decoy_investigated,
 		_test_tilted_frame_seen_and_straightened,
+		_test_decoy_pulls_nearest_guard,
+		_test_hiding_checks_every_guard,
+		_test_second_guard_catches_and_resets_all,
+		_test_fake_found_out_by_one_guard,
 		_test_hide_unseen_and_step_out,
 		_test_hide_view_fills_screen,
 		_test_hide_unknown_painting_reports,
@@ -557,6 +561,34 @@ func _load_room() -> Room:
 	return room
 
 
+## The slice room with a second guard ("Guard2", walking `route`) added under Actors
+## before it enters the tree, made the current scene.
+func _load_two_guard_room(route: PackedVector2Array) -> Room:
+	var room := (load(ROOM_PATH) as PackedScene).instantiate() as Room
+	var second := (load("res://scenes/guard.tscn") as PackedScene).instantiate() as Guard
+	second.name = "Guard2"
+	second.route = route
+	room.get_node("Actors").add_child(second)
+	var old := current_scene
+	root.add_child(room)
+	current_scene = room
+	if old != null:
+		old.queue_free()
+	for i in 3:
+		await physics_frame
+	var map := room.get_world_2d().navigation_map
+	if not await _wait_until(func() -> bool: return NavigationServer2D.map_get_closest_point_owner(map, room.mime.position).is_valid(), 60):
+		_check(false, "load_two_guard_room", "the room's navigation map never synced")
+	return room
+
+
+## Stands `guard` still at `at`, facing `facing`.
+func _stand(guard: Guard, at: Vector2, facing: Vector2) -> void:
+	guard.patrolling = false
+	guard.position = at
+	guard.facing = facing
+
+
 ## A pressed then released touch at `at` (canvas base units), as a finger would.
 func _tap_at(at: Vector2) -> void:
 	for pressed: bool in [true, false]:
@@ -808,6 +840,89 @@ func _test_tilt_decoy_investigated() -> void:
 	_check(room.guard.intent == GuardBrain.Intent.PATROL, name, "after straightening the guard is %s, not patrolling" % _intent_name(room.guard.intent))
 	room.guard.position = Vector2(900, 500)
 	_check(not room.guard.hear(Vector2(100, 180)), name, "a guard %.0f away heard a noise (range %.0f)" % [Vector2(900, 500).distance_to(Vector2(100, 180)), GuardBrain.HEARING_RANGE])
+
+
+## A tilted frame pulls only the nearest guard in earshot (AC 23); with that one out of
+## action the next nearest hears it, and nobody beyond HEARING_RANGE does.
+func _test_decoy_pulls_nearest_guard() -> void:
+	var name := "decoy_pulls_nearest_guard"
+	var room := await _load_two_guard_room(PackedVector2Array([Vector2(300, 430), Vector2(300, 250)]))
+	if room == null:
+		return
+	var near := room.guard
+	var far := room.get_node("Actors/Guard2") as Guard
+	_check(room.guards == ([near, far] as Array[Guard]), name, "the room's guards are %s" % [room.guards])
+	for each in room.guards:
+		each.target = null
+	_stand(near, Vector2(660, 430), Vector2.DOWN)
+	_stand(far, Vector2(300, 430), Vector2.DOWN)
+	room.mime.place_at(Room.ENTRANCE)
+	var frame := room.get_node("Frames/FrameB") as TiltFrame
+	await _tap_at(frame.position)
+	_check(await _wait_until(func() -> bool: return frame.tilted, 600), name, "the mime never tilted the frame")
+	await physics_frame
+	_check(near.senses.noise_heard and near.intent == GuardBrain.Intent.INVESTIGATE, name, "the nearest guard did not investigate (intent %s)" % _intent_name(near.intent))
+	_check(not far.senses.noise_heard and far.intent == GuardBrain.Intent.PATROL, name, "the farther guard in earshot was pulled too (intent %s)" % _intent_name(far.intent))
+	near.active = false
+	_check(room.nearest_in_earshot(frame.view_point()) == far, name, "with the nearest guard out of action the next nearest is not pulled")
+	far.position = Vector2(900, 520)
+	_check(room.nearest_in_earshot(Vector2(100, 180)) == null, name, "a guard beyond HEARING_RANGE was pulled")
+
+
+## Stepping into a portrait is checked against every guard: one that sees it (not the
+## first) chases to it, the mime counts as seen, and a guard that saw nothing stays calm.
+func _test_hiding_checks_every_guard() -> void:
+	var name := "hiding_checks_every_guard"
+	var room := await _load_two_guard_room(PackedVector2Array([Vector2(250, 250), Vector2(400, 250)]))
+	if room == null:
+		return
+	var blind := room.guard
+	var watching := room.get_node("Actors/Guard2") as Guard
+	_stand(blind, Vector2(660, 430), Vector2.RIGHT)
+	_stand(watching, Vector2(240, 230), Vector2.LEFT)
+	var portrait := room.get_node("Portraits/PortraitA") as HidingPortrait
+	room.mime.place_at(portrait.spot())
+	room.hide_target = portrait
+	await physics_frame
+	_check(room.hidden_in == portrait, name, "the mime did not step into the portrait")
+	_check(room.ever_seen and watching.senses.chasing, name, "the second guard saw the mime step in but does not chase (seen %s)" % room.ever_seen)
+	_check(not blind.senses.chasing, name, "the guard facing away chases")
+
+
+## A catch by any guard tosses the mime, and the toss resets every guard to its route.
+func _test_second_guard_catches_and_resets_all() -> void:
+	var name := "second_guard_catches_and_resets_all"
+	var route := PackedVector2Array([Vector2(500, 450), Vector2(800, 450)])
+	var room := await _load_two_guard_room(route)
+	if room == null:
+		return
+	var second := room.get_node("Actors/Guard2") as Guard
+	room.guard.position = Vector2(400, 400)
+	second.position = Vector2(600, 300)
+	second.caught.emit()
+	_check(room.tossing and room.catches == 1, name, "a catch by the second guard did not toss the mime")
+	_check(await _wait_until(func() -> bool: return not room.tossing, 120), name, "the toss never ended")
+	_check(room.guard.position.is_equal_approx(room.guard.route[0]) and second.position.is_equal_approx(route[0]), name, "after the toss the guards are at %s and %s, not their routes' starts" % [room.guard.position, second.position])
+	var canvas := room.get_node("EaselLayer/ForgeryCanvas") as ForgeryCanvas
+	_check(canvas.watchers == room.guards, name, "the canvas eye does not watch every guard")
+
+
+## Every guard watches the hung fake; the one whose inspection finds it out searches, the
+## other does not, and nobody watches it after.
+func _test_fake_found_out_by_one_guard() -> void:
+	var name := "fake_found_out_by_one_guard"
+	var room := await _load_two_guard_room(PackedVector2Array([Vector2(500, 450), Vector2(800, 450)]))
+	if room == null:
+		return
+	var second := room.get_node("Actors/Guard2") as Guard
+	room.fake_quality = 0.1
+	room.mime.has_fake = true
+	room._swap()
+	_check(room.guard.watches_fake and second.watches_fake, name, "not every guard watches the hung fake")
+	room._on_inspected(second)
+	_check(room.found_out and second.senses.search_left > 0.0, name, "the guard who found the Sloppy fake out does not search")
+	_check(room.guard.senses.search_left == 0.0, name, "the other guard searches too")
+	_check(not room.guard.watches_fake and not second.watches_fake, name, "a guard still watches a found-out fake")
 
 
 ## A guard that sees a tilted frame without hearing it walks over and straightens it.

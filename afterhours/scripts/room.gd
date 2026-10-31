@@ -9,23 +9,23 @@ extends Node2D
 ## masterpiece (PAINTING_RECT) walks the mime to SWAP_SPOT below it, where standing still
 ## for SWAP_TIME swaps the fake for the original (tapping elsewhere cancels the swap); a
 ## tap there without one is a tap on the floor. A tap on a straight small frame (a
-## TiltFrame under Frames) walks the mime under it and tilts it: a noise every guard in
-## earshot hears (Guard.hear). A tap on a tall portrait (a HidingPortrait under
+## TiltFrame under Frames) walks the mime under it and tilts it: a noise the nearest guard
+## in earshot hears (Guard.hear) and walks over to. A tap on a tall portrait (a HidingPortrait under
 ## Portraits) walks the mime there and it steps in, out of every guard's sight (a guard
 ## who sees it step in chases it there and pulls it out); the next tap steps it out and
 ## goes on as that tap. The keyboard (KeyboardInput) walks the mime directly (cancelling
 ## any of the above, stepping out of a portrait) and E acts as a tap on the nearest thing
 ## within INTERACT_REACH it can use (easel, masterpiece, straight frame, portrait; E while
 ## hidden steps out). Carrying the original, the exit door
-## glows, and the fake hangs in the original's place: the guard watches it (FAKE_VIEW_POINT,
-## the floor at its foot) and inspects it once per pass, a "?" over the painting while it
-## does; a fake found out (Forgery.is_noticed) turns the "?" into "!" for good, and the guard
-## searches around it. Reaching EXIT ends the wing: the stars (Stars, against PAR_TIME) show in the
+## glows, and the fake hangs in the original's place: every guard watches it (FAKE_VIEW_POINT,
+## the floor at its foot) and inspects it once per pass, a "?" over the painting while one
+## does; a fake found out (Forgery.is_noticed; inspections count across the guards) turns the
+## "?" into "!" for good, and the guard who found it out searches around it. Reaching EXIT ends the wing: the stars (Stars, against PAR_TIME) show in the
 ## results overlay. A guard that chases the mime down (Guard) shakes it and tosses it back
 ## through the entrance (TOSS_SHAKE, then TOSS_FLIGHT along an arc TOSS_HEIGHT high),
 ## closing the canvas if it was painting (its finished strokes are kept); taps are ignored
-## meanwhile, then the guard starts its route again (a mime carrying the fake or the
-## original keeps it: only the guard resets). The timer (elapsed) keeps running through
+## meanwhile, then every guard starts its route again (a mime carrying the fake or the
+## original keeps it: only the guards reset). The guards are the Guard children of Actors. The timer (elapsed) keeps running through
 ## it all, but not while a screen change fades (the player cannot act then); ever_seen
 ## records whether any guard ever spotted the mime.
 
@@ -85,7 +85,9 @@ var finished := false
 var stars: Array[bool] = []
 
 @onready var mime: Mime = $Actors/Mime
-@onready var guard: Guard = $Actors/Guard
+## The room's guards (the Guard children of Actors), and the first of them.
+var guards: Array[Guard] = []
+var guard: Guard
 @onready var _floor: FloorInput = $FloorInput
 @onready var _keys: KeyboardInput = $KeyboardInput
 @onready var _exit_glow: Polygon2D = $ExitGlow
@@ -105,11 +107,16 @@ func _ready() -> void:
 	mime.place_at(ENTRANCE)
 	mime.painting = _masterpiece.painting
 	_canvas.painting = _masterpiece.painting
-	guard.target = mime
-	guard.reset()
-	guard.spotted.connect(_on_spotted)
-	guard.caught.connect(_on_caught)
-	guard.inspected.connect(_on_inspected)
+	for child in $Actors.get_children():
+		if child is Guard:
+			guards.append(child)
+	guard = guards[0] if not guards.is_empty() else null
+	for each in guards:
+		each.target = mime
+		each.reset()
+		each.spotted.connect(_on_spotted)
+		each.caught.connect(_on_caught)
+		each.inspected.connect(_on_inspected.bind(each))
 	_floor.tapped.connect(_on_floor_tapped)
 	_keys.interacted.connect(_on_interacted)
 	for child in $Frames.get_children():
@@ -117,13 +124,14 @@ func _ready() -> void:
 			_frames.append(child)
 		else:
 			_game.report_error("Room '%s': Frames child '%s' is a %s, not a TiltFrame" % [scene_file_path, child.name, child.get_class()])
-	guard.frames = _frames
+	for each in guards:
+		each.frames = _frames
 	for child in $Portraits.get_children():
 		if child is HidingPortrait:
 			_portraits.append(child)
 		else:
 			_game.report_error("Room '%s': Portraits child '%s' is a %s, not a HidingPortrait" % [scene_file_path, child.name, child.get_class()])
-	_canvas.watcher = guard
+	_canvas.watchers = guards
 	_canvas.painted.connect(_on_painted)
 	if DebugOverlay.wanted():
 		add_debug_overlay()
@@ -137,7 +145,7 @@ func add_debug_overlay() -> DebugOverlay:
 	var overlay := DebugOverlay.new()
 	overlay.name = "DebugOverlay"
 	overlay.z_index = 100
-	overlay.guards = [guard]
+	overlay.guards = guards
 	add_child(overlay)
 	print("[Room] Debug overlay on")
 	return overlay
@@ -164,7 +172,7 @@ func _physics_process(delta: float) -> void:
 	if hide_target != null and not tossing and not mime.walking and mime.position.distance_to(hide_target.spot()) <= SWAP_REACH:
 		_hide_in(hide_target)
 	if fake_hung and not found_out:
-		_fake_icon.visible = guard.inspecting
+		_fake_icon.visible = guards.any(func(each: Guard) -> bool: return each.inspecting)
 	if swap_intent and not tossing and not mime.walking and mime.position.distance_to(SWAP_SPOT) <= SWAP_REACH:
 		mime.swap_progress = minf(mime.swap_progress + delta / SWAP_TIME, 1.0)
 		if mime.swap_progress >= 1.0:
@@ -257,10 +265,13 @@ func _cancel_swap() -> void:
 
 func _hide_in(portrait: HidingPortrait) -> void:
 	hide_target = null
-	var seen := guard.active and guard.can_see(mime.global_position)
+	var seen := false
+	for each in guards:
+		if each.active and each.can_see(mime.global_position):
+			seen = true
+			each.saw_hiding()
 	if seen:
 		ever_seen = true
-		guard.saw_hiding()
 	hidden_in = portrait
 	portrait.occupied = true
 	mime.visible = false
@@ -284,8 +295,23 @@ func _step_out() -> void:
 func _tilt(frame: TiltFrame) -> void:
 	tilt_target = null
 	frame.tilt()
-	var heard := guard.hear(frame.view_point())
-	print("[Room] Tilted the frame at %s at t %.2f (heard: %s)" % [frame.position.round(), elapsed, heard])
+	var heard := nearest_in_earshot(frame.view_point())
+	if heard != null:
+		heard.hear(frame.view_point())
+	print("[Room] Tilted the frame at %s at t %.2f (heard by: %s)" % [frame.position.round(), elapsed, str(heard.name) if heard != null else "nobody"])
+
+
+## The active guard nearest `point` within GuardBrain.HEARING_RANGE, or null: a decoy pulls
+## only that one.
+func nearest_in_earshot(point: Vector2) -> Guard:
+	var nearest: Guard
+	var nearest_distance := GuardBrain.HEARING_RANGE
+	for each in guards:
+		var distance := each.global_position.distance_to(point)
+		if each.active and distance < nearest_distance:
+			nearest = each
+			nearest_distance = distance
+	return nearest
 
 
 func _on_painted(quality: float) -> void:
@@ -301,30 +327,33 @@ func _swap() -> void:
 	mime.has_fake = false
 	mime.carrying = true
 	fake_hung = true
-	guard.fake_point = FAKE_VIEW_POINT
-	guard.watches_fake = true
+	for each in guards:
+		each.fake_point = FAKE_VIEW_POINT
+		each.watches_fake = true
 	_fake_icon.texture = QUERY_ICON
 	_exit_glow.visible = true
 	print("[Room] Swapped the forgery for the original at t %.2f (fake %s)" % [elapsed, Forgery.Grade.keys()[Forgery.grade(fake_quality)]])
 
 
-func _on_inspected() -> void:
+func _on_inspected(by: Guard) -> void:
 	inspections += 1
 	var fake_grade := Forgery.grade(fake_quality)
 	var noticed := Forgery.is_noticed(fake_grade, inspections)
-	print("[Room] Inspection %d of the %s fake at t %.2f: %s" % [inspections, Forgery.Grade.keys()[fake_grade], elapsed, "found out" if noticed else "passed"])
+	print("[Room] Inspection %d of the %s fake by %s at t %.2f: %s" % [inspections, Forgery.Grade.keys()[fake_grade], by.name, elapsed, "found out" if noticed else "passed"])
 	if not noticed:
 		return
 	found_out = true
 	_fake_icon.texture = ALARM_ICON
 	_fake_icon.show()
-	guard.watches_fake = false
-	guard.search(FAKE_VIEW_POINT)
+	for each in guards:
+		each.watches_fake = false
+	by.search(FAKE_VIEW_POINT)
 
 
 func _escape() -> void:
 	finished = true
-	guard.active = false
+	for each in guards:
+		each.active = false
 	mime.place_at(mime.position)
 	stars = Stars.earned(ever_seen, elapsed, PAR_TIME)
 	print("[Room] Escaped with the original at t %.2f (par %.0f, seen %s)" % [elapsed, PAR_TIME, ever_seen])
@@ -364,7 +393,8 @@ func _toss_step(t: float, from: Vector2) -> void:
 func _end_toss() -> void:
 	mime.rotation = 0.0
 	mime.place_at(ENTRANCE)
-	guard.reset()
-	guard.watches_fake = fake_hung and not found_out
+	for each in guards:
+		each.reset()
+		each.watches_fake = fake_hung and not found_out
 	tossing = false
 	print("[Room] The mime is back at the entrance at t %.2f" % elapsed)

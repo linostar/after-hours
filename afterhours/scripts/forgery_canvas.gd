@@ -45,8 +45,8 @@ var painting := "starry_night":
 		painting = value
 		if is_node_ready():
 			_sync_reference()
-## The guard whose suspicion the eye shows (set by the room).
-var watcher: Guard
+## The guards whose suspicion the eye shows, the most suspicious one's (set by the room).
+var watchers: Array[Guard] = []
 ## The strokes traced so far, one per finished ghost.
 var traced: Array[PackedVector2Array] = []
 var _current := PackedVector2Array()
@@ -207,8 +207,11 @@ func _deliver() -> void:
 
 
 func _draw_eye() -> void:
-	if watcher != null and watcher.suspicion > 0.0:
-		Guard.draw_eye(_eye, Vector2.ZERO, watcher.suspicion, EYE_SCALE)
+	var suspicion := 0.0
+	for watcher in watchers:
+		suspicion = maxf(suspicion, watcher.suspicion)
+	if suspicion > 0.0:
+		Guard.draw_eye(_eye, Vector2.ZERO, suspicion, EYE_SCALE)
 
 
 ## The ink layer (pad-local): the traced paint, the stroke being traced, and the next ghost.
