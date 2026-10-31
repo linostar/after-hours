@@ -78,9 +78,12 @@ func _ready() -> void:
 	hide()
 
 
+## An unknown painting is reported and leaves the canvas blank.
 func _sync_reference() -> void:
 	_reference.texture = Paintings.SCANS.get(StringName(painting))
 	_reference.material = Paintings.style(StringName(painting))
+	if _reference.texture == null:
+		_game.report_error("Forgery canvas '%s': unknown painting '%s'" % [get_path(), painting])
 
 
 ## Shows the canvas: resumes the strokes traced so far, or starts afresh once all are done.

@@ -18,19 +18,20 @@ const LIP := Color(0.24, 0.17, 0.08)
 @export var size := Vector2(120, 90)
 @export var moulding := 6.0
 
-var _picture := Sprite2D.new()
+var _picture: Sprite2D
 
 
 func _ready() -> void:
+	_picture = Sprite2D.new()
 	_picture.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	_picture.region_enabled = true
 	add_child(_picture)
 	_sync()
 
 
-## The picture's texture (null while the painting id is unknown).
+## The picture's texture (null before _ready or while the painting id is unknown).
 func picture() -> Texture2D:
-	return _picture.texture
+	return _picture.texture if _picture != null else null
 
 
 func _sync() -> void:

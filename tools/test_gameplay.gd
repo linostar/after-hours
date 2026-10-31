@@ -1492,6 +1492,7 @@ func _test_room_paintings_framed() -> void:
 func _test_unknown_painting_reports() -> void:
 	var name := "unknown_painting_reports"
 	var picture := FramedPainting.new()
+	_check(picture.picture() == null, name, "a painting has a picture before it is in the tree")
 	picture.painting = "no_such_painting"
 	var errors_before := _game.errors.size()
 	_game.quiet_errors = true
@@ -1499,6 +1500,15 @@ func _test_unknown_painting_reports() -> void:
 	_game.quiet_errors = false
 	_check(_game.errors.size() == errors_before + 1 and "no_such_painting" in _game.errors[-1], name, "an unknown painting was not reported (errors: %s)" % [_game.errors.slice(errors_before)])
 	_check(picture.picture() == null, name, "an unknown painting shows a picture")
+	var canvas := (load("res://scenes/forgery_canvas.tscn") as PackedScene).instantiate() as ForgeryCanvas
+	root.add_child(canvas)
+	var canvas_errors := _game.errors.size()
+	_game.quiet_errors = true
+	canvas.painting = "no_such_painting"
+	_game.quiet_errors = false
+	_check(_game.errors.size() == canvas_errors + 1 and "Forgery canvas" in _game.errors[-1], name, "the forgery canvas did not report an unknown painting (errors: %s)" % [_game.errors.slice(canvas_errors)])
+	_check((canvas.get_node("Reference") as TextureRect).texture == null, name, "the forgery canvas shows a picture for an unknown painting")
+	canvas.queue_free()
 	_game.errors.resize(errors_before)
 	(_game.get_node("ErrorLayer/ErrorBadge") as TextureRect).visible = false
 	picture.queue_free()
