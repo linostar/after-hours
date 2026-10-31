@@ -8,11 +8,16 @@ extends Node2D
 ## - noise_at: how loud its footsteps are there (0 silent; else a noise every
 ##   STEP_NOISE_GAP while it walks, heard by the nearest guard within that share of
 ##   GuardBrain.HEARING_RANGE);
+## - clue_seen_by: a point `guard` now notices (a trace the mime left) and goes to look at, or
+##   Vector2.INF for none (the room asks every frame, for each guard not chasing);
 ## and moves itself on in tick, which the room calls each physics frame it runs (not while
 ## a screen change fades or after the escape), so the gimmick and the room keep time.
 
 ## Seconds between two noisy footsteps.
 const STEP_NOISE_GAP := 0.5
+
+## The room's mime (set by the room).
+var mime: Mime
 
 
 func light_at(_point: Vector2) -> float:
@@ -25,6 +30,10 @@ func slow_at(_point: Vector2) -> float:
 
 func noise_at(_point: Vector2) -> float:
 	return 0.0
+
+
+func clue_seen_by(_guard: Guard) -> Vector2:
+	return Vector2.INF
 
 
 func tick(_delta: float) -> void:

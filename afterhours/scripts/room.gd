@@ -6,7 +6,8 @@ extends Node2D
 ## load; guards cannot see through them), guards (the Guard children of Actors),
 ## frames, portraits, doors and, optionally, the Easel, the Masterpiece and a Gimmick (the
 ## wing's twist: light, slowing and noisy floor for the guards and the mime; its footsteps
-## on noisy floor are noises the nearest guard in earshot hears). The mime starts
+## on noisy floor are noises the nearest guard in earshot hears; a clue a guard notices
+## sends it to investigate). The mime starts
 ## at the Entrance marker. A tap on the floor walks the mime there. A tap on the glowing
 ## easel (Easel.rect) walks it to Easel.spot, where the forgery canvas opens over the
 ## still-running room; a painted fake puts the glow out (tapping the easel again repaints
@@ -126,6 +127,8 @@ func _ready() -> void:
 	easel = get_node_or_null("Actors/Easel") as Easel
 	gimmick = get_node_or_null("Gimmick") as Gimmick
 	mime.gimmick = gimmick
+	if gimmick != null:
+		gimmick.mime = mime
 	masterpiece = get_node_or_null("Masterpiece") as FramedPainting
 	run = _game.run
 	var on_its_own := run == null or run.room >= run.wing.rooms.size() or run.wing.rooms[run.room] != scene_file_path
@@ -282,6 +285,7 @@ func _physics_process(delta: float) -> void:
 	if gimmick != null:
 		gimmick.tick(delta)
 		_step_noise(delta)
+		_follow_clues()
 	var walk := _keys.direction()
 	if walk != Vector2.ZERO and _accepts_input():
 		if hidden_in != null:
@@ -325,6 +329,18 @@ func _step_noise(delta: float) -> void:
 	if heard != null:
 		heard.hear(mime.position)
 		print("[Room] A loud footstep at %s at t %.2f, heard by %s" % [mime.position.round(), elapsed, heard.name])
+
+
+## Each active guard not chasing looks for a clue the gimmick shows it (Gimmick.clue_seen_by)
+## and goes to investigate it as if it heard a noise there.
+func _follow_clues() -> void:
+	for each in guards:
+		if not each.active or each.senses.chasing:
+			continue
+		var clue := gimmick.clue_seen_by(each)
+		if clue != Vector2.INF:
+			each.hear(clue)
+			print("[Room] %s follows a clue to %s at t %.2f" % [each.name, clue.round(), elapsed])
 
 
 ## Goes through `door` to its room: the room stops and hands its state back to the run.

@@ -71,6 +71,8 @@ class TestGimmick extends Gimmick:
 	var slow := 1.0
 	var noise := 0.0
 	var ticks := 0
+	## A clue to show the next guard that asks, once.
+	var clue := Vector2.INF
 
 	func light_at(_point: Vector2) -> float:
 		return light
@@ -80,6 +82,11 @@ class TestGimmick extends Gimmick:
 
 	func noise_at(_point: Vector2) -> float:
 		return noise
+
+	func clue_seen_by(_guard: Guard) -> Vector2:
+		var shown := clue
+		clue = Vector2.INF
+		return shown
 
 	func tick(_delta: float) -> void:
 		ticks += 1
@@ -154,6 +161,7 @@ func _tests() -> Array[Callable]:
 		_test_gimmick_shade_and_light,
 		_test_gimmick_slows_and_ticks,
 		_test_gimmick_loud_floor,
+		_test_gimmick_clue_investigated,
 		_test_unknown_painting_reports,
 	]
 
@@ -1903,6 +1911,26 @@ func _test_gimmick_loud_floor() -> void:
 	room.mime.walk_to(Vector2(500, 450))
 	_check(await _wait_until(func() -> bool: return room.guard.senses.noise_heard, 60), name, "loud steps in earshot were not heard (guard at %s, mime at %s)" % [room.guard.position, room.mime.position])
 	_check(room.guard.noise_point.distance_to(room.mime.position) < 100.0, name, "the guard heard the step at %s, not near the mime at %s" % [room.guard.noise_point, room.mime.position])
+
+
+## A clue the gimmick shows a guard sends it to investigate there; a chasing guard is not
+## shown clues.
+func _test_gimmick_clue_investigated() -> void:
+	var name := "gimmick_clue_investigated"
+	var gimmick := TestGimmick.new()
+	var room := await _load_room_with_gimmick(gimmick)
+	_check(gimmick.mime == room.mime, name, "the room did not hand its mime to the gimmick")
+	room.guard.target = null
+	_stage_guard(room, Vector2(600, 450), Vector2.LEFT, room.entrance)
+	gimmick.clue = Vector2(300, 450)
+	await physics_frame
+	await physics_frame
+	_check(room.guard.senses.noise_heard and room.guard.noise_point == Vector2(300, 450), name, "the guard shown a clue did not investigate it (heard %s at %s)" % [room.guard.senses.noise_heard, room.guard.noise_point])
+	room.guard.senses = GuardBrain.Senses.new()
+	room.guard.senses.chasing = true
+	gimmick.clue = Vector2(200, 450)
+	await physics_frame
+	_check(gimmick.clue == Vector2(200, 450), name, "a chasing guard was shown a clue")
 
 
 ## A frame naming an unknown painting is reported and stays empty.
