@@ -1429,6 +1429,9 @@ func _test_room_paintings_framed() -> void:
 		var shown := sprite.region_rect.size * sprite.scale
 		_check(shown.is_equal_approx(picture.size - Vector2.ONE * picture.moulding * 2.0), name, "%s's picture is %s, not its frame's inside" % [picture.get_path(), shown])
 	_check((room.mime.get_node("Carried") as FramedPainting).painting == "starry_night", name, "the mime does not carry the room's masterpiece")
+	var reference := room.get_node("EaselLayer/ForgeryCanvas/Reference") as TextureRect
+	var reference_style := reference.material as ShaderMaterial
+	_check(reference.texture == Paintings.SCANS[&"starry_night"] and reference_style != null and reference_style.shader == Paintings.STYLES[&"starry_night"], name, "the forgery canvas does not show the masterpiece in its style")
 
 
 ## A frame naming an unknown painting is reported and stays empty.

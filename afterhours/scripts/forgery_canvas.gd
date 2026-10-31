@@ -38,6 +38,13 @@ const GRADE_ICONS: Dictionary[Forgery.Grade, Texture2D] = {
 
 ## The painting's ghost strokes in canvas units (pad-local), traced in order.
 @export var ghosts: Array[PackedVector2Array] = []
+## The painting being forged (a Paintings id; set by the room): it shows faintly on the
+## canvas, cut to fill it, through its style.
+var painting := "starry_night":
+	set(value):
+		painting = value
+		if is_node_ready():
+			_sync_reference()
 ## The guard whose suspicion the eye shows (set by the room).
 var watcher: Guard
 ## The strokes traced so far, one per finished ghost.
@@ -50,6 +57,7 @@ var _pop: Tween
 var _pop_quality := 0.0
 
 @onready var _pad: StrokePad = $Pad
+@onready var _reference: TextureRect = $Reference
 @onready var _ink: Node2D = $Ink
 @onready var _eye: Node2D = $Eye
 @onready var _grade: TextureRect = $Grade
@@ -66,7 +74,13 @@ func _ready() -> void:
 	_assist.pressed.connect(_paint_assisted)
 	_ink.draw.connect(_draw_ink)
 	_eye.draw.connect(_draw_eye)
+	_sync_reference()
 	hide()
+
+
+func _sync_reference() -> void:
+	_reference.texture = Paintings.SCANS.get(StringName(painting))
+	_reference.material = Paintings.style(StringName(painting))
 
 
 ## Shows the canvas: resumes the strokes traced so far, or starts afresh once all are done.

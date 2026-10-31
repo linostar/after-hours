@@ -104,6 +104,7 @@ var _portraits: Array[HidingPortrait] = []
 func _ready() -> void:
 	mime.place_at(ENTRANCE)
 	mime.painting = _masterpiece.painting
+	_canvas.painting = _masterpiece.painting
 	guard.target = mime
 	guard.reset()
 	guard.spotted.connect(_on_spotted)

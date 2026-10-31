@@ -1,8 +1,7 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://scripts/forgery_canvas.gd" id="1_canvas"]
 [ext_resource type="Script" path="res://scripts/ui/stroke_pad.gd" id="2_pad"]
-[ext_resource type="Texture2D" path="res://art/svg/masterpiece.svg" id="3_painting"]
 [ext_resource type="Texture2D" path="res://art/svg/icon_brush_down.svg" id="4_close"]
 [ext_resource type="Texture2D" path="res://art/svg/icon_assist.svg" id="5_assist"]
 
@@ -45,15 +44,16 @@ mouse_filter = 2
 color = Color(0.95, 0.92, 0.84, 0.5)
 
 [node name="Reference" type="TextureRect" parent="."]
-modulate = Color(1, 1, 1, 0.35)
+modulate = Color(1, 1, 1, 0.45)
+texture_filter = 5
 layout_mode = 0
 offset_left = 628.0
 offset_top = 8.0
 offset_right = 948.0
 offset_bottom = 248.0
 mouse_filter = 2
-texture = ExtResource("3_painting")
 expand_mode = 1
+stretch_mode = 6
 
 [node name="Ink" type="Node2D" parent="."]
 position = Vector2(628, 8)
