@@ -37,10 +37,18 @@ var has_fake := false:
 			_sync_carried()
 
 @onready var _agent: NavigationAgent2D = $Agent
-@onready var _carried: Sprite2D = $Carried
+## The room's masterpiece (a Paintings id), shown small as the carried original or fake.
+var painting := "starry_night":
+	set(value):
+		painting = value
+		if is_node_ready():
+			_carried.painting = value
+
+@onready var _carried: FramedPainting = $Carried
 
 
 func _ready() -> void:
+	_carried.painting = painting
 	_sync_carried()
 
 

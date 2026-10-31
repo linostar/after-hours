@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" path="res://scripts/mime.gd" id="1_mime"]
 [ext_resource type="Texture2D" path="res://art/svg/mime.svg" id="2_sprite"]
-[ext_resource type="Texture2D" path="res://art/svg/masterpiece.svg" id="3_painting"]
+[ext_resource type="Script" path="res://scripts/framed_painting.gd" id="3_painting"]
 
 [node name="Mime" type="Node2D"]
 script = ExtResource("1_mime")
@@ -15,8 +15,9 @@ offset = Vector2(0, -44)
 path_desired_distance = 4.0
 target_desired_distance = 4.0
 
-[node name="Carried" type="Sprite2D" parent="."]
+[node name="Carried" type="Node2D" parent="."]
 visible = false
 position = Vector2(26, -40)
-scale = Vector2(0.3, 0.3)
-texture = ExtResource("3_painting")
+script = ExtResource("3_painting")
+size = Vector2(36, 27)
+moulding = 2.0

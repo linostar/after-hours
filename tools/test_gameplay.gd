@@ -117,6 +117,8 @@ func _tests() -> Array[Callable]:
 		_test_guard_bad_route_reports,
 		_test_room_timer_waits_for_fade,
 		_test_mime_carrying_before_ready,
+		_test_room_paintings_framed,
+		_test_unknown_painting_reports,
 	]
 
 
@@ -1182,7 +1184,7 @@ func _test_room_easel_paints_fake() -> void:
 	_check(await _wait_until(func() -> bool: return room.mime.has_fake, 120), name, "tracing every ghost gave the mime no fake")
 	_check(not glow.visible and not canvas.visible, name, "after painting the easel still glows or the canvas stays open")
 	_check(Forgery.grade(room.fake_quality) == Forgery.Grade.PERFECT, name, "an exact trace of the room's painting graded %s (%.2f)" % [Forgery.Grade.keys()[Forgery.grade(room.fake_quality)], room.fake_quality])
-	var carried := room.mime.get_node("Carried") as Sprite2D
+	var carried := room.mime.get_node("Carried") as FramedPainting
 	_check(carried.visible and carried.modulate == Mime.FAKE_TINT, name, "the carried fake does not show, tinted")
 	await _tap_at(Room.PAINTING_RECT.get_center())
 	_check(await _wait_until(func() -> bool: return room.mime.carrying, 900), name, "the fake never swapped for the original")
@@ -1399,8 +1401,47 @@ func _test_mime_carrying_before_ready() -> void:
 	var mime := (load("res://scenes/mime.tscn") as PackedScene).instantiate() as Mime
 	mime.carrying = true
 	root.add_child(mime)
-	_check((mime.get_node("Carried") as Sprite2D).visible, name, "the carried painting is hidden when carrying was set before _ready")
+	_check((mime.get_node("Carried") as FramedPainting).visible, name, "the carried painting is hidden when carrying was set before _ready")
 	mime.queue_free()
+	await process_frame
+
+
+## The room hangs its paintings: each frame shows its scan through its own style, and the
+## mime carries the room's masterpiece.
+func _test_room_paintings_framed() -> void:
+	var name := "room_paintings_framed"
+	var room := await _load_room()
+	var pictures: Dictionary[String, FramedPainting] = {
+		"starry_night": room.get_node("Masterpiece"),
+		"great_wave": room.get_node("Frames/FrameA/Swing/Picture"),
+		"grande_jatte": room.get_node("Frames/FrameB/Swing/Picture"),
+		"pearl_earring": room.get_node("Portraits/PortraitA/Picture"),
+		"mona_lisa": room.get_node("Portraits/PortraitB/Picture"),
+	}
+	for id in pictures:
+		var picture := pictures[id]
+		var sprite := picture.get_child(0) as Sprite2D
+		_check(picture.painting == id and picture.picture() == Paintings.SCANS[StringName(id)], name, "%s does not show the %s scan" % [picture.get_path(), id])
+		_check(sprite.material is ShaderMaterial and (sprite.material as ShaderMaterial).shader == Paintings.STYLES[StringName(id)], name, "%s is not drawn in the %s style" % [picture.get_path(), id])
+		var shown := sprite.region_rect.size * sprite.scale
+		_check(shown.is_equal_approx(picture.size - Vector2.ONE * picture.moulding * 2.0), name, "%s's picture is %s, not its frame's inside" % [picture.get_path(), shown])
+	_check((room.mime.get_node("Carried") as FramedPainting).painting == "starry_night", name, "the mime does not carry the room's masterpiece")
+
+
+## A frame naming an unknown painting is reported and stays empty.
+func _test_unknown_painting_reports() -> void:
+	var name := "unknown_painting_reports"
+	var picture := FramedPainting.new()
+	picture.painting = "no_such_painting"
+	var errors_before := _game.errors.size()
+	_game.quiet_errors = true
+	root.add_child(picture)
+	_game.quiet_errors = false
+	_check(_game.errors.size() == errors_before + 1 and "no_such_painting" in _game.errors[-1], name, "an unknown painting was not reported (errors: %s)" % [_game.errors.slice(errors_before)])
+	_check(picture.picture() == null, name, "an unknown painting shows a picture")
+	_game.errors.resize(errors_before)
+	(_game.get_node("ErrorLayer/ErrorBadge") as TextureRect).visible = false
+	picture.queue_free()
 	await process_frame
 
 

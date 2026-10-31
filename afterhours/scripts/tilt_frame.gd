@@ -16,11 +16,18 @@ const RIPPLE_COLOR := Color(0.95, 0.85, 0.4, 0.8)
 const STAND_Y := 195.0
 const VIEW_Y := 180.0
 
+## Its picture (a Paintings id).
+@export var painting := "great_wave"
+
 var tilted := false
 ## The ripple's progress, 0 (just tilted) to 1 (gone).
 var _ripple := 1.0
 
-@onready var _sprite: Sprite2D = $Sprite
+@onready var _swing: Node2D = $Swing
+
+
+func _ready() -> void:
+	($Swing/Picture as FramedPainting).painting = painting
 
 
 ## Where a tap means this frame.
@@ -39,12 +46,12 @@ func view_point() -> Vector2:
 func tilt() -> void:
 	tilted = true
 	_ripple = 0.0
-	create_tween().tween_property(_sprite, "rotation", TILT_ANGLE, SWING_TIME).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	create_tween().tween_property(_swing, "rotation", TILT_ANGLE, SWING_TIME).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 func straighten() -> void:
 	tilted = false
-	create_tween().tween_property(_sprite, "rotation", 0.0, SWING_TIME)
+	create_tween().tween_property(_swing, "rotation", 0.0, SWING_TIME)
 
 
 func _process(delta: float) -> void:

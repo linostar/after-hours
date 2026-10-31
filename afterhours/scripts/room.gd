@@ -92,6 +92,7 @@ var stars: Array[bool] = []
 @onready var _easel_glow: Polygon2D = $EaselGlow
 @onready var _canvas: ForgeryCanvas = $EaselLayer/ForgeryCanvas
 @onready var _fake_icon: Sprite2D = $FakeIcon
+@onready var _masterpiece: FramedPainting = $Masterpiece
 var _frames: Array[TiltFrame] = []
 var _portraits: Array[HidingPortrait] = []
 @onready var _results: Results = $ResultsLayer/Results
@@ -100,6 +101,7 @@ var _portraits: Array[HidingPortrait] = []
 
 func _ready() -> void:
 	mime.place_at(ENTRANCE)
+	mime.painting = _masterpiece.painting
 	guard.target = mime
 	guard.reset()
 	guard.spotted.connect(_on_spotted)

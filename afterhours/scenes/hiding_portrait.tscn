@@ -1,15 +1,17 @@
 [gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/hiding_portrait.gd" id="1_portrait"]
-[ext_resource type="Texture2D" path="res://art/svg/portrait.svg" id="2_sprite"]
+[ext_resource type="Script" path="res://scripts/framed_painting.gd" id="2_picture"]
 [ext_resource type="Texture2D" path="res://art/svg/mime_face.svg" id="3_face"]
 
 [node name="HidingPortrait" type="Node2D"]
 z_index = -9
 script = ExtResource("1_portrait")
 
-[node name="Sprite" type="Sprite2D" parent="."]
-texture = ExtResource("2_sprite")
+[node name="Picture" type="Node2D" parent="."]
+script = ExtResource("2_picture")
+painting = "mona_lisa"
+size = Vector2(70, 130)
 
 [node name="MimeFace" type="Sprite2D" parent="."]
 visible = false
