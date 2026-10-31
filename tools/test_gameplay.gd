@@ -197,6 +197,9 @@ func _test_project_display_and_input() -> void:
 		"rendering/renderer/rendering_method": "gl_compatibility",
 		"rendering/renderer/rendering_method.mobile": "gl_compatibility",
 		"application/run/main_scene": TITLE_PATH,
+		# Navigation maps sync on a fixed frame, so tests and the bot's replays repeat exactly.
+		"navigation/world/map_use_async_iterations": false,
+		"navigation/world/region_use_async_iterations": false,
 	}
 	for setting: String in expected:
 		var value: Variant = ProjectSettings.get_setting(setting)
@@ -1096,14 +1099,19 @@ func _key(keycode: Key, pressed: bool) -> void:
 ## easel's canvas next to it, hides it in a portrait next to it, and steps it out again.
 func _test_keyboard_walks_and_interacts() -> void:
 	var name := "keyboard_walks_and_interacts"
-	# A key held from the room's first frame, before the map holds its navmesh (queries
-	# answer (0, 0) then), leaves the mime where it is.
-	change_scene_to_file(ROOM_PATH)
-	await process_frame
-	await process_frame
-	var early := current_scene as Room
-	early.mime.nudge(Vector2.RIGHT, 1.0 / 60.0)
-	_check(early.mime.position == early.entrance, name, "a nudge before the navmesh was in moved the mime to %s" % early.mime.position)
+	# A nudge while the map holds no navmesh (its queries answer (0, 0) then) leaves the
+	# mime where it is.
+	if current_scene != null:
+		current_scene.free()
+	# The map drops the freed room's navmesh at the sync after the next physics step.
+	await physics_frame
+	await physics_frame
+	var lone := (load("res://scenes/mime.tscn") as PackedScene).instantiate() as Mime
+	root.add_child(lone)
+	lone.place_at(Vector2(70, 330))
+	lone.nudge(Vector2.RIGHT, 1.0 / 60.0)
+	_check(lone.position == Vector2(70, 330), name, "a nudge without a navmesh moved the mime to %s" % lone.position)
+	lone.free()
 	var room := await _load_room()
 	if room == null:
 		return

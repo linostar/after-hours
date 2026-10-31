@@ -80,3 +80,8 @@ textures/canvas_textures/default_texture_filter=1
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 environment/defaults/default_clear_color=Color(0.067, 0.063, 0.11, 1)
+
+[navigation]
+
+world/map_use_async_iterations=false
+world/region_use_async_iterations=false

@@ -1,7 +1,12 @@
 extends Control
 ## The title screen (the main scene): a gilded frame on the gallery wall (where the logo
 ## will hang) holding the play button, which starts wing 1 (until the hub of step 7). A
-## wing whose data is broken is reported (log and error badge) and not played.
+## wing whose data is broken is reported (log and error badge) and not played. Run with
+## `-- --wing N` (N from 1) to start wing N at once (development; an N out of range is
+## reported).
+
+## Starts a wing at once (development).
+const WING_FLAG := "--wing"
 
 @onready var _play: Button = $PlayButton
 
@@ -12,6 +17,14 @@ func _ready() -> void:
 	_play.grab_focus()
 	game.arrive(GameState.Flow.TITLE)
 	_log_layout.call_deferred()
+	var args := OS.get_cmdline_user_args()
+	var at := args.find(WING_FLAG)
+	if at >= 0:
+		var number := int(args[at + 1]) if at + 1 < args.size() else 0
+		if number >= 1 and number <= Content.WINGS.size():
+			_play_wing.call_deferred(game, Content.WINGS[number - 1])
+		else:
+			game.report_error("%s needs a wing number from 1 to %d (got '%s')" % [WING_FLAG, Content.WINGS.size(), " ".join(args.slice(at + 1, at + 2))])
 
 
 func _play_wing(game: GameState, path: String) -> void:

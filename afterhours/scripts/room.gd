@@ -197,10 +197,13 @@ func _ready() -> void:
 	if DebugOverlay.wanted():
 		add_debug_overlay()
 	_game.arrive(GameState.Flow.ROOM)
-	if masterpiece != null and exit_door != null:
-		print("[Room] Masterpiece at %s, exit at %s" % [painting_rect(), exit_door.position])
+	# The layout, for the web smoke test's taps.
+	if masterpiece != null:
+		print("[Room] Masterpiece at %s" % painting_rect())
 	if easel != null:
 		print("[Room] Easel at %s" % easel.rect())
+	for door in doors:
+		print("[Room] Door to %d at %s" % [door.to_room, door.position])
 
 
 ## This room as a one-room wing (when it is loaded on its own): its own painting, ghost
