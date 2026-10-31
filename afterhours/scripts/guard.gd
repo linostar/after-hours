@@ -19,7 +19,8 @@ extends Node2D
 ##   target (not visible) is never seen or caught, unless the guard saw it hide
 ##   (saw_hiding): then it chases to the hiding place and pulls it out, until the target
 ##   steps out again.
-## It walks the room's navmesh (Agent). The cone is drawn on the floor (red while it
+## The room's gimmick (Gimmick.light_at) scales how fast suspicion fills; in its shade the
+## guard cannot see the mime. It walks the room's navmesh (Agent). The cone is drawn on the floor (red while it
 ## chases or searches), the suspicion as an eye above its head that fills and reddens, and
 ## the intent as an icon above that (INTENT_ICONS; none while patrolling) that pops in
 ## when the intent changes.
@@ -90,6 +91,8 @@ var suspicion := 0.0
 var watches_fake := false
 var fake_point := Vector2.ZERO
 var inspecting := false
+## The room's gimmick (null for none): how lit the mime is where it stands.
+var gimmick: Gimmick
 ## The room's tilt decoys, which it straightens when it sees them tilted.
 var frames: Array[TiltFrame] = []
 ## Where the noise it is investigating came from.
@@ -368,9 +371,10 @@ func _sense_frames() -> void:
 func _look(delta: float) -> void:
 	if target == null:
 		return
-	var seen := target.visible and can_see(target.global_position)
+	var light := gimmick.light_at(target.global_position) if gimmick != null else 1.0
+	var seen := target.visible and light > 0.0 and can_see(target.global_position)
 	var before := suspicion
-	suspicion = Detection.suspicion_after(suspicion, seen, global_position.distance_to(target.global_position), CONE_RANGE, delta)
+	suspicion = Detection.suspicion_after(suspicion, seen, global_position.distance_to(target.global_position), CONE_RANGE, delta, light)
 	senses.suspicion = suspicion
 	if _knows_hiding and target.visible:
 		# Out of its hiding place again: the chase can lose it like any other.

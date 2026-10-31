@@ -26,13 +26,14 @@ static func in_cone(origin: Vector2, facing: Vector2, target: Vector2, cone_rang
 
 
 ## Suspicion after `delta` seconds: rises while `seen` at `distance` within `cone_range`
-## (FILL_FAR at the edge up to FILL_FAR + FILL_NEAR at distance 0), drains by DRAIN
-## otherwise; always within 0..1.
-static func suspicion_after(current: float, seen: bool, distance: float, cone_range: float, delta: float) -> float:
-	if not seen:
+## (FILL_FAR at the edge up to FILL_FAR + FILL_NEAR at distance 0, times `light`: how lit
+## the mime is, Gimmick.light_at), drains by DRAIN otherwise or in shade (light 0); always
+## within 0..1.
+static func suspicion_after(current: float, seen: bool, distance: float, cone_range: float, delta: float, light := 1.0) -> float:
+	if not seen or light <= 0.0:
 		return maxf(current - DRAIN * delta, 0.0)
 	var closeness := 1.0 - clampf(distance / cone_range, 0.0, 1.0)
-	return minf(current + (FILL_FAR + FILL_NEAR * closeness) * delta, 1.0)
+	return minf(current + (FILL_FAR + FILL_NEAR * closeness) * light * delta, 1.0)
 
 
 ## Full suspicion: the guard gives chase (GuardBrain).

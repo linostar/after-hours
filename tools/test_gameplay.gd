@@ -64,6 +64,27 @@ func _process(_delta: float) -> bool:
 	return false
 
 
+## A gimmick whose light, slowing and loudness the tests set (the same everywhere), and
+## which counts its ticks.
+class TestGimmick extends Gimmick:
+	var light := 1.0
+	var slow := 1.0
+	var noise := 0.0
+	var ticks := 0
+
+	func light_at(_point: Vector2) -> float:
+		return light
+
+	func slow_at(_point: Vector2) -> float:
+		return slow
+
+	func noise_at(_point: Vector2) -> float:
+		return noise
+
+	func tick(_delta: float) -> void:
+		ticks += 1
+
+
 func _tests() -> Array[Callable]:
 	return [
 		_test_project_display_and_input,
@@ -73,6 +94,7 @@ func _tests() -> Array[Callable]:
 		_test_report_error_shows_badge,
 		_test_detection_cone,
 		_test_detection_suspicion,
+		_test_detection_light,
 		_test_stars,
 		_test_guard_brain_priorities,
 		_test_guard_brain_chase_and_noise,
@@ -128,6 +150,9 @@ func _tests() -> Array[Callable]:
 		_test_navmesh_baked_around_partitions,
 		_test_content_validates_wings,
 		_test_wing_doors_carry_the_run,
+		_test_gimmick_shade_and_light,
+		_test_gimmick_slows_and_ticks,
+		_test_gimmick_loud_floor,
 		_test_unknown_painting_reports,
 	]
 
@@ -1752,6 +1777,88 @@ func _wait_for_room(path: String, max_frames: int) -> Room:
 func _wait_navmesh(room: Room) -> void:
 	var map := room.get_world_2d().navigation_map
 	await _wait_until(func() -> bool: return NavigationServer2D.map_get_closest_point_owner(map, room.mime.position).is_valid(), 60)
+
+
+## Light scales how fast a seen mime fills suspicion; in shade (light 0) it drains as if
+## unseen.
+func _test_detection_light() -> void:
+	var name := "detection_light"
+	var lit := Detection.suspicion_after(0.0, true, 0.0, 180.0, 0.1)
+	var bright := Detection.suspicion_after(0.0, true, 0.0, 180.0, 0.1, 2.0)
+	_check(is_equal_approx(bright, lit * 2.0), name, "light 2 filled %.3f, not twice %.3f" % [bright, lit])
+	_check(is_equal_approx(Detection.suspicion_after(0.5, true, 0.0, 180.0, 0.1, 0.0), 0.5 - Detection.DRAIN * 0.1), name, "a seen mime in shade did not drain like an unseen one")
+
+
+## The slice room with a TestGimmick (named Gimmick) added before it enters the tree.
+func _load_room_with_gimmick(gimmick: TestGimmick) -> Room:
+	var room := (load(ROOM_PATH) as PackedScene).instantiate() as Room
+	gimmick.name = "Gimmick"
+	room.add_child(gimmick)
+	var old := current_scene
+	root.add_child(room)
+	current_scene = room
+	if old != null:
+		old.queue_free()
+	await _wait_navmesh(room)
+	return room
+
+
+## In the gimmick's shade a guard staring at the mime never grows suspicious; lit, it does.
+func _test_gimmick_shade_and_light() -> void:
+	var name := "gimmick_shade_and_light"
+	var gimmick := TestGimmick.new()
+	gimmick.light = 0.0
+	var room := await _load_room_with_gimmick(gimmick)
+	_check(room.gimmick == gimmick and room.guard.gimmick == gimmick and room.mime.gimmick == gimmick, name, "the room did not hand its gimmick to the guard and the mime")
+	_stage_guard(room, Vector2(600, 250), Vector2.RIGHT, Vector2(680, 250))
+	for i in 30:
+		await physics_frame
+	_check(room.guard.suspicion == 0.0, name, "a guard grew suspicious (%.2f) of a mime in shade" % room.guard.suspicion)
+	gimmick.light = 1.0
+	for i in 10:
+		await physics_frame
+	_check(room.guard.suspicion > 0.0, name, "a guard staring at a lit mime stayed calm")
+
+
+## The gimmick's slowing scales the mime's walk, and the room ticks it each frame it runs,
+## not after the escape.
+func _test_gimmick_slows_and_ticks() -> void:
+	var name := "gimmick_slows_and_ticks"
+	var gimmick := TestGimmick.new()
+	gimmick.slow = 0.5
+	var room := await _load_room_with_gimmick(gimmick)
+	room.guard.active = false
+	room.mime.place_at(Vector2(100, 450))
+	room.mime.walk_to(Vector2(800, 450))
+	var ticks_before := gimmick.ticks
+	for i in 60:
+		await physics_frame
+	var walked := room.mime.position.x - 100.0
+	_check(absf(walked - Mime.SPEED * 0.5) < 6.0, name, "at half speed the mime walked %.1f in a second, not %.1f" % [walked, Mime.SPEED * 0.5])
+	_check(gimmick.ticks - ticks_before == 60, name, "the gimmick ticked %d times in 60 frames" % (gimmick.ticks - ticks_before))
+	room.finished = true
+	var ticks_done := gimmick.ticks
+	await physics_frame
+	_check(gimmick.ticks == ticks_done, name, "the gimmick ticked after the escape")
+
+
+## Walking on loud floor makes noises the nearest guard in earshot investigates; quiet
+## floor does not carry to a far guard.
+func _test_gimmick_loud_floor() -> void:
+	var name := "gimmick_loud_floor"
+	var gimmick := TestGimmick.new()
+	gimmick.noise = 0.2
+	var room := await _load_room_with_gimmick(gimmick)
+	room.guard.target = null
+	_stage_guard(room, Vector2(700, 450), Vector2.RIGHT, Vector2(100, 450))
+	room.mime.walk_to(Vector2(300, 450))
+	for i in 60:
+		await physics_frame
+	_check(not room.guard.senses.noise_heard, name, "quiet steps %.0f away were heard (reach %.0f)" % [room.guard.position.distance_to(room.mime.position), GuardBrain.HEARING_RANGE * 0.2])
+	gimmick.noise = 1.0
+	room.mime.walk_to(Vector2(500, 450))
+	_check(await _wait_until(func() -> bool: return room.guard.senses.noise_heard, 60), name, "loud steps in earshot were not heard (guard at %s, mime at %s)" % [room.guard.position, room.mime.position])
+	_check(room.guard.noise_point.distance_to(room.mime.position) < 100.0, name, "the guard heard the step at %s, not near the mime at %s" % [room.guard.noise_point, room.mime.position])
 
 
 ## A frame naming an unknown painting is reported and stays empty.

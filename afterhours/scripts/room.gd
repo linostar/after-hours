@@ -4,7 +4,9 @@ extends Node2D
 ## each room scene inherits it (with its walls, floor and navmesh outline) and adds its
 ## partitions (StaticBody2D in the nav_obstacles group: the navmesh is baked around them on
 ## load; guards cannot see through them), guards (the Guard children of Actors),
-## frames, portraits, doors and, optionally, the Easel and the Masterpiece. The mime starts
+## frames, portraits, doors and, optionally, the Easel, the Masterpiece and a Gimmick (the
+## wing's twist: light, slowing and noisy floor for the guards and the mime; its footsteps
+## on noisy floor are noises the nearest guard in earshot hears). The mime starts
 ## at the Entrance marker. A tap on the floor walks the mime there. A tap on the glowing
 ## easel (Easel.rect) walks it to Easel.spot, where the forgery canvas opens over the
 ## still-running room; a painted fake puts the glow out (tapping the easel again repaints
@@ -96,6 +98,9 @@ var easel: Easel
 var masterpiece: FramedPainting
 var doors: Array[Door] = []
 var exit_door: Door
+var gimmick: Gimmick
+## Seconds until the mime's next footstep on noisy floor can make a noise.
+var _step_noise_wait := 0.0
 
 @onready var mime: Mime = $Actors/Mime
 ## The room's guards (the Guard children of Actors), and the first of them.
@@ -119,6 +124,8 @@ func _ready() -> void:
 	($Navigation as NavigationRegion2D).bake_navigation_polygon(false)
 	entrance = ($Entrance as Node2D).position
 	easel = get_node_or_null("Actors/Easel") as Easel
+	gimmick = get_node_or_null("Gimmick") as Gimmick
+	mime.gimmick = gimmick
 	masterpiece = get_node_or_null("Masterpiece") as FramedPainting
 	run = _game.run
 	var on_its_own := run == null or run.room >= run.wing.rooms.size() or run.wing.rooms[run.room] != scene_file_path
@@ -157,6 +164,7 @@ func _ready() -> void:
 	guard = guards[0] if not guards.is_empty() else null
 	for each in guards:
 		each.target = mime
+		each.gimmick = gimmick
 		each.reset()
 		each.spotted.connect(_on_spotted)
 		each.caught.connect(_on_caught)
@@ -271,6 +279,9 @@ func _physics_process(delta: float) -> void:
 	if finished or leaving or _game.is_transitioning():
 		return
 	elapsed += delta
+	if gimmick != null:
+		gimmick.tick(delta)
+		_step_noise(delta)
 	var walk := _keys.direction()
 	if walk != Vector2.ZERO and _accepts_input():
 		if hidden_in != null:
@@ -300,6 +311,20 @@ func _physics_process(delta: float) -> void:
 		if door.to_room != Door.EXIT and not tossing and mime.position.distance_to(door.position) <= Door.REACH:
 			_leave(door)
 			return
+
+
+## Footsteps on noisy floor (Gimmick.noise_at) while the mime walks: a noise every
+## Gimmick.STEP_NOISE_GAP that the nearest guard within that share of hearing range hears.
+func _step_noise(delta: float) -> void:
+	_step_noise_wait = maxf(_step_noise_wait - delta, 0.0)
+	var loudness := gimmick.noise_at(mime.position)
+	if not mime.walking or loudness <= 0.0 or _step_noise_wait > 0.0:
+		return
+	_step_noise_wait = Gimmick.STEP_NOISE_GAP
+	var heard := nearest_in_earshot(mime.position, GuardBrain.HEARING_RANGE * loudness)
+	if heard != null:
+		heard.hear(mime.position)
+		print("[Room] A loud footstep at %s at t %.2f, heard by %s" % [mime.position.round(), elapsed, heard.name])
 
 
 ## Goes through `door` to its room: the room stops and hands its state back to the run.
@@ -443,11 +468,11 @@ func _tilt(frame: TiltFrame) -> void:
 	print("[Room] Tilted the frame at %s at t %.2f (heard by: %s)" % [frame.position.round(), elapsed, str(heard.name) if heard != null else "nobody"])
 
 
-## The active guard nearest `point` within GuardBrain.HEARING_RANGE, or null: a decoy pulls
-## only that one.
-func nearest_in_earshot(point: Vector2) -> Guard:
+## The active guard nearest `point` within `reach` (GuardBrain.HEARING_RANGE unless a quieter
+## noise carries less), or null: a noise pulls only that one.
+func nearest_in_earshot(point: Vector2, reach := GuardBrain.HEARING_RANGE) -> Guard:
 	var nearest: Guard
-	var nearest_distance := GuardBrain.HEARING_RANGE
+	var nearest_distance := reach
 	for each in guards:
 		var distance := each.global_position.distance_to(point)
 		if each.active and distance < nearest_distance:

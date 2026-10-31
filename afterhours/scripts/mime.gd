@@ -1,7 +1,7 @@
 class_name Mime
 extends Node2D
 ## The player's mime: walks a navmesh path (NavigationAgent2D) to wherever the room sends
-## it, at SPEED. Its origin is its feet, so the room y-sorts it with the guards and props.
+## it, at SPEED (times the room gimmick's slow_at where it stands). Its origin is its feet, so the room y-sorts it with the guards and props.
 ## While swapping it draws a ring beside its head (clear of the painting above it) that
 ## fills (swap_progress 0..1); while it carries the fake (paler, unframed-looking) or the
 ## original, the little painting shows at its side.
@@ -19,6 +19,8 @@ const FAKE_TINT := Color(1.0, 0.95, 0.85, 0.75)
 signal arrived(at: Vector2)
 
 var walking := false
+## The room's gimmick (null for none): how fast it walks where it stands.
+var gimmick: Gimmick
 var swap_progress := 0.0:
 	set(value):
 		swap_progress = value
@@ -66,11 +68,16 @@ func walk_to(point: Vector2) -> void:
 func nudge(direction: Vector2, delta: float) -> void:
 	walking = false
 	var map := _agent.get_navigation_map()
-	var step := position + direction * SPEED * delta
+	var step := position + direction * speed() * delta
 	if not NavigationServer2D.map_get_closest_point_owner(map, step).is_valid():
 		return
 	position = NavigationServer2D.map_get_closest_point(map, step)
 	_agent.target_position = position
+
+
+## Walking speed where it stands: SPEED, slowed by the gimmick.
+func speed() -> float:
+	return SPEED * (gimmick.slow_at(position) if gimmick != null else 1.0)
 
 
 ## Stops at once and stands at `point` (a reset, a toss).
@@ -94,7 +101,7 @@ func _physics_process(delta: float) -> void:
 		arrived.emit(position)
 		return
 	var next := _agent.get_next_path_position()
-	position = position.move_toward(next, SPEED * delta)
+	position = position.move_toward(next, speed() * delta)
 
 
 func _draw() -> void:
