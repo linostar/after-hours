@@ -1,0 +1,76 @@
+[
+  {
+    "id": "pearl_earring",
+    "file": "pearl_earring.webp",
+    "artist": "Johannes Vermeer",
+    "title": "Girl with a Pearl Earring",
+    "year": 1665,
+    "date": "c. 1665",
+    "page_url": "https://commons.wikimedia.org/wiki/File:1665_Girl_with_a_Pearl_Earring.jpg",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/1665_Girl_with_a_Pearl_Earring.jpg/1280px-1665_Girl_with_a_Pearl_Earring.jpg",
+    "licence": "Public domain",
+    "sha256": "fc7aa0b6dcae15e41f1b9b64ba8e89db6fd5e6cbbd9ca74d61eefe8d135fa6f7"
+  },
+  {
+    "id": "great_wave",
+    "file": "great_wave.webp",
+    "artist": "Katsushika Hokusai",
+    "title": "The Great Wave off Kanagawa",
+    "year": 1831,
+    "date": "c. 1830-1832",
+    "page_url": "https://commons.wikimedia.org/wiki/File:Tsunami_by_hokusai_19th_century.jpg",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Tsunami_by_hokusai_19th_century.jpg/1280px-Tsunami_by_hokusai_19th_century.jpg",
+    "licence": "Public domain",
+    "sha256": "54c3d6b7a70bd0bfe33b7fd1363a6974b2a763e81674d17cfa98fd6e6af9b3c2",
+    "crop": [0.1, 0, 1, 1],
+    "note": "Left tenth cropped: the title cartouche and signature are writing (No Text rule)."
+  },
+  {
+    "id": "grande_jatte",
+    "file": "grande_jatte.webp",
+    "artist": "Georges Seurat",
+    "title": "A Sunday on La Grande Jatte",
+    "year": 1886,
+    "date": "1884-1886",
+    "page_url": "https://commons.wikimedia.org/wiki/File:A_Sunday_on_La_Grande_Jatte,_Georges_Seurat,_1884.jpg",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7d/A_Sunday_on_La_Grande_Jatte%2C_Georges_Seurat%2C_1884.jpg/1280px-A_Sunday_on_La_Grande_Jatte%2C_Georges_Seurat%2C_1884.jpg",
+    "licence": "Public domain",
+    "sha256": "131ac8fcd2bfb74a7c189c7956ebaef4295e22d3efdcfed7e950ad7fccaf31db"
+  },
+  {
+    "id": "starry_night",
+    "file": "starry_night.webp",
+    "artist": "Vincent van Gogh",
+    "title": "The Starry Night",
+    "year": 1889,
+    "date": "1889",
+    "page_url": "https://commons.wikimedia.org/wiki/File:Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg/1280px-Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg",
+    "licence": "Public domain",
+    "sha256": "a2759458dbc9cf1150ddc8b5d16453aba4790ed6fe826c29f4cf59471d07e629"
+  },
+  {
+    "id": "earthly_delights",
+    "file": "earthly_delights.webp",
+    "artist": "Hieronymus Bosch",
+    "title": "The Garden of Earthly Delights",
+    "year": 1510,
+    "date": "c. 1490-1510",
+    "page_url": "https://commons.wikimedia.org/wiki/File:The_Garden_of_earthly_delights.jpg",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/The_Garden_of_earthly_delights.jpg/1280px-The_Garden_of_earthly_delights.jpg",
+    "licence": "Public domain",
+    "sha256": "7113a760aad84caa8a1fa12f13623e0efaca47c2eedf4513225cd8ffe258f76e"
+  },
+  {
+    "id": "mona_lisa",
+    "file": "mona_lisa.webp",
+    "artist": "Leonardo da Vinci",
+    "title": "Mona Lisa",
+    "year": 1519,
+    "date": "c. 1503-1519",
+    "page_url": "https://commons.wikimedia.org/wiki/File:Mona_Lisa,_by_Leonardo_da_Vinci,_from_C2RMF_retouched.jpg",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg/1280px-Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg",
+    "licence": "Public domain",
+    "sha256": "8056105c343c16563f8afd4615b4653067e168ec41f344ef5b7e8aaea97463ad"
+  }
+]
