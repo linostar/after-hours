@@ -240,7 +240,6 @@ func _physics_process(delta: float) -> void:
 	_update_cone()
 
 
-## The current path on the navmesh (room coordinates), for the debug overlay.
 ## Says this guard's next line for `event` in its voice (Audio.say); outside the tree (a
 ## test's loose guard) it says nothing.
 func say(event: StringName) -> void:
@@ -248,6 +247,7 @@ func say(event: StringName) -> void:
 		(get_node(GameState.AUTOLOAD_PATH) as GameState).audio.say(voice, event)
 
 
+## The current path on the navmesh (room coordinates), for the debug overlay.
 func nav_path() -> PackedVector2Array:
 	return _agent.get_current_navigation_path()
 

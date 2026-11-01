@@ -118,6 +118,10 @@ func _tiptoe(delta: float) -> void:
 		return
 	_tiptoe_wait = TIPTOE_GAP
 	if gimmick != null and gimmick.noise_at(position) > 0.0:
+		# A path walk's loud step is the room's (with the noise guards hear); a keyboard step,
+		# which the room does not count, still sounds like the floor.
+		if not walking:
+			Audio.play_for(self, gimmick.noise_sound(position))
 		return
 	_tiptoes += 1
 	Audio.play_for(self, &"tiptoe", 0.92 if _tiptoes % 2 == 0 else 1.08)

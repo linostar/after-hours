@@ -84,6 +84,9 @@ class TestGimmick extends Gimmick:
 	func noise_at(_point: Vector2) -> float:
 		return noise
 
+	func noise_sound(_point: Vector2) -> StringName:
+		return &"splash"
+
 	func clue_seen_by(_guard: Guard) -> Vector2:
 		var shown := clue
 		clue = Vector2.INF
@@ -103,6 +106,7 @@ func _tests() -> Array[Callable]:
 		_test_sfx_files,
 		_test_sfx_on_actions,
 		_test_guards_take_voices,
+		_test_keyboard_steps_sound,
 		_test_detection_cone,
 		_test_detection_suspicion,
 		_test_detection_light,
@@ -397,6 +401,27 @@ func _test_sfx_files() -> void:
 	_game.run = was_run
 	_game.errors.resize(errors_before)
 	(_game.get_node("ErrorLayer/ErrorBadge") as TextureRect).visible = false
+
+
+## Keyboard walking sounds too: tiptoes on quiet floor, the floor's own sound (the gimmick's
+## noise_sound) on noisy floor, where the room's loud step (a path walk's) does not count it.
+func _test_keyboard_steps_sound() -> void:
+	var name := "keyboard_steps_sound"
+	_game.run = null
+	var gimmick := TestGimmick.new()
+	var room := await _load_room_with_gimmick(gimmick)
+	var played := _game.audio.played
+	for noisy: bool in [false, true]:
+		gimmick.noise = 1.0 if noisy else 0.0
+		played.clear()
+		for i in 40:
+			room.mime.nudge(Vector2.LEFT if i < 20 else Vector2.RIGHT, 1.0 / 60.0)
+			await physics_frame
+		var want := &"splash" if noisy else &"tiptoe"
+		_check(want in played and not (&"tiptoe" if noisy else &"splash") in played, name, "keyboard steps on %s floor played %s, not only %s" % ["noisy" if noisy else "quiet", played, want])
+	room.queue_free()
+	_game.run = null
+	await process_frame
 
 
 ## A room hands its guards the voices in turn (wing 6's salon has three: watchman, rookie,

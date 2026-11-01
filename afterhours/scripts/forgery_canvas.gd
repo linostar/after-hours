@@ -109,6 +109,7 @@ func open() -> void:
 		_assist.grab_focus()
 	else:
 		_close.grab_focus()
+	_game.audio.play(&"brush")
 	print("[Forgery] Canvas open at stroke %d of %d" % [traced.size() + 1, ghosts.size()])
 	_log_ghosts.call_deferred()
 
