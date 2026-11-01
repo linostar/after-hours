@@ -11,7 +11,7 @@ extends Node
 ## Every error goes to the log (push_error) and shows the cracked-frame ErrorBadge,
 ## never text (CLAUDE.md, "Errors are visible without words").
 
-enum Flow { TITLE, ROOM, HUB }
+enum Flow { TITLE, ROOM, HUB, HIDEOUT }
 
 ## Scripts reach the autoload through this path (get_node(GameState.AUTOLOAD_PATH)), never
 ## the bare Game name, which tool runs (--script) cannot compile against.
@@ -36,6 +36,7 @@ var scene_paths: Dictionary[Flow, String] = {
 	Flow.TITLE: "res://scenes/title.tscn",
 	Flow.ROOM: "res://scenes/room.tscn",
 	Flow.HUB: "res://scenes/hub.tscn",
+	Flow.HIDEOUT: "res://scenes/hideout.tscn",
 }
 var state := Flow.TITLE
 ## The wing being played (null before any; a room loaded on its own makes a one-room run).

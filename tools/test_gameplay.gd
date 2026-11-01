@@ -143,6 +143,7 @@ func _tests() -> Array[Callable]:
 		_test_catches_during_swap_and_while_carrying,
 		_test_title_play_opens_hub,
 		_test_hub_doors_unlock_and_enter,
+		_test_hideout_hangs_originals,
 		_test_goto_missing_scene_reports,
 		_test_room_swap_and_escape,
 		_test_room_swap_cancel_and_locked_exit,
@@ -1395,6 +1396,38 @@ func _test_hub_doors_unlock_and_enter() -> void:
 	_game.save = Save.defaults()
 	DirAccess.remove_absolute(_game.save_path)
 	_game.scene_paths[GameState.Flow.ROOM] = ROOM_PATH
+
+
+## The hub's hideout door leads to the hideout, where each stolen original hangs alive
+## through its style (gilt with three stars, wood otherwise) and an unrobbed wing's frame is
+## empty; home goes back to the hub, the mime at the hideout door.
+func _test_hideout_hangs_originals() -> void:
+	var name := "hideout_hangs_originals"
+	_game.run = null
+	_game.save = Save.defaults()
+	Save.record(_game.save, "wing_01", [true, true, true] as Array[bool], 60.0)
+	Save.record(_game.save, "wing_02", [true, false, false] as Array[bool], 200.0)
+	var hub := await _load_hub()
+	_check(hub.hideout_door.glowing, name, "the hideout door does not glow with originals stolen")
+	await _tap_at(hub.hideout_door.position)
+	var arrived := await _wait_until(func() -> bool: return current_scene is Hideout and not _game.is_transitioning(), 600)
+	_check(arrived and _game.state == GameState.Flow.HIDEOUT, name, "a tap on the hideout door did not lead to the hideout")
+	var hideout := current_scene as Hideout
+	if hideout == null:
+		return
+	var first := hideout.originals[0]
+	var second := hideout.originals[1]
+	_check(first != null and first.painting == "pearl_earring" and first.gilded and first.picture() != null, name, "wing 1's original does not hang gilded")
+	_check(second != null and second.painting == "great_wave" and not second.gilded, name, "wing 2's original does not hang in wood")
+	_check(hideout.originals.slice(2).all(func(each: FramedPainting) -> bool: return each == null), name, "unrobbed wings hang an original")
+	_check(first != null and (first.get_child(0) as Sprite2D).material != null, name, "wing 1's original is not alive through its style")
+	var home := hideout.get_node("HomeButton") as Button
+	_check(home.has_focus(true), name, "home does not have visible keyboard focus")
+	await _tap_control(home)
+	await _wait_until(func() -> bool: return current_scene is Hub and not _game.is_transitioning(), 120)
+	hub = current_scene as Hub
+	_check(hub != null and hub.mime.position.distance_to(hub.hideout_door.arrival_point()) <= 1.0, name, "back from the hideout the mime is not at its door")
+	_game.save = Save.defaults()
 
 
 ## The hub as the current scene, its navmesh synced.

@@ -1,9 +1,10 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/hub.gd" id="1_hub"]
 [ext_resource type="PackedScene" path="res://scenes/mime.tscn" id="2_mime"]
 [ext_resource type="Script" path="res://scripts/ui/floor_input.gd" id="3_floor"]
 [ext_resource type="Script" path="res://scripts/ui/keyboard_input.gd" id="4_keys"]
+[ext_resource type="PackedScene" path="res://scenes/door.tscn" id="5_door"]
 
 [sub_resource type="NavigationPolygon" id="NavigationPolygon_floor"]
 outlines = Array[PackedVector2Array]([PackedVector2Array(32, 172, 928, 172, 928, 508, 32, 508)])
@@ -42,6 +43,11 @@ navigation_polygon = SubResource("NavigationPolygon_floor")
 position = Vector2(480, 470)
 
 [node name="Doors" type="Node2D" parent="."]
+
+[node name="HideoutDoor" parent="." instance=ExtResource("5_door")]
+position = Vector2(45, 400)
+opening = Rect2(-45, -40, 24, 80)
+arrival = Vector2(60, 0)
 
 [node name="Actors" type="Node2D" parent="."]
 y_sort_enabled = true
