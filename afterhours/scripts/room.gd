@@ -62,6 +62,11 @@ const TOSS_FLIGHT := 0.8
 const TOSS_HEIGHT := 120.0
 ## The mime's wobble while the guard shakes it (radians either way).
 const SHAKE_ANGLE := 0.3
+## A catch shakes the screen this far (base units) for TOSS_SHAKE; a swap punches the
+## camera in by SWAP_PUNCH for PUNCH_TIME (neither under Reduce Motion: Game.shake, punch).
+const CAUGHT_SHAKE := 7.0
+const SWAP_PUNCH := 0.04
+const PUNCH_TIME := 0.3
 
 ## The par time for the third star, in seconds.
 @export var par_time := 45.0
@@ -380,6 +385,7 @@ func _leave(door: Door) -> void:
 func _on_floor_tapped(at: Vector2) -> void:
 	if tossing or finished or leaving:
 		return
+	TapRipple.spawn(self, at)
 	if hidden_in != null:
 		if hidden_in.rect().has_point(at):
 			return
@@ -542,6 +548,7 @@ func _swap() -> void:
 		exit_door.glowing = true
 	print("[Room] Swapped the forgery for the original at t %.2f (fake %s)" % [elapsed, Forgery.Grade.keys()[Forgery.grade(fake_quality)]])
 	_game.audio.play(&"swap")
+	_game.punch(SWAP_PUNCH, PUNCH_TIME)
 
 
 func _on_inspected(by: Guard) -> void:
@@ -591,6 +598,7 @@ func _on_caught() -> void:
 	mime.place_at(from)
 	print("[Room] Caught (%d) at t %.2f: tossing the mime from %s to the entrance" % [catches, elapsed, from.round()])
 	_game.audio.play(&"caught")
+	_game.shake(CAUGHT_SHAKE, TOSS_SHAKE)
 	var toss := create_tween()
 	for angle: float in [SHAKE_ANGLE, -SHAKE_ANGLE, SHAKE_ANGLE, 0.0]:
 		toss.tween_property(mime, "rotation", angle, TOSS_SHAKE / 4.0)

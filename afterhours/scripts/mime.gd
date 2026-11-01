@@ -15,6 +15,10 @@ const RING_CENTER := Vector2(34, -84)
 const RING_RADIUS := 14.0
 const RING_TRACK := Color(0.1, 0.08, 0.13, 0.7)
 const RING_FILL := Color(0.95, 0.85, 0.4)
+## The sprite bobs this high once per tiptoe while it walks, and settles once it has
+## stood still for BOB_SETTLE.
+const BOB_HEIGHT := 3.0
+const BOB_SETTLE := 0.06
 ## The carried painting's tint while it is the fake.
 const FAKE_TINT := Color(1.0, 0.95, 0.85, 0.75)
 
@@ -50,8 +54,12 @@ var painting := "starry_night":
 			_carried.painting = value
 
 @onready var _carried: FramedPainting = $Carried
+@onready var _sprite: Sprite2D = $Sprite
 var _tiptoe_wait := 0.0
 var _tiptoes := 0
+## Walking time along the current bob, and time stood still since the last step.
+var _bob := 0.0
+var _still := 0.0
 
 
 func _ready() -> void:
@@ -111,8 +119,19 @@ func _physics_process(delta: float) -> void:
 	_tiptoe(delta)
 
 
-## Counts down walking time to the next tiptoe (pitched up and down in turn).
+func _process(delta: float) -> void:
+	_still += delta
+	if _still >= BOB_SETTLE:
+		_bob = 0.0
+		_sprite.position.y = 0.0
+
+
+## Counts down walking time to the next tiptoe (pitched up and down in turn) and bobs the
+## sprite once per tiptoe.
 func _tiptoe(delta: float) -> void:
+	_still = 0.0
+	_bob = fmod(_bob + delta / TIPTOE_GAP, 1.0)
+	_sprite.position.y = -absf(sin(_bob * PI)) * BOB_HEIGHT
 	_tiptoe_wait -= delta
 	if _tiptoe_wait > 0.0:
 		return

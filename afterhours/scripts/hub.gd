@@ -91,6 +91,7 @@ func _physics_process(delta: float) -> void:
 func _on_floor_tapped(at: Vector2) -> void:
 	if _game.is_transitioning():
 		return
+	TapRipple.spawn(self, at)
 	_target = null
 	for door in wing_doors:
 		if door.rect().has_point(at):

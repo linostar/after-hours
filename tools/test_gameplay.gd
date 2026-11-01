@@ -185,6 +185,7 @@ func _tests() -> Array[Callable]:
 		_test_unknown_painting_reports,
 		_test_screen_fit,
 		_test_rotate_overlay_pauses,
+		_test_juice_on_actions,
 	]
 
 
@@ -1528,6 +1529,64 @@ func _test_title_logo_sways() -> void:
 	await process_frame
 	_check(logo.rotation == 0.0, name, "the logo still sways under Reduce Motion")
 	_game.save["settings"]["reduce_motion"] = false
+
+
+## Every action answers at once: a tap ripples where it lands, the walking mime bobs and
+## settles when it stops, a pressed button dips and springs back (even when it pauses the
+## tree), a swap punches the camera in and a catch shakes the screen, both easing back to
+## the world's place; Reduce Motion stops the shake and the punch.
+func _test_juice_on_actions() -> void:
+	var name := "juice_on_actions"
+	var room := await _load_room()
+	room.guard.active = false
+	var target := room.mime.position + Vector2(160, 0)
+	await _tap_at(target)
+	var ripple := room.get_node_or_null("TapRipple") as TapRipple
+	_check(ripple != null and ripple.position.is_equal_approx(target), name, "a floor tap left no ripple where it landed")
+	var bobbed := false
+	for i in 20:
+		await physics_frame
+		await process_frame
+		bobbed = bobbed or room.get_node("Actors/Mime/Sprite").position.y < 0.0
+	_check(bobbed, name, "the walking mime does not bob")
+	await _walk_trace(room.mime, 300)
+	for i in 6:
+		await process_frame
+	_check(room.get_node("Actors/Mime/Sprite").position.y == 0.0, name, "the mime still bobs standing still")
+	_check(room.get_node_or_null("TapRipple") == null, name, "the ripple outlived its %.2f s" % TapRipple.LIFE)
+	var pause_button := room.get_node("PauseButton") as Button
+	pause_button.button_down.emit()
+	await process_frame
+	await process_frame
+	_check(pause_button.scale.x < 1.0, name, "a pressed button does not dip")
+	room.pause()
+	for i in ceili(GameState.PRESS_TIME * 60.0) + 4:
+		await process_frame
+	_check(pause_button.scale.is_equal_approx(Vector2.ONE), name, "a button pressed into a pause did not spring back (scale %s)" % pause_button.scale)
+	room.pause_menu.resume()
+	var rest := Transform2D(0.0, _game.world_offset())
+	room.mime.has_fake = true
+	room._swap()
+	await process_frame
+	await process_frame
+	_check(_game.jolting() and get_root().canvas_transform.get_scale().x > 1.0, name, "the swap did not punch the camera in")
+	await _wait_until(func() -> bool: return not _game.jolting(), 60)
+	_check(get_root().canvas_transform.is_equal_approx(rest), name, "the punch did not settle back to the world's place")
+	room.guard.caught.emit()
+	# process_frame comes before the nodes' _process: the second one follows Game's.
+	await process_frame
+	await process_frame
+	_check(_game.jolting() and not get_root().canvas_transform.origin.is_equal_approx(rest.origin), name, "a catch did not shake the screen")
+	await _wait_until(func() -> bool: return not room.tossing, 180)
+	_check(get_root().canvas_transform.is_equal_approx(rest), name, "the shake did not settle back to the world's place")
+	_game.set_setting("reduce_motion", true)
+	room._swap()
+	room.guard.caught.emit()
+	await process_frame
+	await process_frame
+	_check(not _game.jolting() and get_root().canvas_transform.is_equal_approx(rest), name, "Reduce Motion still shakes or punches")
+	await _wait_until(func() -> bool: return not room.tossing, 180)
+	_game.set_setting("reduce_motion", false)
 
 
 ## Screen changes wipe with the iris shader; Reduce Motion makes it a plain fade.
