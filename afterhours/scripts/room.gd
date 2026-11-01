@@ -429,7 +429,7 @@ func _accepts_input() -> bool:
 
 
 ## E: steps out of a portrait, or taps the nearest usable thing within INTERACT_REACH of
-## where the mime would stand for it.
+## where the mime would stand for it; with nothing in reach the mime shrugs.
 func _on_interacted() -> void:
 	if not _accepts_input():
 		return
@@ -445,6 +445,8 @@ func _on_interacted() -> void:
 			best_tap = usable[1]
 	if best_tap != Vector2.INF:
 		_on_floor_tapped(best_tap)
+	else:
+		mime.shrug()
 
 
 ## What the mime can use now, each as [where it stands, where a tap means it].

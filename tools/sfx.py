@@ -372,6 +372,11 @@ def fx_escape(rng):
                (ping(note_hz(F6), 1.2, 3.5, VIBES), 0.45, 0.8))
 
 
+def fx_shrug(rng):
+    """The mime shrugging (E with nothing in reach): two muted plucks, down and back up."""
+    return arpeggio([C5, A4, C5], 0.09, 0.14, 16.0, PIZZ)
+
+
 def fx_star(rng):
     """A star earned on the results: a bright bell ping (played higher star by star)."""
     return ping(note_hz(C6), 0.7, 6.0, BELL)
@@ -450,6 +455,7 @@ EFFECTS = {
     "escape": (fx_escape, 0.5, "stinger"),
     "star": (fx_star, 0.42, "stinger"),
     "no_star": (fx_no_star, 0.57, "event"),
+    "shrug": (fx_shrug, 0.4, "ui"),
     "ui_tap": (fx_ui_tap, 0.42, "ui"),
     "toggle_on": (fx_toggle_on, 0.26, "ui"),
     "toggle_off": (fx_toggle_off, 0.25, "ui"),

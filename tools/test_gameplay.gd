@@ -1372,6 +1372,18 @@ func _test_keyboard_walks_and_interacts() -> void:
 	await _key(KEY_E, true)
 	await _key(KEY_E, false)
 	_check(room.hidden_in == null and room.mime.visible, name, "E while hidden did not step the mime out")
+	# Out of reach of everything usable, E shrugs with a sound and goes nowhere.
+	var lonely := Vector2(300, 470)
+	var in_reach := room._usables().filter(func(usable: Array) -> bool: return lonely.distance_to(usable[0]) <= Room.INTERACT_REACH)
+	_check(in_reach.is_empty(), name, "the test's lonely spot %s has something in reach: %s" % [lonely, in_reach])
+	room.mime.place_at(lonely)
+	await _key(KEY_E, true)
+	await _key(KEY_E, false)
+	var sprite := room.mime.get_node("Sprite") as Sprite2D
+	var shrugged := await _wait_until(func() -> bool: return sprite.scale.y < 1.0, 10)
+	_check(shrugged and _game.audio.played.slice(-4).has(&"shrug"), name, "E with nothing in reach did not shrug with its sound")
+	_check(not room.mime.walking, name, "E with nothing in reach walked the mime")
+	_check(await _wait_until(func() -> bool: return sprite.scale == Vector2.ONE, ceili(Mime.SHRUG_TIME * 60.0) + 10), name, "the shrug did not settle")
 
 
 ## A guard that saw the mime hide loses it like any other once it steps out and gets away

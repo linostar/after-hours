@@ -109,7 +109,7 @@ func _on_floor_tapped(at: Vector2) -> void:
 	mime.walk_to(at)
 
 
-## E: uses the nearest door within Room.INTERACT_REACH.
+## E: uses the nearest door within Room.INTERACT_REACH; with none the mime shrugs.
 func _on_interacted() -> void:
 	if settings.visible:
 		return
@@ -124,3 +124,5 @@ func _on_interacted() -> void:
 			best_distance = distance
 	if best != null:
 		_on_floor_tapped(best.position)
+	else:
+		mime.shrug()

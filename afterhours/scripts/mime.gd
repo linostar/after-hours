@@ -19,6 +19,10 @@ const RING_FILL := Color(0.95, 0.85, 0.4)
 ## stood still for BOB_SETTLE.
 const BOB_HEIGHT := 3.0
 const BOB_SETTLE := 0.06
+## A shrug (E with nothing in reach): the sprite sinks and widens to SHRUG_SCALE and back,
+## twice, over SHRUG_TIME.
+const SHRUG_SCALE := Vector2(1.14, 0.88)
+const SHRUG_TIME := 0.4
 ## The carried painting's tint while it is the fake.
 const FAKE_TINT := Color(1.0, 0.95, 0.85, 0.75)
 
@@ -60,6 +64,7 @@ var _tiptoes := 0
 ## Walking time along the current bob, and time stood still since the last step.
 var _bob := 0.0
 var _still := 0.0
+var _shrug: Tween
 
 
 func _ready() -> void:
@@ -99,6 +104,18 @@ func place_at(point: Vector2) -> void:
 	position = point
 	_agent.target_position = point
 	walking = false
+
+
+## Shrugs with a sound: E found nothing in reach to use.
+func shrug() -> void:
+	if _shrug != null:
+		_shrug.kill()
+	_shrug = create_tween()
+	for i in 2:
+		_shrug.tween_property(_sprite, "scale", SHRUG_SCALE, SHRUG_TIME / 4.0)
+		_shrug.tween_property(_sprite, "scale", Vector2.ONE, SHRUG_TIME / 4.0)
+	Audio.play_for(self, &"shrug")
+	print("[Mime] Shrugged: nothing in reach")
 
 
 func _sync_carried() -> void:
