@@ -320,8 +320,9 @@ async function smoke(browser, url, run) {
       const hubPath = join(buildDir, '..', `smoke-${run.name}-hub.png`);
       await page.screenshot({ path: hubPath });
       console.log(`[${run.name}] screenshots: ${join(buildDir, '..', `smoke-${run.name}-results.png`)}, ${hubPath}`);
-      // The wing's loop and the swap's sound played in the export (a load failure is a console error).
-      for (const want of ['[Audio] Music wing_01', '[Audio] SFX swap']) {
+      // The wing's loop and the swap's sound played in the export (a load failure is a console
+      // error), and the ghost mime found its replay (a JSON file the export must include).
+      for (const want of ['[Audio] Music wing_01', '[Audio] SFX swap', '[Room] Ghost mime replays']) {
         if (!logs.some((line) => line.startsWith(want))) failures.push(`the web run never logged "${want}"`);
       }
     }

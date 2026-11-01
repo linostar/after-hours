@@ -50,6 +50,7 @@ extends Node2D
 const SWAP_Y := 235.0
 const FAKE_VIEW_Y := 180.0
 const QUERY_ICON := preload("res://art/svg/icon_query.svg")
+const GHOST_SCENE := preload("res://scenes/ghost_mime.tscn")
 const ALARM_ICON := preload("res://art/svg/icon_alarm.svg")
 ## How close to the swap spot (or the easel's, a frame's or a portrait's) counts as
 ## standing there.
@@ -107,6 +108,9 @@ var masterpiece: FramedPainting
 var doors: Array[Door] = []
 var exit_door: Door
 var gimmick: Gimmick
+## The ghost mime replaying the bot's route through this visit (GhostMime), while the wing
+## was never escaped from; null otherwise.
+var ghost: GhostMime
 ## Seconds until the mime's next footstep on noisy floor can make a noise.
 var _step_noise_wait := 0.0
 
@@ -207,6 +211,9 @@ func _ready() -> void:
 			each.watches_fake = not found_out
 		_fake_icon.texture = ALARM_ICON if found_out else QUERY_ICON
 		_fake_icon.visible = found_out
+	var visit: int = run.visits.get(run.room, 0)
+	run.visits[run.room] = visit + 1
+	_add_ghost(visit)
 	if DebugOverlay.wanted():
 		add_debug_overlay()
 	_game.arrive(GameState.Flow.ROOM)
@@ -228,6 +235,30 @@ func _own_wing() -> WingData:
 	wing.par_time = par_time
 	wing.ghosts = _canvas.ghosts
 	return wing
+
+
+## The ghost mime for the mime's `visit`-th stay here (from 0), while the run's wing (a
+## wing file: a room loaded on its own has none) was never escaped from. A replay that is
+## missing or broken is reported; one without that visit adds no ghost.
+func _add_ghost(visit: int) -> void:
+	var wing_path := run.wing.resource_path
+	if wing_path.is_empty() or Save.finished(_game.save, Content.wing_id(wing_path)):
+		return
+	var problems: Array[String] = []
+	var replay := GhostMime.load_replay(GhostMime.path_for(wing_path), problems)
+	for problem in problems:
+		_game.report_error("Room '%s': %s" % [scene_file_path, problem])
+	if replay.is_empty():
+		return
+	var samples := GhostMime.visit_samples(replay["trail"], run.room, visit)
+	if samples.is_empty():
+		print("[Room] No ghost mime: the bot came into room %d fewer than %d time(s)" % [run.room, visit + 1])
+		return
+	ghost = GHOST_SCENE.instantiate() as GhostMime
+	ghost.samples = samples
+	ghost.period = replay["period"]
+	$Actors.add_child(ghost)
+	print("[Room] Ghost mime replays visit %d of room %d (%d samples)" % [visit + 1, run.room, samples.size()])
 
 
 ## The run's state, into this room (and the mime).
@@ -309,6 +340,8 @@ func _physics_process(delta: float) -> void:
 		gimmick.tick(delta)
 		_step_noise(delta)
 		_follow_clues()
+	if ghost != null:
+		ghost.advance(delta)
 	var walk := _keys.direction()
 	if walk != Vector2.ZERO and _accepts_input():
 		if hidden_in != null:
@@ -622,5 +655,7 @@ func _end_toss() -> void:
 		each.reset()
 		each.watches_fake = fake_hung and not found_out
 	tossing = false
+	if ghost != null:
+		ghost.restart()
 	_game.audio.play(&"land")
 	print("[Room] The mime is back at the entrance at t %.2f" % elapsed)

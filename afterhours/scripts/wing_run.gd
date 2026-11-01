@@ -20,6 +20,9 @@ var has_fake := false
 var carrying := false
 ## Per room index: {"fake_hung": bool, "inspections": int, "found_out": bool}.
 var hung: Dictionary[int, Dictionary] = {}
+## Per room index: how many times the mime has come in (the ghost mime replays the bot's
+## stay of the same number).
+var visits: Dictionary[int, int] = {}
 
 
 func _init(of: WingData) -> void:

@@ -186,6 +186,8 @@ func _tests() -> Array[Callable]:
 		_test_screen_fit,
 		_test_rotate_overlay_pauses,
 		_test_juice_on_actions,
+		_test_ghost_replay_visits,
+		_test_ghost_mime_until_escape,
 	]
 
 
@@ -1599,6 +1601,66 @@ func _test_juice_on_actions() -> void:
 	_check(not _game.jolting() and get_root().canvas_transform.is_equal_approx(rest), name, "Reduce Motion still shakes or punches")
 	await _wait_until(func() -> bool: return not room.tossing, 180)
 	_game.set_setting("reduce_motion", false)
+
+
+## A ghost replay reads as its samples per visit: the n-th run of samples in a room is the
+## bot's n-th stay there; a missing or malformed replay is a problem, not a crash.
+func _test_ghost_replay_visits() -> void:
+	var name := "ghost_replay_visits"
+	var trail: Array = [[0, 1, 1, false], [0, 2, 2, true], [1, 3, 3, false], [0, 4, 4, false], [2, 5, 5, false]]
+	_check(GhostMime.visit_samples(trail, 0, 0) == ([[1.0, 1.0, false], [2.0, 2.0, true]] as Array[Array]), name, "room 0's first stay is %s" % [GhostMime.visit_samples(trail, 0, 0)])
+	_check(GhostMime.visit_samples(trail, 0, 1) == ([[4.0, 4.0, false]] as Array[Array]), name, "room 0's second stay is %s" % [GhostMime.visit_samples(trail, 0, 1)])
+	_check(GhostMime.visit_samples(trail, 0, 2).is_empty() and GhostMime.visit_samples(trail, 3, 0).is_empty(), name, "a stay the bot never made has samples")
+	_check(GhostMime.path_for("res://data/wings/wing_03.tres") == "res://data/ghosts/wing_03.ghost.json" and GhostMime.path_for("res://scenes/test/slice_wing.tres") == "res://scenes/test/slice_wing.ghost.json", name, "ghost replay paths differ from where the bot records them")
+	for wing_path in Content.WINGS:
+		var problems: Array[String] = []
+		var replay := GhostMime.load_replay(GhostMime.path_for(wing_path), problems)
+		_check(problems.is_empty() and not replay["trail"].is_empty() and is_equal_approx(replay["period"], 0.1), name, "%s's ghost replay does not load: %s" % [wing_path, problems])
+	var missing: Array[String] = []
+	_check(GhostMime.load_replay("res://data/ghosts/none.ghost.json", missing).is_empty() and missing.size() == 1, name, "a missing replay is not one problem: %s" % [missing])
+	var bad_path := "user://bad.ghost.json"
+	for content: String in ["not json", '{"gap_frames": 6, "trail": [[0, 1, 2]]}']:
+		var file := FileAccess.open(bad_path, FileAccess.WRITE)
+		file.store_string(content)
+		file.close()
+		var problems: Array[String] = []
+		_check(GhostMime.load_replay(bad_path, problems).is_empty() and problems.size() == 1, name, "a malformed replay (%s) is not one problem: %s" % [content, problems])
+	DirAccess.remove_absolute(bad_path)
+
+
+## Until a wing is escaped from, a ghost mime walks the bot's recorded route through each of
+## its rooms on room time, starts over after a toss, and is gone once the wing has been
+## escaped from.
+func _test_ghost_mime_until_escape() -> void:
+	var name := "ghost_mime_until_escape"
+	var saved := _game.save.duplicate(true)
+	_game.save = Save.defaults()
+	_game.play_wing_file(Content.WINGS[0])
+	var room := await _wait_for_room(load(Content.WINGS[0]).rooms[0], 300)
+	if room == null or room.ghost == null:
+		_check(false, name, "wing 1's first room shows no ghost mime on a fresh save")
+		_game.save = saved
+		return
+	var replay := GhostMime.load_replay(GhostMime.path_for(Content.WINGS[0]), [] as Array[String])
+	var samples := GhostMime.visit_samples(replay["trail"], 0, 0)
+	_check(room.ghost.samples == samples and room.ghost.position == Vector2(samples[0][0], samples[0][1]), name, "the ghost does not start the bot's first stay in room 0")
+	for guard in room.guards:
+		guard.active = false
+	for i in 30:
+		await physics_frame
+	var expected := Vector2(samples[5][0], samples[5][1])
+	_check(room.ghost.position.distance_to(expected) < 2.0, name, "after 0.5 s of room time the ghost is at %s, not the bot's %s" % [room.ghost.position, expected])
+	# Wing 1's foyer has no guard: the catch comes straight to the room.
+	room._on_caught()
+	await _wait_until(func() -> bool: return not room.tossing, 180)
+	_check(room.ghost.time < 0.05 and room.ghost.position == Vector2(samples[0][0], samples[0][1]), name, "the ghost did not start over after the toss (t %.2f)" % room.ghost.time)
+	Save.record(_game.save, Content.wing_id(Content.WINGS[0]), [true, false, false] as Array[bool], 99.0)
+	_game.replay()
+	await _wait_until(func() -> bool: return current_scene != room, 120)
+	room = await _wait_for_room(load(Content.WINGS[0]).rooms[0], 300)
+	_check(room != null and room.ghost == null, name, "the ghost mime still shows after the wing was escaped from")
+	_game.save = saved
+	_game.run = null
 
 
 ## Screen changes wipe with the iris shader; Reduce Motion makes it a plain fade.
