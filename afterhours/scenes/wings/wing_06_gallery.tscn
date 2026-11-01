@@ -2,7 +2,7 @@
 
 [ext_resource type="PackedScene" path="res://scenes/room_base.tscn" id="base"]
 [ext_resource type="Script" path="res://scripts/gimmicks/gimmick_mix.gd" id="gimmick"]
-[ext_resource type="Script" path="res://scripts/gimmicks/tide.gd" id="part0"]
+[ext_resource type="Script" path="res://scripts/gimmicks/puddles.gd" id="part0"]
 [ext_resource type="Script" path="res://scripts/gimmicks/creatures.gd" id="part1"]
 [ext_resource type="PackedScene" path="res://scenes/tilt_frame.tscn" id="frame"]
 [ext_resource type="PackedScene" path="res://scenes/hiding_portrait.tscn" id="portrait"]
@@ -30,10 +30,8 @@ script = ExtResource("gimmick")
 
 [node name="Part0" type="Node2D" parent="Gimmick"]
 script = ExtResource("part0")
-dry_y = 530.0
-flood_y = 380.0
-period = 10.0
-phase = 0.5
+puddles = PackedVector3Array(480, 330, 80)
+beats = PackedVector2Array(10, 0.5)
 
 [node name="Part1" type="Node2D" parent="Gimmick"]
 script = ExtResource("part1")

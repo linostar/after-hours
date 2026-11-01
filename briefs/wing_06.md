@@ -10,8 +10,8 @@
 
 ## Layout
 - Room 0, the salon (Louvre browns): Vermeer's window light drifts across the floor and
-  Hokusai's tide laps the front; the easel stands left of centre beside a partition; a guard
-  paces the waterline, another walks up and down the middle of the room.
+  wing 2's burst pipes pour onto it; the easel stands left of centre beside a partition; a
+  guard paces the front, another walks up and down the middle of the room.
 - Room 1, the Salle des États: the Mona Lisa under glass in the middle of the back wall.
   Seurat's footprints (no parasol by the painting: the swap must be timed), Van Gogh's
   searchlights on the floor and a Bosch strawberry roaming the front. Three guards: one
@@ -32,5 +32,11 @@ Lengthening pass: a middle gallery and more guards.
 4. The grand gallery's second guard first paced up and down at x 500, facing up across the
    line between its doors: no wait got the mime across. It now walks the bottom wall.
 
+## Burst pipes pass
+The tide in the salon and the grand gallery became burst pipes (wing 2's gimmick changed).
+1. The salon's first puddle sat at (660, 330), on the line from its right door to the
+   exit, next to the third guard's beat: wading slowly there on the way out kept the mime
+   in that guard's view, and no wait got the last leg through. It moved to (480, 400).
+
 ## Bot result
-`tools/bot.gd --record`: 74 plays; the swap waits 8 s; the run takes 45.5 s, par 100 s.
+`tools/bot.gd --record`: 77 plays; the doors in wait 1 and 4.5 s, the swap 8 s and the way back 4 s; the run takes 46.6 s, par 100 s.
