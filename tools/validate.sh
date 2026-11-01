@@ -14,7 +14,7 @@ mkdir -p "$LOG_DIR"
 
 fail() {
   echo "FAIL $1 (log: $2)" >&2
-  grep -E "ERROR|WARNING|check_project|test_gameplay|run_main|import_cache|scans|bot" "$2" >&2 || true
+  grep -E "ERROR|WARNING|check_project|test_gameplay|run_main|import_cache|scans|sfx|bot" "$2" >&2 || true
   exit 1
 }
 
@@ -78,6 +78,11 @@ if [ "$cache_state" != "fresh" ]; then
 fi
 godot "$LOG_DIR/import.log" --headless --path afterhours --import || fail "import exited non-zero" "$LOG_DIR/import.log"
 if grep -qE "ERROR|WARNING" "$LOG_DIR/import.log"; then fail "import reported problems" "$LOG_DIR/import.log"; fi
+# The sound effects must be byte-identical to their synth (tools/sfx.py), inside their
+# loudness bands and imported.
+if ! python3 tools/sfx.py --check >"$LOG_DIR/sfx.log" 2>&1 || ! grep -q "^sfx: OK" "$LOG_DIR/sfx.log"; then
+  fail "sound check" "$LOG_DIR/sfx.log"
+fi
 
 run_script check_project "$LOG_DIR/check.log"
 
@@ -123,7 +128,7 @@ godot "$LOG_DIR/bot.log" --headless --path afterhours --fixed-fps 60 --script "$
 if [ "$bot_status" -ne 0 ] || ! grep -q "^bot: OK" "$LOG_DIR/bot.log" || grep -qE "ERROR|WARNING" "$LOG_DIR/bot.log"; then
   fail "bot (status $bot_status)" "$LOG_DIR/bot.log"
 fi
-summary="$(grep "^import_cache: OK" "$LOG_DIR/import_cache.log"); $(grep -E "^scans: (OK|self-test skipped)" "$LOG_DIR/scans.log"); $(grep "^check_project: OK" "$LOG_DIR/check.log"); check fixtures: $fixtures; $(grep "^test_gameplay: OK" "$LOG_DIR/test.log"); $(grep "^bot: OK" "$LOG_DIR/bot.log")"
+summary="$(grep "^import_cache: OK" "$LOG_DIR/import_cache.log"); $(grep -E "^scans: (OK|self-test skipped)" "$LOG_DIR/scans.log"); $(grep "^sfx: OK" "$LOG_DIR/sfx.log"); $(grep "^check_project: OK" "$LOG_DIR/check.log"); check fixtures: $fixtures; $(grep "^test_gameplay: OK" "$LOG_DIR/test.log"); $(grep "^bot: OK" "$LOG_DIR/bot.log")"
 # The main scene (the title) runs 120 frames (2 s at 60 fixed fps) by default; run_main
 # requires the flow state to match the running scene.
 RUN_FRAMES="${RUN_FRAMES:-120}" run_script run_main "$LOG_DIR/run.log" --fixed-fps 60

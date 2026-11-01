@@ -100,6 +100,7 @@ func _tests() -> Array[Callable]:
 		_test_web_export_preset,
 		_test_title_arrives,
 		_test_report_error_shows_badge,
+		_test_sfx_files,
 		_test_detection_cone,
 		_test_detection_suspicion,
 		_test_detection_light,
@@ -318,6 +319,33 @@ func _test_stars() -> void:
 	_check(Stars.earned(false, 60.0, 60.0)[Stars.Star.PAR], name, "an escape exactly at par misses the par star")
 	_check(not Stars.earned(false, 60.1, 60.0)[Stars.Star.PAR], name, "an escape over par earns the par star")
 	_check(Stars.count(Stars.earned(true, 99.0, 60.0)) == 1, name, "a seen, slow escape does not earn exactly the swap star")
+
+
+## Audio.SFX_IDS and the files tools/sfx.py writes agree; every sound loads as audio on the
+## SFX bus's players; play logs the id; an unknown id is reported and plays nothing.
+func _test_sfx_files() -> void:
+	var name := "sfx_files"
+	var files: Array[StringName] = []
+	for file in DirAccess.get_files_at("res://audio/sfx"):
+		if file.get_extension() == "wav":
+			files.append(StringName(file.get_basename()))
+	var ids := Audio.SFX_IDS.duplicate()
+	ids.sort()
+	files.sort()
+	_check(files == ids, name, "audio/sfx holds %s, Audio.SFX_IDS lists %s" % [files, ids])
+	for id in Audio.SFX_IDS:
+		_check(load(Audio.SFX_PATH % id) is AudioStream, name, "sound %s does not load as audio" % id)
+	var audio := _game.audio
+	_check(audio.get_child_count() == Audio.VOICES and (audio.get_child(0) as AudioStreamPlayer).bus == Audio.SFX_BUS, name, "the sound players are not on the SFX bus")
+	audio.play(&"tilt")
+	_check(audio.played.back() == &"tilt", name, "play does not log the sound")
+	var errors_before := _game.errors.size()
+	_game.quiet_errors = true
+	audio.play(&"no_such_sound")
+	_game.quiet_errors = false
+	_check(_game.errors.size() == errors_before + 1 and audio.played.back() == &"tilt", name, "an unknown sound is not reported, or it was played")
+	_game.errors.resize(errors_before)
+	(_game.get_node("ErrorLayer/ErrorBadge") as TextureRect).visible = false
 
 
 func _test_save_shape() -> void:

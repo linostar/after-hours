@@ -59,6 +59,8 @@ var assist: bool:
 		return save["settings"]["assist"]
 	set(value):
 		set_setting("assist", value)
+## The game's sound (sound effects; music from step 8.3).
+var audio: Audio
 var _transitioning := false
 var _visible_rect := Rect2()
 var _safe_rect := Rect2()
@@ -71,6 +73,9 @@ var _paused_by_rotate := false
 
 
 func _ready() -> void:
+	audio = Audio.new()
+	audio.name = "Audio"
+	add_child(audio)
 	_fit_window()
 	get_viewport().size_changed.connect(fit_screen)
 	fit_screen()
@@ -362,6 +367,7 @@ func report_error(message: String) -> void:
 		print("[Game] Error (quiet): " + message)
 	else:
 		push_error(message)
+		audio.play(&"error")
 	_error_badge.visible = true
 
 
