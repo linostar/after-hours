@@ -7,7 +7,8 @@ extends Node2D
 ## one before it was escaped from (Save.unlocked). The keyboard walks the mime and E uses
 ## the nearest door within Room.INTERACT_REACH. The HideoutDoor in the left wall (glowing
 ## once an original was stolen) leads to the hideout. The mime starts at Entrance, in front
-## of the door of the wing it comes back from, or inside the hideout door.
+## of the door of the wing it comes back from, or inside the hideout door. The gear (top
+## right) opens the settings (SettingsMenu); the lobby takes no taps while they are open.
 
 const FIRST_DOOR_X := 120.0
 const DOOR_GAP := 144.0
@@ -23,6 +24,8 @@ var _target: Node2D
 @onready var hideout_door: Door = $HideoutDoor
 @onready var _floor: FloorInput = $FloorInput
 @onready var _keys: KeyboardInput = $KeyboardInput
+@onready var settings: SettingsMenu = $SettingsLayer/SettingsMenu
+@onready var _gear: Button = $SettingsButton
 @onready var _game := get_node(GameState.AUTOLOAD_PATH) as GameState
 
 
@@ -57,6 +60,8 @@ func _ready() -> void:
 	mime.place_at(start)
 	_floor.tapped.connect(_on_floor_tapped)
 	_keys.interacted.connect(_on_interacted)
+	_gear.pressed.connect(settings.open)
+	settings.closed.connect(_gear.grab_focus)
 	_game.arrive(GameState.Flow.HUB)
 	# The layout, for the web smoke test's taps.
 	for door in wing_doors:
@@ -65,7 +70,7 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if _game.is_transitioning():
+	if _game.is_transitioning() or settings.visible:
 		return
 	var walk := _keys.direction()
 	if walk != Vector2.ZERO:
@@ -104,6 +109,8 @@ func _on_floor_tapped(at: Vector2) -> void:
 
 ## E: uses the nearest door within Room.INTERACT_REACH.
 func _on_interacted() -> void:
+	if settings.visible:
+		return
 	var best: Node2D
 	var best_distance := Room.INTERACT_REACH
 	var doors: Array[Node2D] = [hideout_door]

@@ -144,6 +144,8 @@ func _tests() -> Array[Callable]:
 		_test_title_play_opens_hub,
 		_test_hub_doors_unlock_and_enter,
 		_test_hideout_hangs_originals,
+		_test_pause_and_settings,
+		_test_hub_settings,
 		_test_goto_missing_scene_reports,
 		_test_room_swap_and_escape,
 		_test_room_swap_cancel_and_locked_exit,
@@ -1428,6 +1430,80 @@ func _test_hideout_hangs_originals() -> void:
 	hub = current_scene as Hub
 	_check(hub != null and hub.mime.position.distance_to(hub.hideout_door.arrival_point()) <= 1.0, name, "back from the hideout the mime is not at its door")
 	_game.save = Save.defaults()
+
+
+## Space (or the pause button) pauses the room under the pause menu and Space resumes it;
+## the timer stops meanwhile. Its settings toggle and save each setting (music mutes its
+## bus, the Off mark shows); Space does nothing while they are open; back returns focus to
+## the settings button; home leaves for the hub with the tree running.
+func _test_pause_and_settings() -> void:
+	var name := "pause_and_settings"
+	_game.save = Save.defaults()
+	var room := await _load_room()
+	for each in room.guards:
+		each.active = false
+	await _press_key(KEY_SPACE)
+	var menu := room.pause_menu
+	_check(paused and menu.visible and (menu.get_node("Panel/ResumeButton") as Button).has_focus(true), name, "Space did not pause under the menu with resume focused")
+	var at := room.elapsed
+	for i in 10:
+		await process_frame
+	_check(room.elapsed == at, name, "the timer ran while paused")
+	await _press_key(KEY_SPACE)
+	_check(not paused and not menu.visible, name, "Space did not resume")
+	await _tap_control(room.get_node("PauseButton") as Button)
+	_check(paused and menu.visible, name, "the pause button did not pause")
+	await _tap_control(menu.get_node("Panel/SettingsButton") as Button)
+	var settings := menu.get_node("SettingsMenu") as SettingsMenu
+	var music := settings.get_node("Panel/MusicToggle") as Button
+	_check(settings.visible and music.has_focus(true) and music.button_pressed and not (music.get_node("Off") as CanvasItem).visible, name, "settings did not open with music on and focused")
+	await _tap_control(music)
+	_check(not _game.setting("music") and (music.get_node("Off") as CanvasItem).visible and AudioServer.is_bus_mute(AudioServer.get_bus_index("Music")), name, "the music toggle did not turn music off, mark it and mute its bus")
+	var problems: Array[String] = []
+	_check(not Save.parse(FileAccess.get_file_as_string(_game.save_path), problems)["settings"]["music"], name, "music off was not saved")
+	await _tap_control(settings.get_node("Panel/AssistToggle") as Button)
+	_check(_game.assist, name, "the assist toggle did not turn assist on")
+	var motion := settings.get_node("Panel/MotionToggle") as Button
+	_check(motion.button_pressed and not (motion.get_node("Off") as CanvasItem).visible, name, "motion effects do not show on while reduce motion is off")
+	await _tap_control(motion)
+	_check(_game.setting("reduce_motion") and (motion.get_node("Off") as CanvasItem).visible, name, "crossing out motion did not turn reduce motion on")
+	await _press_key(KEY_SPACE)
+	_check(paused and settings.visible, name, "Space resumed with the settings open")
+	await _tap_control(settings.get_node("Panel/BackButton") as Button)
+	_check(not settings.visible and (menu.get_node("Panel/SettingsButton") as Button).has_focus(true), name, "back did not close the settings onto the settings button")
+	await _tap_control(menu.get_node("Panel/HomeButton") as Button)
+	var home := await _wait_until(func() -> bool: return current_scene is Hub and not _game.is_transitioning(), 120)
+	_check(home and not paused, name, "home did not reach the hub with the tree running")
+	_game.save = Save.defaults()
+	_game.set_setting("music", true)
+	DirAccess.remove_absolute(_game.save_path)
+	_game.scene_paths[GameState.Flow.ROOM] = ROOM_PATH
+
+
+## The hub's gear opens the settings, which take the lobby's taps until back closes them.
+func _test_hub_settings() -> void:
+	var name := "hub_settings"
+	var hub := await _load_hub()
+	var gear := hub.get_node("SettingsButton") as Button
+	await _tap_control(gear)
+	_check(hub.settings.visible, name, "the gear did not open the settings")
+	var from := hub.mime.position
+	await _tap_at(Vector2(700, 450))
+	for i in 20:
+		await physics_frame
+	_check(hub.mime.position == from, name, "a tap under the open settings walked the mime")
+	await _tap_control(hub.settings.get_node("Panel/BackButton") as Button)
+	_check(not hub.settings.visible and gear.has_focus(true), name, "back did not close the settings onto the gear")
+
+
+## A key press and release (physical key `key`), a frame each.
+func _press_key(key: Key) -> void:
+	for pressed: bool in [true, false]:
+		var event := InputEventKey.new()
+		event.physical_keycode = key
+		event.pressed = pressed
+		Input.parse_input_event(event)
+		await process_frame
 
 
 ## The hub as the current scene, its navmesh synced.

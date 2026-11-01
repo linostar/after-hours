@@ -280,6 +280,12 @@ func goto(flow: Flow) -> void:
 	if error == OK:
 		# The new scene enters the tree (and runs its _ready) at the end of this frame.
 		await get_tree().scene_changed
+		# A change from the pause menu leaves its pause behind; under the rotate overlay the
+		# tree stays paused until landscape.
+		if _rotate_overlay.visible:
+			_paused_by_rotate = true
+		else:
+			get_tree().paused = false
 	else:
 		report_error("Failed to load scene '%s' for %s: %s" % [path, to_name, error_string(error)])
 	await _fade(0.0)

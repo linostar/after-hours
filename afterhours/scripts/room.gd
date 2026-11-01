@@ -41,7 +41,8 @@ extends Node2D
 ## (a Door whose to_room is a room index) walks the mime through it: the room hands its
 ## state back to the run (with the hung fake's state there, which it finds again on a later
 ## visit) and Game.enter_room changes to that room, where the mime comes in at the door
-## leading back (Door.arrival_point; the toss lands there too).
+## leading back (Door.arrival_point; the toss lands there too). The PauseButton (top left)
+## or Space pauses the room under the pause menu (PauseMenu).
 
 ## Where the mime stands to swap the masterpiece (below it), and where a guard looks to
 ## inspect the hung fake: the floor at the painting's foot (sight rays to the painting
@@ -117,6 +118,7 @@ var guard: Guard
 var _frames: Array[TiltFrame] = []
 var _portraits: Array[HidingPortrait] = []
 @onready var _results: Results = $ResultsLayer/Results
+@onready var pause_menu: PauseMenu = $PauseLayer/PauseMenu
 @onready var _game := get_node(GameState.AUTOLOAD_PATH) as GameState
 
 
@@ -175,6 +177,8 @@ func _ready() -> void:
 		each.inspected.connect(_on_inspected.bind(each))
 	_floor.tapped.connect(_on_floor_tapped)
 	_keys.interacted.connect(_on_interacted)
+	_keys.pause_pressed.connect(pause)
+	($PauseButton as Button).pressed.connect(pause)
 	for child in $Frames.get_children():
 		if child is TiltFrame:
 			_frames.append(child)
@@ -269,6 +273,13 @@ func swap_spot() -> Vector2:
 
 func fake_view_point() -> Vector2:
 	return Vector2(masterpiece.position.x, FAKE_VIEW_Y) if masterpiece != null else Vector2.INF
+
+
+## Pauses the room under the pause menu (the PauseButton, or Space); not once it is over.
+func pause() -> void:
+	if finished or leaving or _game.is_transitioning():
+		return
+	pause_menu.open()
 
 
 ## Adds the dev-only guard debug overlay (DebugOverlay) above the room.
