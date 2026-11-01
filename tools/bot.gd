@@ -4,7 +4,8 @@ extends SceneTree
 ## (base units: the easel, a portrait, a door, the masterpiece, the exit...) in order;
 ## bot_waits holds how long to wait before each. After a tap the bot waits until the mime
 ## has settled (arrived and done what the tap meant: painted, by tracing every ghost stroke
-## exactly; swapped; hidden; through a door); a catch, a sighting or a leg running past
+## exactly at a person's pace, PAINT_PACE a stroke, while the room runs on; swapped;
+## hidden; through a door); a catch, a sighting or a leg running past
 ## LEG_TIMEOUT fails the run. Guards are deterministic, so a replay plays out the same.
 ##
 ## Run with --fixed-fps 60 (one frame = one physics tick):
@@ -25,9 +26,12 @@ const WAIT_STEP := 0.25
 const MAX_WAIT := 16.0
 const LEG_TIMEOUT := 30.0
 const PAR_FACTOR := 1.25
-## Seconds a person takes per ghost stroke beyond the bot's instant tracing, added to the
-## bot's time before PAR_FACTOR.
-const PAINT_ALLOWANCE := 4.0
+## Seconds the bot spends on each ghost stroke before tracing it, as a person would (about
+## what the developer took in the step 9 playtest): the easel must stay unseen that long.
+const PAINT_PACE := 2.5
+## Seconds a person takes per ghost stroke beyond the bot's PAINT_PACE, added to the bot's
+## time before PAR_FACTOR.
+const PAINT_ALLOWANCE := 1.5
 const PAR_ROUND := 5.0
 const TRAIL_GAP := 6
 const GHOSTS_DIR := "res://data/ghosts/"
@@ -261,10 +265,15 @@ func _tick(_room: Room = null) -> void:
 	await physics_frame
 
 
-## Traces every remaining ghost exactly (a dab is a tap).
+## Traces every remaining ghost exactly (a dab is a tap), PAINT_PACE before each stroke;
+## stops if the canvas closes (a catch).
 func _paint(canvas: ForgeryCanvas) -> void:
 	var origin := (canvas.get_node("Pad") as Control).get_global_rect().position
 	for i in range(canvas.traced.size(), canvas.ghosts.size()):
+		for frame in roundi(PAINT_PACE * 60.0):
+			await _tick()
+			if not canvas.visible:
+				return
 		var points := PackedVector2Array()
 		for point in Forgery.resample(canvas.ghosts[i]):
 			points.append(origin + point)
