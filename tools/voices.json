@@ -1,0 +1,370 @@
+{
+  "voices": {
+    "watchman": {
+      "about": "The old night watchman: slow, gruff, seen it all.",
+      "instruct": "male, elderly, low pitch, british accent",
+      "seed": 101
+    },
+    "rookie": {
+      "about": "The jumpy new guard: young, keen, easily startled.",
+      "instruct": "male, young adult, moderate pitch, american accent",
+      "seed": 202
+    }
+  },
+  "events": {
+    "hear": [
+      "Hm? What was that?",
+      "Did I hear something?"
+    ],
+    "straighten": [
+      "Crooked again...",
+      "Who keeps doing that?"
+    ],
+    "inspect": [
+      "Hmm. Is that right?",
+      "Let's have a look."
+    ],
+    "search": [
+      "Who's there?",
+      "I know you're in here!"
+    ],
+    "chase": [
+      "Hey! Stop right there!",
+      "Thief! Come back here!"
+    ],
+    "lost": [
+      "Must have been the wind.",
+      "Nobody. Again."
+    ],
+    "found_fake": [
+      "That's a fake!",
+      "Wait... this is a forgery!"
+    ],
+    "caught": [
+      "Gotcha!",
+      "Not so fast!"
+    ]
+  },
+  "lines": {
+    "rookie_caught_1": {
+      "voice": "rookie",
+      "event": "caught",
+      "text": "Gotcha!",
+      "instruct": "male, young adult, moderate pitch, american accent",
+      "seed_from": 202,
+      "seed": 204,
+      "heard": "Gotcha.",
+      "sha256": "dd056a07af4e97d09b4aab658c5d59a29495d2a4df3b80c94dcea204b17fffa0"
+    },
+    "rookie_caught_2": {
+      "voice": "rookie",
+      "event": "caught",
+      "text": "Not so fast!",
+      "instruct": "male, young adult, moderate pitch, american accent",
+      "seed_from": 202,
+      "seed": 202,
+      "heard": "Not so fast.",
+      "sha256": "0558c2aed39e3cb8474a158620cdc0a6b9e5afc5fffc36353413bd69f474b859"
+    },
+    "rookie_chase_1": {
+      "voice": "rookie",
+      "event": "chase",
+      "text": "Hey! Stop right there!",
+      "instruct": "male, young adult, moderate pitch, american accent",
+      "seed_from": 202,
+      "seed": 204,
+      "heard": "Hey, stop right there.",
+      "sha256": "d3378444a5d2e47f6a07e22812e92c65f3fc927f18da82f714ac118138c8b86e"
+    },
+    "rookie_chase_2": {
+      "voice": "rookie",
+      "event": "chase",
+      "text": "Thief! Come back here!",
+      "instruct": "male, young adult, moderate pitch, american accent",
+      "seed_from": 202,
+      "seed": 203,
+      "heard": "Thief, come back here.",
+      "sha256": "33dac71ae55ef6bcfb69aa6bacd5d77a00b0a0d38bf35b0654758f45accb7845"
+    },
+    "rookie_found_fake_1": {
+      "voice": "rookie",
+      "event": "found_fake",
+      "text": "That's a fake!",
+      "instruct": "male, young adult, moderate pitch, american accent",
+      "seed_from": 202,
+      "seed": 203,
+      "heard": "That's a fake.",
+      "sha256": "c1899b330a91307a086c0f832d76af033ad9219c32371c5a19ca0053b0bf3220"
+    },
+    "rookie_found_fake_2": {
+      "voice": "rookie",
+      "event": "found_fake",
+      "text": "Wait... this is a forgery!",
+      "instruct": "male, young adult, moderate pitch, american accent",
+      "seed_from": 202,
+      "seed": 203,
+      "heard": "This is a forgery.",
+      "sha256": "869c5d262f3466a6a5f0bc019efc3aa20690e859b7e6c339f1306f30ff205df1"
+    },
+    "rookie_hear_1": {
+      "voice": "rookie",
+      "event": "hear",
+      "text": "Hm? What was that?",
+      "instruct": "male, young adult, moderate pitch, american accent",
+      "seed_from": 202,
+      "seed": 202,
+      "heard": "Hmm? What was that?",
+      "sha256": "964d29602ca64c6cf62f52af032bc1632cad10631b75f648bcba50d97ed56423"
+    },
+    "rookie_hear_2": {
+      "voice": "rookie",
+      "event": "hear",
+      "text": "Did I hear something?",
+      "instruct": "male, young adult, moderate pitch, american accent",
+      "seed_from": 202,
+      "seed": 202,
+      "heard": "Did I hear something?",
+      "sha256": "d9b2ce5f7c6d0274005531b11dedc09e9b9f1fae442c38766407cbed5fe733da"
+    },
+    "rookie_inspect_1": {
+      "voice": "rookie",
+      "event": "inspect",
+      "text": "Hmm. Is that right?",
+      "instruct": "male, young adult, moderate pitch, american accent",
+      "seed_from": 202,
+      "seed": 204,
+      "heard": "Hmm, is that right?",
+      "sha256": "f3f288bb1da84e1d9ff33af488311046f25becdb17ee42d261686395c6df9e5b"
+    },
+    "rookie_inspect_2": {
+      "voice": "rookie",
+      "event": "inspect",
+      "text": "Let's have a look.",
+      "instruct": "male, young adult, moderate pitch, american accent",
+      "seed_from": 202,
+      "seed": 202,
+      "heard": "Let's have a look.",
+      "sha256": "f1189268430f51ba1c83a2c3ff509fecbe107cae38a31d514378b856d0756187"
+    },
+    "rookie_lost_1": {
+      "voice": "rookie",
+      "event": "lost",
+      "text": "Must have been the wind.",
+      "instruct": "male, young adult, moderate pitch, american accent",
+      "seed_from": 202,
+      "seed": 202,
+      "heard": "Must have been the wind.",
+      "sha256": "1dc5265edda5320c9fa82dde0745dd93321969885bc51f4f755e4c3fcfb83389"
+    },
+    "rookie_lost_2": {
+      "voice": "rookie",
+      "event": "lost",
+      "text": "Nobody. Again.",
+      "instruct": "male, young adult, moderate pitch, american accent",
+      "seed_from": 202,
+      "seed": 202,
+      "heard": "Nobody. Again.",
+      "sha256": "628ee784c4ee5570725752a44e36b66e62da9c00d94bf5b97d60976b42b7200d"
+    },
+    "rookie_search_1": {
+      "voice": "rookie",
+      "event": "search",
+      "text": "Who's there?",
+      "instruct": "male, young adult, moderate pitch, american accent",
+      "seed_from": 202,
+      "seed": 202,
+      "heard": "Who's there?",
+      "sha256": "22c3de85e03830b0fbe398ac35f9e4505e7ea08352f4238bf93e3b87f115a608"
+    },
+    "rookie_search_2": {
+      "voice": "rookie",
+      "event": "search",
+      "text": "I know you're in here!",
+      "instruct": "male, young adult, moderate pitch, american accent",
+      "seed_from": 202,
+      "seed": 203,
+      "heard": "I know you're in here.",
+      "sha256": "dfaf0d24b7e3408101429c837417db2ce22e43eb6427f524dfb589cf5c3ed18c"
+    },
+    "rookie_straighten_1": {
+      "voice": "rookie",
+      "event": "straighten",
+      "text": "Crooked again...",
+      "instruct": "male, young adult, moderate pitch, american accent",
+      "seed_from": 202,
+      "seed": 202,
+      "heard": "Crooked again.",
+      "sha256": "faa0b993813a350f7614b3417b7ec5b249240278ff8bbdc4a9f8239ab8340413"
+    },
+    "rookie_straighten_2": {
+      "voice": "rookie",
+      "event": "straighten",
+      "text": "Who keeps doing that?",
+      "instruct": "male, young adult, moderate pitch, american accent",
+      "seed_from": 202,
+      "seed": 202,
+      "heard": "Who keeps doing that?",
+      "sha256": "669245592bf8cba0b0b3c1c9056fe2922444c11d8b8c2c1068e3d352e1decc0b"
+    },
+    "watchman_caught_1": {
+      "voice": "watchman",
+      "event": "caught",
+      "text": "Gotcha!",
+      "instruct": "male, elderly, low pitch, british accent",
+      "seed_from": 101,
+      "seed": 101,
+      "heard": "Gotcha.",
+      "sha256": "0bc7e5346d9735e1879292c02a416c38f97b08f857e543c5fc07e3aef9ff7b11"
+    },
+    "watchman_caught_2": {
+      "voice": "watchman",
+      "event": "caught",
+      "text": "Not so fast!",
+      "instruct": "male, elderly, low pitch, british accent",
+      "seed_from": 101,
+      "seed": 101,
+      "heard": "Not so fast.",
+      "sha256": "79762097e3e4b7a0d325d22c01dfaec4228e25773cb71fcffb1b6fc20a0c4904"
+    },
+    "watchman_chase_1": {
+      "voice": "watchman",
+      "event": "chase",
+      "text": "Hey! Stop right there!",
+      "instruct": "male, elderly, low pitch, british accent",
+      "seed_from": 101,
+      "seed": 101,
+      "heard": "Hey, stop right there.",
+      "sha256": "bff3fc883c220810ad981039ee8f4b99da5fa3737b0b04c0406871f43a498493"
+    },
+    "watchman_chase_2": {
+      "voice": "watchman",
+      "event": "chase",
+      "text": "Thief! Come back here!",
+      "instruct": "male, elderly, low pitch, british accent",
+      "seed_from": 101,
+      "seed": 101,
+      "heard": "Thief, come back here.",
+      "sha256": "5f2b50d0450996d203b91d1a971645f841a5a2ee7f6d730d79f2dc9b77f73c65"
+    },
+    "watchman_found_fake_1": {
+      "voice": "watchman",
+      "event": "found_fake",
+      "text": "That's a fake!",
+      "instruct": "male, elderly, low pitch, british accent",
+      "seed_from": 101,
+      "seed": 101,
+      "heard": "That's a fake.",
+      "sha256": "01c6edb32f3b88473685f0404b0dfd1a1feeb359646fc57eed1cc08bae308eaf"
+    },
+    "watchman_found_fake_2": {
+      "voice": "watchman",
+      "event": "found_fake",
+      "text": "Wait... this is a forgery!",
+      "instruct": "male, elderly, low pitch, british accent",
+      "seed_from": 101,
+      "seed": 101,
+      "heard": "Wait, this is a forgery.",
+      "sha256": "4151e58e79e575fd467aaf2ceb1f0e48dcee0b3f4c762709dcae8cdd5ef52544"
+    },
+    "watchman_hear_1": {
+      "voice": "watchman",
+      "event": "hear",
+      "text": "Hm? What was that?",
+      "instruct": "male, elderly, low pitch, british accent",
+      "seed_from": 101,
+      "seed": 101,
+      "heard": "Hmm? What was that?",
+      "sha256": "d491078122b6ccc193b95a84121ce224da20776382261075d217870c45010b89"
+    },
+    "watchman_hear_2": {
+      "voice": "watchman",
+      "event": "hear",
+      "text": "Did I hear something?",
+      "instruct": "male, elderly, low pitch, british accent",
+      "seed_from": 101,
+      "seed": 101,
+      "heard": "Did I hear something?",
+      "sha256": "600af89be98fcacddfeebc596e10ad1cdad9c8bb75870dcc74ca6fca51ccda52"
+    },
+    "watchman_inspect_1": {
+      "voice": "watchman",
+      "event": "inspect",
+      "text": "Hmm. Is that right?",
+      "instruct": "male, elderly, low pitch, british accent",
+      "seed_from": 101,
+      "seed": 101,
+      "heard": "Hmm, is that right?",
+      "sha256": "b68979ae70711c91d0ae9e244ce066ffa5cd8321023a0a6c973fe142bb55326b"
+    },
+    "watchman_inspect_2": {
+      "voice": "watchman",
+      "event": "inspect",
+      "text": "Let's have a look.",
+      "instruct": "male, elderly, low pitch, british accent",
+      "seed_from": 101,
+      "seed": 101,
+      "heard": "Let's have a look.",
+      "sha256": "f0ba0229929f3086350d1a73324e4761200f316e3c608ab5fb18484760baf232"
+    },
+    "watchman_lost_1": {
+      "voice": "watchman",
+      "event": "lost",
+      "text": "Must have been the wind.",
+      "instruct": "male, elderly, low pitch, british accent",
+      "seed_from": 101,
+      "seed": 101,
+      "heard": "Must have been the wind.",
+      "sha256": "1badf2a1831790f7d98df4f4eb76b1d6407157ec826a22e50c63a028a5fe3479"
+    },
+    "watchman_lost_2": {
+      "voice": "watchman",
+      "event": "lost",
+      "text": "Nobody. Again.",
+      "instruct": "male, elderly, low pitch, british accent",
+      "seed_from": 101,
+      "seed": 101,
+      "heard": "Nobody. Again.",
+      "sha256": "b434137655d74d6811f6e559c89fc94b0cf2941a9a97d937c689a4eca8f1eecb"
+    },
+    "watchman_search_1": {
+      "voice": "watchman",
+      "event": "search",
+      "text": "Who's there?",
+      "instruct": "male, elderly, low pitch, british accent",
+      "seed_from": 101,
+      "seed": 101,
+      "heard": "Who's there?",
+      "sha256": "cfc25698755e3a00b9f4fc0d40f6a281f55cd53c4d70b60078f1d7a63053ba47"
+    },
+    "watchman_search_2": {
+      "voice": "watchman",
+      "event": "search",
+      "text": "I know you're in here!",
+      "instruct": "male, elderly, low pitch, british accent",
+      "seed_from": 101,
+      "seed": 101,
+      "heard": "I know you're in here.",
+      "sha256": "7d961caacc0fe4813111bee934a2313bb6b7003175929c3e1c78c3bfd864c50e"
+    },
+    "watchman_straighten_1": {
+      "voice": "watchman",
+      "event": "straighten",
+      "text": "Crooked again...",
+      "instruct": "male, elderly, low pitch, british accent",
+      "seed_from": 101,
+      "seed": 101,
+      "heard": "Crooked again.",
+      "sha256": "8612138819323831a3b6449169bce7ad2da7eb745db8b48a62b89d911b7dc3ec"
+    },
+    "watchman_straighten_2": {
+      "voice": "watchman",
+      "event": "straighten",
+      "text": "Who keeps doing that?",
+      "instruct": "male, elderly, low pitch, british accent",
+      "seed_from": 101,
+      "seed": 101,
+      "heard": "Who keeps doing that?",
+      "sha256": "d21d60763bebb362e09e2eda1fc294c35f6823b9d874b7d8d4e45240b73e9be9"
+    }
+  }
+}

@@ -67,6 +67,14 @@ const INTENT_ICONS: Dictionary[GuardBrain.Intent, Texture2D] = {
 	GuardBrain.Intent.SEARCH: preload("res://art/svg/icon_query.svg"),
 	GuardBrain.Intent.CHASE: preload("res://art/svg/icon_alarm.svg"),
 }
+## The line each intent's guard says as it starts it (Audio.VOICE_EVENTS).
+const INTENT_LINES: Dictionary[GuardBrain.Intent, StringName] = {
+	GuardBrain.Intent.INVESTIGATE: &"hear",
+	GuardBrain.Intent.STRAIGHTEN: &"straighten",
+	GuardBrain.Intent.INSPECT: &"inspect",
+	GuardBrain.Intent.SEARCH: &"search",
+	GuardBrain.Intent.CHASE: &"chase",
+}
 ## The sound each intent's icon pops in with (Audio.SFX_IDS).
 const INTENT_SOUNDS: Dictionary[GuardBrain.Intent, StringName] = {
 	GuardBrain.Intent.INVESTIGATE: &"guard_hear",
@@ -89,6 +97,8 @@ signal inspected
 @export var route: PackedVector2Array
 ## Whom the guard looks for (set by the room).
 var target: Node2D
+## Its voice (Audio.GUARD_VOICES; the room hands them out in turn).
+var voice: StringName = &"watchman"
 ## Whether it walks its route (tests stand it still; other intents still move it).
 var patrolling := true
 ## Whether it moves and looks at all (off from a catch until the room resets it).
@@ -231,6 +241,13 @@ func _physics_process(delta: float) -> void:
 
 
 ## The current path on the navmesh (room coordinates), for the debug overlay.
+## Says this guard's next line for `event` in its voice (Audio.say); outside the tree (a
+## test's loose guard) it says nothing.
+func say(event: StringName) -> void:
+	if is_inside_tree():
+		(get_node(GameState.AUTOLOAD_PATH) as GameState).audio.say(voice, event)
+
+
 func nav_path() -> PackedVector2Array:
 	return _agent.get_current_navigation_path()
 
@@ -239,6 +256,8 @@ func nav_path() -> PackedVector2Array:
 func _show_intent() -> void:
 	if INTENT_SOUNDS.has(intent):
 		Audio.play_for(self, INTENT_SOUNDS[intent])
+	if INTENT_LINES.has(intent):
+		say(INTENT_LINES[intent])
 	_icon.visible = INTENT_ICONS.has(intent)
 	if not _icon.visible:
 		return
@@ -310,6 +329,7 @@ func _chase(delta: float) -> void:
 	if target != null and (target.visible or _knows_hiding) and global_position.distance_to(target.global_position) <= CATCH_REACH:
 		active = false
 		print("[Guard] %s catches the mime at %s" % [name, target.global_position.round()])
+		say(&"caught")
 		caught.emit()
 
 
@@ -346,6 +366,7 @@ func _search(delta: float) -> void:
 	if senses.search_left <= 0.0:
 		print("[Guard] %s gives up the search" % name)
 		Audio.play_for(self, &"guard_lost")
+		say(&"lost")
 
 
 func _inspect(delta: float) -> void:

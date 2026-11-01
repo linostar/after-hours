@@ -6,6 +6,10 @@ extends Node
 ## Every button in the tree sounds when used: a toggle its on or off tick, any other the tap.
 ## play_music(track) crossfades to loop audio/music/<track>.mp3 (tools/music.py) on the Music
 ## bus over CROSSFADE and logs "[Audio] Music <track>"; the same track again changes nothing.
+## say(voice, event) speaks a guard's line (audio/voice/<voice>_<event>_<n>.mp3, tools/voices.py),
+## its LINES_PER_EVENT lines in turn, on one voice player: an URGENT event cuts in, any other
+## waits for silence (skipped). Speech never carries what the player needs: each line comes
+## with its event's icon and sound.
 
 const SFX_PATH := "res://audio/sfx/%s.wav"
 ## Every sound effect: tools/sfx.py EFFECTS makes one file per id (a test checks both agree).
@@ -22,6 +26,13 @@ const MUSIC_PATH := "res://audio/music/%s.mp3"
 const MUSIC_TRACKS: Array[String] = ["caper", "wing_01", "wing_02", "wing_03", "wing_04", "wing_05", "wing_06", "results"]
 const MUSIC_BUS := &"Music"
 const CROSSFADE := 1.0
+const VOICE_PATH := "res://audio/voice/%s_%s_%d.mp3"
+## The guards' voices (tools/voices.json "voices") and the events they speak on ("events").
+const GUARD_VOICES: Array[StringName] = [&"watchman", &"rookie"]
+const VOICE_EVENTS: Array[StringName] = [&"hear", &"straighten", &"inspect", &"search", &"chase", &"lost", &"found_fake", &"caught"]
+const LINES_PER_EVENT := 2
+## Events whose line cuts off one being spoken.
+const URGENT: Array[StringName] = [&"chase", &"found_fake", &"caught"]
 ## The audio driver of headless runs: sounds are only logged there.
 const SILENT_DRIVER := "Dummy"
 const VOICES := 8
@@ -32,6 +43,8 @@ const LOG_SIZE := 64
 var played: Array[StringName] = []
 ## The loop playing (or fading in), "" before the first.
 var music := ""
+## The latest line ids spoken, oldest first (LOG_SIZE at most; tests read it).
+var said: Array[StringName] = []
 
 var _streams: Dictionary[StringName, AudioStream] = {}
 var _players: Array[AudioStreamPlayer] = []
@@ -39,6 +52,9 @@ var _next := 0
 var _music_players: Array[AudioStreamPlayer] = []
 var _music_current := 0
 var _fade: Tween
+var _voice: AudioStreamPlayer
+## How many times each voice has spoken each event ("<voice>_<event>": count).
+var _spoken: Dictionary[StringName, int] = {}
 
 
 func _ready() -> void:
@@ -55,6 +71,10 @@ func _ready() -> void:
 		player.bus = MUSIC_BUS
 		add_child(player)
 		_music_players.append(player)
+	_voice = AudioStreamPlayer.new()
+	_voice.name = "Voice"
+	_voice.bus = SFX_BUS
+	add_child(_voice)
 	get_tree().node_added.connect(_on_node_added)
 
 
@@ -111,6 +131,32 @@ func play_music(track: String) -> void:
 	_fade.tween_property(player, "volume_linear", 1.0, CROSSFADE)
 	_fade.tween_property(old, "volume_linear", 0.0, CROSSFADE)
 	_fade.chain().tween_callback(old.stop)
+
+
+## Speaks `voice`'s next line for `event` (GUARD_VOICES, VOICE_EVENTS); an unknown voice or
+## event, or a missing line, is reported once.
+func say(voice: StringName, event: StringName) -> void:
+	var game := get_parent() as GameState
+	if not voice in GUARD_VOICES or not event in VOICE_EVENTS:
+		game.report_error("Unknown guard voice '%s' or event '%s' (Audio.GUARD_VOICES, Audio.VOICE_EVENTS)" % [voice, event])
+		return
+	if _voice.playing and not event in URGENT:
+		return
+	var key := StringName("%s_%s" % [voice, event])
+	var count: int = _spoken.get(key, 0)
+	var line := count % LINES_PER_EVENT + 1
+	_spoken[key] = count + 1
+	var id := StringName("%s_%d" % [key, line])
+	var stream := _load(id, VOICE_PATH % [voice, event, line], "Voice line", "voices")
+	if stream == null:
+		return
+	said.append(id)
+	if said.size() > LOG_SIZE:
+		said.pop_front()
+	print("[Audio] Voice %s" % id)
+	_voice.stream = stream
+	if AudioServer.get_driver_name() != SILENT_DRIVER:
+		_voice.play()
 
 
 func _on_node_added(node: Node) -> void:

@@ -102,6 +102,7 @@ func _tests() -> Array[Callable]:
 		_test_report_error_shows_badge,
 		_test_sfx_files,
 		_test_sfx_on_actions,
+		_test_guards_take_voices,
 		_test_detection_cone,
 		_test_detection_suspicion,
 		_test_detection_light,
@@ -365,6 +366,28 @@ func _test_sfx_files() -> void:
 	audio.play_music("no_such_track")
 	_game.quiet_errors = false
 	_check(_game.errors.size() == errors_before + 2 and audio.music == playing, name, "an unknown track is not reported, or the music changed")
+	var lines: Array[String] = []
+	for voice in Audio.GUARD_VOICES:
+		for event in Audio.VOICE_EVENTS:
+			for n in Audio.LINES_PER_EVENT:
+				var path := Audio.VOICE_PATH % [voice, event, n + 1]
+				lines.append(path.get_file())
+				_check(load(path) is AudioStream, name, "voice line %s does not load as audio" % path)
+	var spoken: Array[String] = []
+	for file in DirAccess.get_files_at("res://audio/voice"):
+		if file.get_extension() == "mp3":
+			spoken.append(file)
+	lines.sort()
+	spoken.sort()
+	_check(spoken == lines, name, "audio/voice holds %s, the voices and events make %s" % [spoken, lines])
+	audio.say(&"rookie", &"hear")
+	audio.say(&"rookie", &"hear")
+	audio.say(&"rookie", &"hear")
+	_check(audio.said.slice(-3) == [&"rookie_hear_1", &"rookie_hear_2", &"rookie_hear_1"], name, "a voice does not take its lines in turn: %s" % [audio.said])
+	_game.quiet_errors = true
+	audio.say(&"nobody", &"hear")
+	_game.quiet_errors = false
+	_check(_game.errors.size() == errors_before + 3, name, "an unknown voice is not reported")
 	var was_run := _game.run
 	_game.run = null
 	_check(_game.music_for(GameState.Flow.HUB) == "caper" and _game.music_for(GameState.Flow.ROOM) == "caper", name, "outside a wing the caper does not play")
@@ -374,6 +397,22 @@ func _test_sfx_files() -> void:
 	_game.run = was_run
 	_game.errors.resize(errors_before)
 	(_game.get_node("ErrorLayer/ErrorBadge") as TextureRect).visible = false
+
+
+## A room hands its guards the voices in turn (wing 6's salon has three: watchman, rookie,
+## watchman).
+func _test_guards_take_voices() -> void:
+	var name := "guards_take_voices"
+	_game.run = null
+	var room := (load("res://scenes/wings/wing_06_salon.tscn") as PackedScene).instantiate() as Room
+	root.add_child(room)
+	var voices: Array[StringName] = []
+	for each in room.guards:
+		voices.append(each.voice)
+	_check(voices.size() >= 2 and voices[0] == &"watchman" and voices[1] == &"rookie", name, "the salon's guards speak as %s" % [voices])
+	room.queue_free()
+	_game.run = null
+	await process_frame
 
 
 ## Every action sounds (AC 35): walking tiptoes; a tilt; hiding and stepping out; the swap;
@@ -397,10 +436,12 @@ func _test_sfx_on_actions() -> void:
 	room._swap()
 	room.guard.intent = GuardBrain.Intent.CHASE
 	room.guard._show_intent()
+	var shout: StringName = _game.audio.said.back()
 	room._on_caught()
 	await create_timer(Room.TOSS_SHAKE + Room.TOSS_FLIGHT + 0.2).timeout
 	(room.get_node("PauseButton") as Button).pressed.emit()
 	room.pause_menu.resume()
+	_check(str(shout).begins_with("%s_chase_" % room.guard.voice), name, "the chasing guard did not shout: %s" % [_game.audio.said])
 	for id: StringName in [&"tiptoe", &"tilt", &"hide", &"unhide", &"swap", &"guard_alert", &"caught", &"toss", &"land", &"ui_tap", &"pause", &"resume"]:
 		_check(id in played, name, "%s did not sound; played %s" % [id, played])
 	played.clear()

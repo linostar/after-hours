@@ -168,6 +168,9 @@ func _ready() -> void:
 		if child is Guard:
 			guards.append(child)
 	guard = guards[0] if not guards.is_empty() else null
+	for i in guards.size():
+		# The guards take the voices in turn, so two in a room sound apart.
+		guards[i].voice = Audio.GUARD_VOICES[i % Audio.GUARD_VOICES.size()]
 	for each in guards:
 		each.target = mime
 		each.gimmick = gimmick
@@ -550,6 +553,7 @@ func _on_inspected(by: Guard) -> void:
 		return
 	found_out = true
 	_game.audio.play(&"fake_found")
+	by.say(&"found_fake")
 	_fake_icon.texture = ALARM_ICON
 	_fake_icon.show()
 	for each in guards:
