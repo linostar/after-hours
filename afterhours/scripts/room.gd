@@ -111,6 +111,8 @@ var gimmick: Gimmick
 ## The ghost mime replaying the bot's route through this visit (GhostMime), while the wing
 ## was never escaped from; null otherwise.
 var ghost: GhostMime
+## In a replay (WingRun.replaying), the room the bot went to after this stay (-1: the end).
+var _replay_next := -1
 ## Seconds until the mime's next footstep on noisy floor can make a noise.
 var _step_noise_wait := 0.0
 
@@ -214,6 +216,11 @@ func _ready() -> void:
 	var visit: int = run.visits.get(run.room, 0)
 	run.visits[run.room] = visit + 1
 	_add_ghost(visit)
+	if run.replaying:
+		# Only the ghost moves: the mime is away and the guards stand still.
+		mime.visible = false
+		for each in guards:
+			each.active = false
 	if DebugOverlay.wanted():
 		add_debug_overlay()
 	_game.arrive(GameState.Flow.ROOM)
@@ -238,11 +245,11 @@ func _own_wing() -> WingData:
 
 
 ## The ghost mime for the mime's `visit`-th stay here (from 0), while the run's wing (a
-## wing file: a room loaded on its own has none) was never escaped from. A replay that is
-## missing or broken is reported; one without that visit adds no ghost.
+## wing file: a room loaded on its own has none) was never escaped from, or in a replay.
+## A replay that is missing or broken is reported; one without that visit adds no ghost.
 func _add_ghost(visit: int) -> void:
 	var wing_path := run.wing.resource_path
-	if wing_path.is_empty() or Save.finished(_game.save, Content.wing_id(wing_path)):
+	if wing_path.is_empty() or (Save.finished(_game.save, Content.wing_id(wing_path)) and not run.replaying):
 		return
 	var problems: Array[String] = []
 	var replay := GhostMime.load_replay(GhostMime.path_for(wing_path), problems)
@@ -254,6 +261,7 @@ func _add_ghost(visit: int) -> void:
 	if samples.is_empty():
 		print("[Room] No ghost mime: the bot came into room %d fewer than %d time(s)" % [run.room, visit + 1])
 		return
+	_replay_next = GhostMime.room_after(replay["trail"], run.room, visit)
 	ghost = GHOST_SCENE.instantiate() as GhostMime
 	ghost.samples = samples
 	ghost.period = replay["period"]
@@ -335,6 +343,9 @@ func add_debug_overlay() -> DebugOverlay:
 func _physics_process(delta: float) -> void:
 	if finished or leaving or _game.is_transitioning():
 		return
+	if run.replaying:
+		_replay(delta)
+		return
 	elapsed += delta
 	if gimmick != null:
 		gimmick.tick(delta)
@@ -371,6 +382,27 @@ func _physics_process(delta: float) -> void:
 		if door.to_room != Door.EXIT and not tossing and mime.position.distance_to(door.position) <= Door.REACH:
 			_leave(door)
 			return
+
+
+## The hideout's replay: the ghost walks this stay, then the replay goes on to the room the
+## bot went to next, or back to the hideout after the escape.
+func _replay(delta: float) -> void:
+	if ghost != null and not ghost.is_done():
+		ghost.advance(delta)
+		return
+	if _replay_next < 0:
+		_end_replay()
+	else:
+		leaving = true
+		print("[Room] Replay goes on to room %d" % _replay_next)
+		_game.enter_room(_replay_next)
+
+
+## Ends the hideout's replay: back to the hideout.
+func _end_replay() -> void:
+	leaving = true
+	print("[Room] Replay over")
+	_game.goto(GameState.Flow.HIDEOUT)
 
 
 ## Footsteps on noisy floor (Gimmick.noise_at) while the mime walks: a noise every
@@ -418,6 +450,10 @@ func _leave(door: Door) -> void:
 func _on_floor_tapped(at: Vector2) -> void:
 	if tossing or finished or leaving:
 		return
+	if run.replaying:
+		# A tap during the replay leaves it.
+		_end_replay()
+		return
 	TapRipple.spawn(self, at)
 	if hidden_in != null:
 		if hidden_in.rect().has_point(at):
@@ -458,7 +494,7 @@ func _on_floor_tapped(at: Vector2) -> void:
 
 ## Whether the player can act in the room now (not tossed, painting or finished).
 func _accepts_input() -> bool:
-	return not tossing and not finished and not leaving and not _canvas.visible
+	return not tossing and not finished and not leaving and not _canvas.visible and not run.replaying
 
 
 ## E: steps out of a portrait, or taps the nearest usable thing within INTERACT_REACH of

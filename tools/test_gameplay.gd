@@ -153,6 +153,7 @@ func _tests() -> Array[Callable]:
 		_test_wipe_follows_reduce_motion,
 		_test_hub_doors_unlock_and_enter,
 		_test_hideout_hangs_originals,
+		_test_hideout_replays_ghost,
 		_test_pause_and_settings,
 		_test_hub_settings,
 		_test_goto_missing_scene_reports,
@@ -1611,6 +1612,8 @@ func _test_ghost_replay_visits() -> void:
 	_check(GhostMime.visit_samples(trail, 0, 0) == ([[1.0, 1.0, false], [2.0, 2.0, true]] as Array[Array]), name, "room 0's first stay is %s" % [GhostMime.visit_samples(trail, 0, 0)])
 	_check(GhostMime.visit_samples(trail, 0, 1) == ([[4.0, 4.0, false]] as Array[Array]), name, "room 0's second stay is %s" % [GhostMime.visit_samples(trail, 0, 1)])
 	_check(GhostMime.visit_samples(trail, 0, 2).is_empty() and GhostMime.visit_samples(trail, 3, 0).is_empty(), name, "a stay the bot never made has samples")
+	var nexts := [GhostMime.room_after(trail, 0, 0), GhostMime.room_after(trail, 0, 1), GhostMime.room_after(trail, 2, 0), GhostMime.room_after(trail, 0, 2)]
+	_check(nexts == [1, 2, -1, -1], name, "the rooms after each stay are %s, not [1, 2, -1, -1]" % [nexts])
 	_check(GhostMime.path_for("res://data/wings/wing_03.tres") == "res://data/ghosts/wing_03.ghost.json" and GhostMime.path_for("res://scenes/test/slice_wing.tres") == "res://scenes/test/slice_wing.ghost.json", name, "ghost replay paths differ from where the bot records them")
 	for wing_path in Content.WINGS:
 		var problems: Array[String] = []
@@ -1731,6 +1734,45 @@ func _test_hub_doors_unlock_and_enter() -> void:
 	_game.save = Save.defaults()
 	DirAccess.remove_absolute(_game.save_path)
 	_game.scene_paths[GameState.Flow.ROOM] = ROOM_PATH
+
+
+## Under each stolen original the hideout offers a replay: the bot's escape from that wing
+## with only the ghost mime moving (the mime away, the guards still), room after room in the
+## bot's order; a tap leaves it for the hideout.
+func _test_hideout_replays_ghost() -> void:
+	var name := "hideout_replays_ghost"
+	_game.run = null
+	_game.save = Save.defaults()
+	Save.record(_game.save, "wing_01", [true, true, true] as Array[bool], 60.0)
+	change_scene_to_file("res://scenes/hideout.tscn")
+	await process_frame
+	await process_frame
+	var replay := current_scene.get_node_or_null("Replay1") as Button
+	_check(replay != null and replay.size.x >= 44.0 and replay.size.y >= 44.0 and not replay.accessibility_name.is_empty(), name, "wing 1's original has no 44x44 named replay button")
+	_check(current_scene.get_node_or_null("Replay2") == null, name, "an unrobbed wing offers a replay")
+	if replay == null:
+		_game.save = Save.defaults()
+		return
+	await _tap_control(replay)
+	var wing := load(Content.WINGS[0]) as WingData
+	var room := await _wait_for_room(wing.rooms[0], 300)
+	_check(room != null and room.run.replaying and room.ghost != null, name, "the replay did not open wing 1's first room with the ghost")
+	if room == null or room.ghost == null:
+		_game.save = Save.defaults()
+		return
+	_check(not room.mime.visible and room.guards.all(func(each: Guard) -> bool: return not each.active), name, "in the replay the mime shows or a guard moves")
+	var trail: Array = GhostMime.load_replay(GhostMime.path_for(Content.WINGS[0]), [] as Array[String])["trail"]
+	var next := GhostMime.room_after(trail, 0, 0)
+	room.ghost.time = (room.ghost.samples.size() - 1) * room.ghost.period
+	var then := await _wait_for_room(wing.rooms[next], 300)
+	_check(then != null and then.run.replaying and then.ghost != null, name, "after its stay in room 0 the replay did not go on to room %d with the ghost" % next)
+	if then != null:
+		await _wait_navmesh(then)
+		await _tap_at(Vector2(480, 400))
+	var back := await _wait_until(func() -> bool: return current_scene is Hideout and not _game.is_transitioning(), 120)
+	_check(back, name, "a tap during the replay did not lead back to the hideout")
+	_game.run = null
+	_game.save = Save.defaults()
 
 
 ## The hub's hideout door leads to the hideout, where each stolen original hangs alive

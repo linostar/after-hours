@@ -73,6 +73,21 @@ static func visit_samples(trail: Array, room: int, visit: int) -> Array[Array]:
 	return found
 
 
+## The room the bot went to after its `visit`-th stay (from 0) in room `room`, or -1 when
+## that stay ended the trail (the escape) or never happened.
+static func room_after(trail: Array, room: int, visit: int) -> int:
+	var seen := -1
+	var previous := -1
+	for sample: Array in trail:
+		var at := int(sample[0])
+		if at == room and previous != room:
+			seen += 1
+		elif at != room and previous == room and seen == visit:
+			return at
+		previous = at
+	return -1
+
+
 func _ready() -> void:
 	_sprite.modulate = TINT
 	_sprite.modulate.a = 0.0

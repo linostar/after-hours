@@ -399,6 +399,27 @@ func play_wing(wing: WingData) -> void:
 	goto(Flow.ROOM)
 
 
+## Replays the playtest bot's run of the wing at `path` (the hideout's replay): the ghost
+## mime walks its rooms in the bot's order, alone (Room in WingRun.replaying), and the replay
+## ends back in the hideout. A broken wing is reported and not replayed; ignored while a
+## screen change runs.
+func replay_ghost(path: String) -> void:
+	if _transitioning:
+		print("[Game] Ignored replay_ghost while a transition is running")
+		return
+	var problems: Array[String] = []
+	var wing := Content.load_wing(path, problems)
+	for problem in problems:
+		report_error("Wing data: " + problem)
+	if wing == null:
+		return
+	run = WingRun.new(wing)
+	run.replaying = true
+	scene_paths[Flow.ROOM] = wing.rooms[0]
+	print("[Game] Replaying the bot's run of the %s wing" % wing.painting)
+	goto(Flow.ROOM)
+
+
 ## Moves the run to its room `index`, coming from the room it is in. Ignored while a screen
 ## change runs.
 func enter_room(index: int) -> void:
