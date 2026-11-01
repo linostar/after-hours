@@ -11,7 +11,7 @@ extends Node
 ## Every error goes to the log (push_error) and shows the cracked-frame ErrorBadge,
 ## never text (CLAUDE.md, "Errors are visible without words").
 
-enum Flow { TITLE, ROOM }
+enum Flow { TITLE, ROOM, HUB }
 
 ## Scripts reach the autoload through this path (get_node(GameState.AUTOLOAD_PATH)), never
 ## the bare Game name, which tool runs (--script) cannot compile against.
@@ -35,6 +35,7 @@ signal screen_fit_changed
 var scene_paths: Dictionary[Flow, String] = {
 	Flow.TITLE: "res://scenes/title.tscn",
 	Flow.ROOM: "res://scenes/room.tscn",
+	Flow.HUB: "res://scenes/hub.tscn",
 }
 var state := Flow.TITLE
 ## The wing being played (null before any; a room loaded on its own makes a one-room run).
@@ -285,6 +286,19 @@ func goto(flow: Flow) -> void:
 	_transitioning = false
 	if error == OK:
 		transition_finished.emit(flow)
+
+
+## Loads the wing at `path` (a Content.WINGS entry) and plays it; a wing whose data is
+## broken is reported and not played. Returns whether it plays.
+func play_wing_file(path: String) -> bool:
+	var problems: Array[String] = []
+	var wing := Content.load_wing(path, problems)
+	for problem in problems:
+		report_error("Wing data: " + problem)
+	if wing == null:
+		return false
+	play_wing(wing)
+	return true
 
 
 ## Starts `wing` afresh in its room 0. Ignored while a screen change runs.

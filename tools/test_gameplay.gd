@@ -8,6 +8,7 @@ extends SceneTree
 
 const TITLE_PATH := "res://scenes/title.tscn"
 const ROOM_PATH := "res://scenes/room.tscn"
+const HUB_PATH := "res://scenes/hub.tscn"
 const CANVAS_PATH := "res://scenes/forgery_canvas.tscn"
 ## Every synthetic touch uses this index: a web build's index is the browser's
 ## Touch.identifier, which iOS Safari makes large and never 0.
@@ -140,7 +141,8 @@ func _tests() -> Array[Callable]:
 		_test_keyboard_walks_and_interacts,
 		_test_guard_pauses_facing_its_leg,
 		_test_catches_during_swap_and_while_carrying,
-		_test_title_play_starts_room,
+		_test_title_play_opens_hub,
+		_test_hub_doors_unlock_and_enter,
 		_test_goto_missing_scene_reports,
 		_test_room_swap_and_escape,
 		_test_room_swap_cancel_and_locked_exit,
@@ -1339,9 +1341,9 @@ func _wait_until(done: Callable, max_frames: int) -> bool:
 	return done.call()
 
 
-## Play on the title starts wing 1 in its first room; a goto during the fade is ignored.
-func _test_title_play_starts_room() -> void:
-	var name := "title_play_starts_room"
+## Play on the title opens the hub; a goto during the fade is ignored.
+func _test_title_play_opens_hub() -> void:
+	var name := "title_play_opens_hub"
 	change_scene_to_file(TITLE_PATH)
 	await process_frame
 	await process_frame
@@ -1351,12 +1353,59 @@ func _test_title_play_starts_room() -> void:
 	_check(_game.is_transitioning(), name, "tapping play did not start a screen change")
 	_game.goto(GameState.Flow.TITLE)
 	var arrived := await _wait_until(func() -> bool: return not _game.is_transitioning(), 120)
-	var first := (load(Content.WINGS[0]) as WingData).rooms[0]
-	_check(arrived and current_scene != null and current_scene.scene_file_path == first, name, "wing 1's first room is not running after the fade (a goto during it was not ignored?)")
-	_check(_game.state == GameState.Flow.ROOM, name, "Game.state is %s, expected ROOM" % GameState.Flow.keys()[_game.state])
-	_check(_game.run != null and _game.run.wing.resource_path == Content.WINGS[0], name, "play did not start a run of wing 1")
+	_check(arrived and current_scene is Hub and _game.state == GameState.Flow.HUB, name, "the hub is not running after the fade (a goto during it was not ignored?)")
+
+
+## The hub's doors follow the save: a fresh save opens wing 1 only (a tap on wing 2 rattles
+## its chain and goes nowhere; a tap on wing 1 walks the mime through it into the wing); an
+## escape from wing 1 shows its stars and opens wing 2; back in the hub the mime stands in
+## front of the wing's door.
+func _test_hub_doors_unlock_and_enter() -> void:
+	var name := "hub_doors_unlock_and_enter"
+	_game.save = Save.defaults()
 	_game.run = null
+	var hub := await _load_hub()
+	_check(hub.wing_doors.size() == Content.WINGS.size(), name, "the hub has %d wing doors, not %d" % [hub.wing_doors.size(), Content.WINGS.size()])
+	_check(hub.wing_doors[0].open and hub.wing_doors.slice(1).all(func(door: WingDoor) -> bool: return not door.open), name, "a fresh save does not open wing 1 only")
+	_check(hub.wing_doors.all(func(door: WingDoor) -> bool: return not door.broken and not door.finished), name, "a wing door is broken or finished on a fresh save")
+	await _tap_at(hub.wing_doors[1].position + Vector2(0, -60))
+	for i in 40:
+		await physics_frame
+	_check(not _game.is_transitioning() and current_scene == hub, name, "a tap on locked wing 2 left the hub")
+	await _tap_at(hub.wing_doors[0].position + Vector2(0, -60))
+	var entered := await _wait_until(func() -> bool: return _game.state == GameState.Flow.ROOM and not _game.is_transitioning(), 600)
+	_check(entered and _game.run != null and _game.run.wing.resource_path == Content.WINGS[0] and current_scene.scene_file_path == _game.run.wing.rooms[0], name, "walking through wing 1's door did not start wing 1 in its first room")
+	var room := current_scene as Room
+	if room == null:
+		return
+	for each in room.guards:
+		each.active = false
+	room.mime.carrying = true
+	room.ever_seen = true
+	room.exit_door.glowing = true
+	room.mime.place_at(room.exit_door.position)
+	await _wait_until(func() -> bool: return room.finished, 30)
+	_check(Save.stars_of(_game.save, "wing_01") == 2 and FileAccess.file_exists(_game.save_path), name, "the escape from wing 1 was not saved with its 2 stars")
+	_game.goto(GameState.Flow.HUB)
+	await _wait_until(func() -> bool: return current_scene is Hub and not _game.is_transitioning(), 120)
+	hub = current_scene as Hub
+	_check(hub.wing_doors[0].finished and hub.wing_doors[0].stars == 2 and hub.wing_doors[1].open and not hub.wing_doors[2].open, name, "after wing 1 its door does not show 2 stars and open wing 2 only")
+	_check(hub.mime.position.distance_to(hub.wing_doors[0].position + Hub.BACK_FROM_WING) <= 1.0, name, "back from wing 1 the mime is at %s, not in front of its door" % hub.mime.position)
+	_game.run = null
+	_game.save = Save.defaults()
+	DirAccess.remove_absolute(_game.save_path)
 	_game.scene_paths[GameState.Flow.ROOM] = ROOM_PATH
+
+
+## The hub as the current scene, its navmesh synced.
+func _load_hub() -> Hub:
+	change_scene_to_file(HUB_PATH)
+	for i in 3:
+		await physics_frame
+	var hub := current_scene as Hub
+	var map := hub.get_world_2d().navigation_map
+	await _wait_until(func() -> bool: return NavigationServer2D.map_get_closest_point_owner(map, hub.mime.position).is_valid(), 60)
+	return hub
 
 
 func _test_goto_missing_scene_reports() -> void:
@@ -1627,7 +1676,7 @@ func _test_results_buttons() -> void:
 	await process_frame
 	await _tap_control(results.get_node("Panel/HomeButton") as Button)
 	await _wait_until(func() -> bool: return not _game.is_transitioning(), 120)
-	_check(current_scene != null and current_scene.scene_file_path == TITLE_PATH and _game.state == GameState.Flow.TITLE, name, "home did not return to the title")
+	_check(current_scene is Hub and _game.state == GameState.Flow.HUB, name, "home did not return to the hub")
 
 
 ## A route the guard cannot patrol (under 2 points) is reported through the error badge.

@@ -2,7 +2,7 @@ class_name Results
 extends Control
 ## The end-of-wing overlay, wordless: three stars over their legend icons (swap, unseen,
 ## par clock), each popping in STAR_GAP after the last, gold when earned and dark when
-## missed; then replay (the wing again, from its start) and home (the title) icon buttons.
+## missed; then replay (the wing again, from its start) and home (the hub) icon buttons.
 ## The panel sits over the room (Game.world_offset). While shown it takes every touch, so
 ## the room below gets none.
 
@@ -19,7 +19,7 @@ const STAR_MISSED := preload("res://art/svg/star_empty.svg")
 func _ready() -> void:
 	var game := get_node(GameState.AUTOLOAD_PATH) as GameState
 	_replay.pressed.connect(game.replay)
-	_home.pressed.connect(game.goto.bind(GameState.Flow.TITLE))
+	_home.pressed.connect(game.goto.bind(GameState.Flow.HUB))
 	game.screen_fit_changed.connect(_fit.bind(game))
 	_fit(game)
 	hide()
@@ -42,3 +42,5 @@ func present(stars: Array[bool]) -> void:
 		pops.tween_interval(STAR_GAP)
 		pops.tween_property(star, "scale", Vector2.ONE, POP_TIME).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	print("[Results] Stars %s (%d of 3)" % [stars, Stars.count(stars)])
+	# Where the buttons landed (screen base units), for the web smoke test's taps.
+	print("[Results] Home button at %s" % _home.get_global_rect().get_center())

@@ -7,20 +7,26 @@
 // wing 1 with the mouse (desktop) or CDP touches with id 7 (phone; iOS Safari's touch ids
 // are never 0), tapping where each room logs its layout ("[Room] Easel at ...", "[Room]
 // Masterpiece at ...", "[Room] Door to N at ...", N -1 for the exit): tap the title's play
-// button where it logs itself ("[Title] Play button at ..."), require "[Game] Arrived at
-// ROOM" (the foyer, no guard), tap the easel and drag along every ghost stroke the canvas
+// button where it logs itself ("[Title] Play button at ..."), then in the hub wing 1's
+// door where it logs itself ("[Hub] Wing door 1 at ... (open, 0 star(s))"), require "[Game]
+// Arrived at ROOM" (the foyer, no guard), tap the easel and drag along every ghost stroke the canvas
 // logs ("[Forgery] Ghosts in base units ...") until "[Room] Fake ready"; through the door
 // to room 1 (the hall) and on through its door to room 2 (the gallery); there wait until
 // the guard reaches its bottom-right corner ("[Guard] Guard reaches waypoint 2", from where
 // it walks the bottom leg facing away from the painting) and tap the masterpiece until
 // "[Room] Swapped"; back through the hall to the foyer and tap its exit until "[Room]
-// Escaped", and require "[Results] Stars". A catch ("[Room] Caught") is waited out until
-// the mime is back at the entrance, then the tap is repeated, at most ATTEMPTS times.
+// Escaped", require "[Results] Stars", tap home and require the hub to show wing 1's
+// stars and wing 2's door open. World points (rooms and the hub log base units of the
+// 960x540 world) are shifted by the world's offset on screen ("[Game] Screen fit: ...
+// world at (x, y)": the world is centred on the safe area of a wider screen). A catch
+// ("[Room] Caught") is waited out until the mime is back at the entrance, then the tap is
+// repeated, at most ATTEMPTS times.
 // Usage: node tools/smoke_web.mjs [buildDir]   (default: build/web)
 // Env:   SMOKE_BOOT_TIMEOUT_MS (default 30000), SMOKE_SETTLE_MS (default 2000),
 //        SMOKE_STEP_TIMEOUT_MS (each waited-for log line, default 20000)
-// Screenshots (next to buildDir): build/smoke-<run>.png (the title) and
-// build/smoke-<run>-results.png (the results overlay).
+// Screenshots (next to buildDir): build/smoke-<run>.png (the title),
+// build/smoke-<run>-results.png (the results overlay) and build/smoke-<run>-hub.png (the hub
+// after wing 1).
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { launchChrome, serveBuild } from './web_util.mjs';
@@ -45,6 +51,11 @@ const TOUCH_CSS = { touchAction: 'none', overscrollBehavior: 'none', userSelect:
 const BASE = { width: 960, height: 540 };
 const RECT = '\\[P: \\(([\\d.-]+), ([\\d.-]+)\\), S: \\(([\\d.-]+), ([\\d.-]+)\\)\\]';
 const PLAY_RECT = new RegExp(`^\\[Title\\] Play button at ${RECT}`);
+const WORLD_AT = /^\[Game\] Screen fit: .* world at \(([\d.-]+), ([\d.-]+)\)/;
+// "[Hub] Wing door N at (x, y) (open|locked|broken, K star(s))".
+const wingDoorLog = (n) => new RegExp(`^\\[Hub\\] Wing door ${n} at \\(([\\d.-]+), ([\\d.-]+)\\) \\((\\w+), (\\d) star`);
+// A tap on a wing door's painting, above its floor spot, means the door.
+const WING_DOOR_TAP_Y = -60;
 const MASTERPIECE_RECT = new RegExp(`^\\[Room\\] Masterpiece at ${RECT}`);
 // "[Room] Door to N at (x, y)": the door's spot, N the room it leads to (-1: the exit).
 const doorLog = (to) => new RegExp(`^\\[Room\\] Door to ${to} at \\(([\\d.-]+), ([\\d.-]+)\\)`);
@@ -114,18 +125,26 @@ async function pointerFor(page, context, run) {
   };
 }
 
-// A base-unit point in page coordinates. Godot fits the 960x540 base by the smaller ratio
-// and expands the other axis from the top-left; the web reports no safe-area insets.
-async function pagePoint(page, x, y) {
-  return (await pagePoints(page, [[x, y]]))[0];
+// The world's offset on screen (base units) from the latest screen fit log.
+function worldOffset(logs) {
+  const line = logs.findLast((each) => WORLD_AT.test(each));
+  const match = line === undefined ? null : line.match(WORLD_AT);
+  return match === null ? { x: 0, y: 0 } : { x: Number(match[1]), y: Number(match[2]) };
+}
+
+// A base-unit point in page coordinates, shifted by `offset` (a world point: worldOffset).
+// Godot fits the 960x540 base by the smaller ratio and expands the other axis from the
+// top-left.
+async function pagePoint(page, x, y, offset) {
+  return (await pagePoints(page, [[x, y]], offset))[0];
 }
 
 // pagePoint for a list of [x, y] base-unit points with one canvas lookup (each lookup is
 // slow on a busy page: a stroke mapped point by point gives the guard time to come round).
-async function pagePoints(page, points) {
+async function pagePoints(page, points, offset) {
   const box = await page.locator('canvas').boundingBox();
   const scale = Math.min(box.width / BASE.width, box.height / BASE.height);
-  return points.map(([x, y]) => ({ x: box.x + x * scale, y: box.y + y * scale }));
+  return points.map(([x, y]) => ({ x: box.x + (x + offset.x) * scale, y: box.y + (y + offset.y) * scale }));
 }
 
 // Paints the fake: taps the easel (base units), then drags along every ghost from the one
@@ -134,13 +153,13 @@ async function pagePoints(page, points) {
 async function paintFake(page, logs, pointer, easel) {
   for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
     const from = logs.length;
-    await pointer.tap(await pagePoint(page, easel.x, easel.y));
+    await pointer.tap(await pagePoint(page, easel.x, easel.y, worldOffset(logs)));
     const open = await waitForLog(page, logs, new RegExp(`${CANVAS_OPEN.source}|^\\[Room\\] Caught`), 'the canvas at the easel', from);
     if (open[1] !== undefined) {
       const ghosts = JSON.parse((await waitForLog(page, logs, GHOSTS, 'the ghost strokes', open.index))[1]);
       for (let i = Number(open[1]) - 1; i < ghosts.length; i++) {
         if (logs.slice(from).some((line) => line.startsWith('[Room] Caught'))) break;
-        await pointer.drag(await pagePoints(page, ghosts[i]));
+        await pointer.drag(await pagePoints(page, ghosts[i], worldOffset(logs)));
       }
     }
     const outcome = await waitForLog(page, logs, /^\[Room\] Fake ready|^\[Room\] Caught/, 'the painted fake', from);
@@ -157,7 +176,7 @@ async function tapUntil(page, logs, pointer, point, goal, what, window = null) {
   for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
     if (window !== null) await waitForLog(page, logs, window, `the guard's safe window before ${what}`, logs.length, GUARD_WAIT_MS);
     const from = logs.length;
-    await pointer.tap(await pagePoint(page, point.x, point.y));
+    await pointer.tap(await pagePoint(page, point.x, point.y, worldOffset(logs)));
     const outcome = await waitForLog(page, logs, new RegExp(`${goal.source}|^\\[Room\\] Caught`), what, from);
     if (goal.test(outcome[0])) return attempt;
     await waitForLog(page, logs, /^\[Room\] The mime is back at the entrance/, 'the end of the toss', outcome.index);
@@ -171,15 +190,28 @@ async function doorAt(page, logs, to, from) {
   return { x: Number(door[1]), y: Number(door[2]) };
 }
 
-// Wing 1 end to end: play, paint the fake in the foyer, through the hall to the gallery,
-// swap the masterpiece, back through the hall to the foyer, escape, the results.
+// Wing door `n`'s spot and state in the hub logged at or after `from`.
+async function wingDoorAt(page, logs, n, from) {
+  const door = await waitForLog(page, logs, wingDoorLog(n), `wing door ${n} in the hub`, from);
+  return { x: Number(door[1]), y: Number(door[2]), state: door[3], stars: Number(door[4]) };
+}
+
+// Wing 1 end to end: play, wing 1's door in the hub, paint the fake in the foyer, through the hall to the gallery,
+// swap the masterpiece, back through the hall to the foyer, escape, the results, home to
+// the hub with wing 1's stars on its door and wing 2 open.
 async function playWing1(page, logs, pointer, run) {
   const arrived = /^\[Game\] Arrived at ROOM/;
   const play = await waitForLog(page, logs, PLAY_RECT, 'the play button\'s rect');
   const [px, py, pw, ph] = play.slice(1).map(Number);
   let from = logs.length;
-  await pointer.tap(await pagePoint(page, px + pw / 2, py + ph / 2));
-  await waitForLog(page, logs, arrived, 'the foyer after tapping play', from);
+  await pointer.tap(await pagePoint(page, px + pw / 2, py + ph / 2, { x: 0, y: 0 }));
+  await waitForLog(page, logs, /^\[Game\] Arrived at HUB/, 'the hub after tapping play', from);
+  const wing1 = await wingDoorAt(page, logs, 1, from);
+  if (wing1.state !== 'open') throw new Error(`wing 1's door is ${wing1.state} on a fresh save`);
+  await page.waitForTimeout(FADE_WAIT_MS);
+  from = logs.length;
+  await pointer.tap(await pagePoint(page, wing1.x, wing1.y + WING_DOOR_TAP_Y, worldOffset(logs)));
+  await waitForLog(page, logs, arrived, 'the foyer after wing 1\'s door', from);
   const easel = await waitForLog(page, logs, EASEL_RECT, 'the easel', from);
   const [ax, ay, aw, ah] = easel.slice(1).map(Number);
   const toHall = await doorAt(page, logs, 1, from);
@@ -207,7 +239,17 @@ async function playWing1(page, logs, pointer, run) {
   await page.waitForTimeout(FADE_WAIT_MS);
   const exits = await tapUntil(page, logs, pointer, exit, /^\[Room\] Escaped/, 'the escape');
   const stars = await waitForLog(page, logs, /^\[Results\] Stars/, 'the results');
-  console.log(`[${run.name}] wing 1: painted on attempt ${paints} (${fake}), swap on attempt ${swaps}, escape on attempt ${exits}; ${stars.input}`);
+  const home = await waitForLog(page, logs, /^\[Results\] Home button at \(([\d.-]+), ([\d.-]+)\)/, 'the home button');
+  // The stars pop in one after another; the buttons work at once, but wait for the screenshot.
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: join(buildDir, '..', `smoke-${run.name}-results.png`) });
+  from = logs.length;
+  await pointer.tap(await pagePoint(page, Number(home[1]), Number(home[2]), { x: 0, y: 0 }));
+  await waitForLog(page, logs, /^\[Game\] Arrived at HUB/, 'the hub after home', from);
+  const after = await wingDoorAt(page, logs, 1, from);
+  const wing2 = await wingDoorAt(page, logs, 2, from);
+  if (after.stars < 1 || wing2.state !== 'open') throw new Error(`back in the hub wing 1 shows ${after.stars} star(s) and wing 2 is ${wing2.state}`);
+  console.log(`[${run.name}] wing 1: painted on attempt ${paints} (${fake}), swap on attempt ${swaps}, escape on attempt ${exits}; ${stars.input}; hub: wing 1 ${after.stars} star(s), wing 2 ${wing2.state}`);
 }
 
 async function smoke(browser, url, run) {
@@ -275,11 +317,11 @@ async function smoke(browser, url, run) {
     if (failures.length === 0) {
       await playWing1(page, logs, await pointerFor(page, context, run), run);
       await page.waitForTimeout(settleMs);
-      const resultsPath = join(buildDir, '..', `smoke-${run.name}-results.png`);
-      await page.screenshot({ path: resultsPath });
-      console.log(`[${run.name}] screenshot: ${resultsPath}`);
+      const hubPath = join(buildDir, '..', `smoke-${run.name}-hub.png`);
+      await page.screenshot({ path: hubPath });
+      console.log(`[${run.name}] screenshots: ${join(buildDir, '..', `smoke-${run.name}-results.png`)}, ${hubPath}`);
     }
-    for (const line of logs.filter((l) => /^\[(Game|Room|Results)\]/.test(l))) console.log(`[${run.name}] ${line}`);
+    for (const line of logs.filter((l) => /^\[(Game|Room|Results|Hub)\]/.test(l))) console.log(`[${run.name}] ${line}`);
   } catch (err) {
     failures.push(`smoke test aborted: ${err.message}`);
     // The game's last log lines show where the run got stuck.
