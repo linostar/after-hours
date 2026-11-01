@@ -187,6 +187,7 @@ func _tests() -> Array[Callable]:
 		_test_screen_fit,
 		_test_rotate_overlay_pauses,
 		_test_juice_on_actions,
+		_test_no_flash_rates,
 		_test_ghost_replay_visits,
 		_test_ghost_mime_until_escape,
 	]
@@ -1602,6 +1603,52 @@ func _test_juice_on_actions() -> void:
 	_check(not _game.jolting() and get_root().canvas_transform.is_equal_approx(rest), name, "Reduce Motion still shakes or punches")
 	await _wait_until(func() -> bool: return not room.tossing, 180)
 	_game.set_setting("reduce_motion", false)
+
+
+## The no-flash audit (jam rule 5, under 2 Hz): every repeating effect runs slower. The
+## canvas's start-dot pulse and the logo's sway by their rates; every shader's *speed
+## uniform read as cycles per second (its strictest reading: under sin(TIME * speed) it
+## is speed / TAU); every wing gimmick's cycle (window light, searchlights, pipe beats,
+## creatures) by its period.
+func _test_no_flash_rates() -> void:
+	var name := "no_flash_rates"
+	const LIMIT_HZ := 2.0
+	_check(ForgeryCanvas.PULSE_HZ < LIMIT_HZ, name, "the canvas's start dot pulses at %.1f Hz" % ForgeryCanvas.PULSE_HZ)
+	var title_hz: float = (load("res://scripts/title.gd") as Script).get_script_constant_map()["SWAY_HZ"]
+	_check(title_hz < LIMIT_HZ, name, "the logo sways at %.1f Hz" % title_hz)
+	var speed := RegEx.create_from_string("uniform float (\\w*speed) = ([0-9.]+)")
+	var shaders := 0
+	for file in DirAccess.get_files_at("res://shaders"):
+		if not file.ends_with(".gdshader"):
+			continue
+		for found in speed.search_all(FileAccess.get_file_as_string("res://shaders/" + file)):
+			shaders += 1
+			_check(float(found.get_string(2)) < LIMIT_HZ, name, "%s's %s is %s" % [file, found.get_string(1), found.get_string(2)])
+	_check(shaders >= 7, name, "found only %d shader speeds (the regex no longer matches?)" % shaders)
+	_check(Creatures.BASE_PERIOD >= 1.0 / LIMIT_HZ, name, "creatures loop every %.2f s" % Creatures.BASE_PERIOD)
+	var gimmicks := 0
+	for wing_path in Content.WINGS:
+		for room_path: String in (load(wing_path) as WingData).rooms:
+			var room := (load(room_path) as PackedScene).instantiate()
+			var stack: Array[Node] = [room.get_node_or_null("Gimmick")]
+			while not stack.is_empty():
+				var each := stack.pop_back() as Node
+				if each == null:
+					continue
+				stack.append_array(each.get_children())
+				var periods: Array[float] = []
+				if each is WindowLight:
+					periods.append((each as WindowLight).period)
+				elif each is Searchlights:
+					periods.append((each as Searchlights).period)
+				elif each is Puddles:
+					for beat in (each as Puddles).beats:
+						periods.append(beat.x)
+				for period in periods:
+					gimmicks += 1
+					_check(period >= 1.0 / LIMIT_HZ, name, "%s's %s repeats every %.2f s" % [room_path, each.name, period])
+			room.free()
+	_check(gimmicks >= 10, name, "found only %d gimmick cycles in the wings" % gimmicks)
 
 
 ## A ghost replay reads as its samples per visit: the n-th run of samples in a room is the
