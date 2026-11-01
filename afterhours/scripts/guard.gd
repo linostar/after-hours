@@ -91,7 +91,8 @@ var suspicion := 0.0
 var watches_fake := false
 var fake_point := Vector2.ZERO
 var inspecting := false
-## The room's gimmick (null for none): how lit the mime is where it stands.
+## The room's gimmick (null for none): how lit the mime is where it stands, and how fast
+## the guard itself walks where it stands (slow_at: it wades through water as the mime does).
 var gimmick: Gimmick
 ## The room's tilt decoys, which it straightens when it sees them tilted.
 var frames: Array[TiltFrame] = []
@@ -262,8 +263,13 @@ func _travel(goal: Vector2, speed: float, delta: float) -> bool:
 	# A zero step keeps the old facing: a zero facing would see all round.
 	if not next.is_equal_approx(position):
 		facing = (next - position).normalized()
-	position = position.move_toward(next, speed * delta)
+	position = position.move_toward(next, speed * _pace() * delta)
 	return false
+
+
+## The share of its speed the guard walks at where it stands (the gimmick's slow_at).
+func _pace() -> float:
+	return gimmick.slow_at(position) if gimmick != null else 1.0
 
 
 func _patrol(delta: float) -> void:
@@ -278,7 +284,7 @@ func _patrol(delta: float) -> void:
 		return
 	if not position.is_equal_approx(goal):
 		facing = (goal - position).normalized()
-	position = position.move_toward(goal, PATROL_SPEED * delta)
+	position = position.move_toward(goal, PATROL_SPEED * _pace() * delta)
 	if position.is_equal_approx(goal):
 		position = goal
 		print("[Guard] %s reaches waypoint %d at %s" % [name, _next, goal.round()])

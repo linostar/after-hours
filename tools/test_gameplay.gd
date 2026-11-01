@@ -171,6 +171,7 @@ func _tests() -> Array[Callable]:
 		_test_gimmick_clue_investigated,
 		_test_gimmick_mix_combines,
 		_test_wing_gimmicks,
+		_test_guards_wade,
 		_test_unknown_painting_reports,
 		_test_screen_fit,
 		_test_rotate_overlay_pauses,
@@ -2211,8 +2212,9 @@ func _test_gimmick_mix_combines() -> void:
 	await process_frame
 
 
-## Each wing's gimmick keeps its rules: the window band is lit and drifts; the tide rises
-## and its water slows and splashes; a parasol shades and walking prints the lawn (prints
+## Each wing's gimmick keeps its rules: the window band is lit and drifts; a burst pipe's
+## puddle grows while it gushes and dries back to a damp patch, and its water slows and
+## splashes (also inside the finale's mix); a parasol shades and walking prints the lawn (prints
 ## fade); a searchlight pool lights and reveals the mime once, to a guard in earshot only;
 ## a creature squawks only close by.
 func _test_wing_gimmicks() -> void:
@@ -2223,13 +2225,28 @@ func _test_wing_gimmicks() -> void:
 	window.tick(window.period / 4.0)
 	_check(not is_equal_approx(window.band_x(300.0), band.x), name, "the window band does not drift")
 	window.free()
-	var tide := Tide.new()
-	_check(is_equal_approx(tide.waterline(), tide.dry_y), name, "the tide does not start low (%.1f)" % tide.waterline())
-	tide.tick(tide.period / 2.0)
-	_check(is_equal_approx(tide.waterline(), tide.flood_y), name, "half a period on, the tide is at %.1f, not high (%.1f)" % [tide.waterline(), tide.flood_y])
-	var wet := Vector2(400, tide.flood_y + 20.0)
-	_check(tide.slow_at(wet) == Tide.SLOW and tide.noise_at(wet) == Tide.LOUD and tide.slow_at(Vector2(400, tide.flood_y - 20.0)) == 1.0, name, "the water does not slow and splash, or the dry floor does")
-	tide.free()
+	var pipes := Puddles.new()
+	pipes.puddles = PackedVector3Array([Vector3(400, 300, 80)])
+	pipes.beats = PackedVector2Array([Vector2(10.0, 0.0)])
+	_check(pipes.gushing(0) and is_equal_approx(pipes.radius(0), 80.0 * Puddles.DAMP), name, "a pipe does not start gushing over a damp patch (radius %.1f)" % pipes.radius(0))
+	var rim := Vector2(400 + 60.0, 300)
+	_check(pipes.slow_at(rim) == 1.0 and pipes.noise_at(rim) == 0.0, name, "the floor beyond the damp patch is wet")
+	pipes.tick(2.5)
+	_check(pipes.gushing(0) and pipes.radius(0) > 80.0 * Puddles.DAMP and pipes.radius(0) < 80.0, name, "the puddle does not grow while the pipe gushes (radius %.1f)" % pipes.radius(0))
+	pipes.tick(2.5)
+	_check(not pipes.gushing(0) and is_equal_approx(pipes.radius(0), 80.0), name, "at half its rhythm the puddle is not full (%.1f) or the pipe still gushes" % pipes.radius(0))
+	_check(pipes.slow_at(rim) == Puddles.SLOW and pipes.noise_at(rim) == Puddles.LOUD, name, "the full puddle does not slow and splash")
+	_check(pipes.slow_at(Vector2(400, 300 + 80.0 * Puddles.FLATTEN + 2.0)) == 1.0 and pipes.slow_at(Vector2(400 + 82.0, 300)) == 1.0, name, "floor just outside the flat ellipse is wet")
+	pipes.tick(4.0)
+	_check(not pipes.gushing(0) and pipes.radius(0) < 40.0, name, "the puddle does not dry back while the pipe drips (radius %.1f)" % pipes.radius(0))
+	var mix := GimmickMix.new()
+	var in_mix := Puddles.new()
+	in_mix.puddles = pipes.puddles
+	in_mix.beats = PackedVector2Array([Vector2(10.0, 0.5)])
+	mix.add_child(in_mix)
+	_check(mix.slow_at(Vector2(400, 300)) == Puddles.SLOW and mix.noise_at(Vector2(400, 300)) == Puddles.LOUD, name, "the finale's mix does not take the puddle's slowing and splash")
+	mix.free()
+	pipes.free()
 	var mime := (load("res://scenes/mime.tscn") as PackedScene).instantiate() as Mime
 	root.add_child(mime)
 	var lawn := Footprints.new()
@@ -2272,6 +2289,27 @@ func _test_wing_gimmicks() -> void:
 	beasts.free()
 	mime.free()
 	await process_frame
+
+
+## A guard wades where the gimmick slows the floor: its patrol stride shrinks by slow_at.
+func _test_guards_wade() -> void:
+	var name := "guards_wade"
+	var strides: Array[float] = []
+	for slow: float in [1.0, Puddles.SLOW]:
+		var gimmick := TestGimmick.new()
+		gimmick.slow = slow
+		var room := await _load_room_with_gimmick(gimmick)
+		room.mime.place_at(Vector2(100, 480))
+		var guard := room.guard
+		guard.route = PackedVector2Array([Vector2(200, 260), Vector2(800, 260)])
+		guard.reset()
+		for i in 60:
+			await physics_frame
+		var from := guard.position
+		for i in 30:
+			await physics_frame
+		strides.append(from.distance_to(guard.position))
+	_check(strides[0] > 20.0 and is_equal_approx(strides[1] / strides[0], Puddles.SLOW), name, "a guard in water walked %.1f against %.1f on dry floor, not %.2f of it" % [strides[1], strides[0], Puddles.SLOW])
 
 
 ## A frame naming an unknown painting is reported and stays empty.
