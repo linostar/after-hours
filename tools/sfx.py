@@ -359,13 +359,6 @@ def fx_searchlight(rng):
     return mix((hum, 0, 0.4), (ping(note_hz(Eb6), 0.5, 7.0, GLASS), 0, 1.0))
 
 
-def fx_creature(rng):
-    """One of Bosch's creatures: a squeaky two-chirp warble."""
-    n = int(0.09 * RATE)
-    chirp = [s * e for s, e in zip(oscillate(lerp_curve([(0, 1400), (0.5, 2300), (1, 1700)], n), triangle), envelope(n, 0.004, 0.04))]
-    return mix((chirp, 0, 1.0), (chirp, 0.12, 0.8))
-
-
 def fx_escape(rng):
     """Out with the original: a jaunty pizzicato-and-vibes run up to a held F."""
     return mix((arpeggio([C5, Eb5, F5, A5, C6], 0.09, 0.4, 9.0, PIZZ), 0, 1.0),
@@ -451,7 +444,6 @@ EFFECTS = {
     "guard_lost": (fx_guard_lost, 0.22, "event"),
     "fake_found": (fx_fake_found, 0.43, "stinger"),
     "searchlight": (fx_searchlight, 0.25, "event"),
-    "creature": (fx_creature, 0.2, "event"),
     "escape": (fx_escape, 0.5, "stinger"),
     "star": (fx_star, 0.42, "stinger"),
     "no_star": (fx_no_star, 0.57, "event"),

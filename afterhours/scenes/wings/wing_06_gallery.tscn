@@ -1,9 +1,8 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/room_base.tscn" id="base"]
 [ext_resource type="Script" path="res://scripts/gimmicks/gimmick_mix.gd" id="gimmick"]
 [ext_resource type="Script" path="res://scripts/gimmicks/puddles.gd" id="part0"]
-[ext_resource type="Script" path="res://scripts/gimmicks/creatures.gd" id="part1"]
 [ext_resource type="PackedScene" path="res://scenes/tilt_frame.tscn" id="frame"]
 [ext_resource type="PackedScene" path="res://scenes/hiding_portrait.tscn" id="portrait"]
 [ext_resource type="Script" path="res://scripts/partition.gd" id="partition"]
@@ -32,10 +31,6 @@ script = ExtResource("gimmick")
 script = ExtResource("part0")
 puddles = PackedVector3Array(420, 330, 75)
 beats = PackedVector2Array(10, 0.5)
-
-[node name="Part1" type="Node2D" parent="Gimmick"]
-script = ExtResource("part1")
-loops = PackedVector3Array(400, 330, 70, 760, 420, 60)
 
 [node name="FrameA" parent="Frames" instance=ExtResource("frame")]
 position = Vector2(260, 75)

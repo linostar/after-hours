@@ -1622,8 +1622,8 @@ func _test_juice_on_actions() -> void:
 ## The no-flash audit (jam rule 5, under 2 Hz): every repeating effect runs slower. The
 ## canvas's start-dot pulse and the logo's sway by their rates; every shader's *speed
 ## uniform read as cycles per second (its strictest reading: under sin(TIME * speed) it
-## is speed / TAU); every wing gimmick's cycle (window light, searchlights, pipe beats,
-## creatures) by its period.
+## is speed / TAU); every wing gimmick's cycle (window light, searchlights, pipe beats) by
+## its period.
 func _test_no_flash_rates() -> void:
 	var name := "no_flash_rates"
 	const LIMIT_HZ := 2.0
@@ -1639,7 +1639,6 @@ func _test_no_flash_rates() -> void:
 			shaders += 1
 			_check(float(found.get_string(2)) < LIMIT_HZ, name, "%s's %s is %s" % [file, found.get_string(1), found.get_string(2)])
 	_check(shaders >= 7, name, "found only %d shader speeds (the regex no longer matches?)" % shaders)
-	_check(Creatures.BASE_PERIOD >= 1.0 / LIMIT_HZ, name, "creatures loop every %.2f s" % Creatures.BASE_PERIOD)
 	var gimmicks := 0
 	for wing_path in Content.WINGS:
 		for room_path: String in (load(wing_path) as WingData).rooms:
@@ -2650,8 +2649,7 @@ func _test_gimmick_mix_combines() -> void:
 ## Each wing's gimmick keeps its rules: the window band is lit and drifts; a burst pipe's
 ## puddle grows while it gushes and dries back to a damp patch, and its water slows and
 ## splashes (also inside the finale's mix); a parasol shades and walking prints the lawn (prints
-## fade); a searchlight pool lights and reveals the mime once, to a guard in earshot only;
-## a creature squawks only close by.
+## fade); a searchlight pool lights and reveals the mime once, to a guard in earshot only.
 func _test_wing_gimmicks() -> void:
 	var name := "wing_gimmicks"
 	var window := WindowLight.new()
@@ -2718,10 +2716,6 @@ func _test_wing_gimmicks() -> void:
 	lights.free()
 	near.free()
 	far.free()
-	var beasts := Creatures.new()
-	beasts.loops = PackedVector3Array([Vector3(300, 400, 0)])
-	_check(beasts.noise_at(Vector2(300 + Creatures.REACH - 1.0, 400)) == Creatures.LOUD and beasts.noise_at(Vector2(300 + Creatures.REACH + 1.0, 400)) == 0.0, name, "the creature does not squawk only within REACH")
-	beasts.free()
 	mime.free()
 	await process_frame
 
