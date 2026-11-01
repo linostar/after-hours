@@ -44,3 +44,4 @@ The tide in the salon and the grand gallery became burst pipes (wing 2's gimmick
 
 ## Bot result
 `tools/bot.gd --record`: 75 plays; the doors in wait 1 and 4 s, the swap 8 s and the way back 4 s; the run takes 46 s, par 100 s.
+Re-recorded with 6 s footprints, at a person's painting pace (step 10): 63 plays; the run takes 62.8 s, par 95 s.

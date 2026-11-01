@@ -31,3 +31,4 @@ way through on the first recording.
 
 ## Bot result
 `tools/bot.gd --record`: the easel waits 5.75 s, the hall crossing 5.75 s and the way back 4 s; the run takes 45 s, par 100 s.
+Re-recorded with 6 s footprints wiped on a catch, at a person's painting pace (step 10): 35 plays; the run takes 56.3 s, par 90 s.

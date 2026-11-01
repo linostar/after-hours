@@ -41,3 +41,4 @@ added between the foyer and the gallery, and a second gallery guard.
 
 ## Bot result
 `tools/bot.gd --record`: 45 plays; the hall crossing waits 2 s, the swap 7.5 s; the run takes 39.5 s, par 85 s.
+Re-recorded at a person's painting pace (step 10): 41 plays; the run takes 56 s, par 85 s.

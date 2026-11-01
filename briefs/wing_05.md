@@ -40,3 +40,4 @@ Lengthening pass (more guards; the wing already had three rooms):
 ## Bot result
 `tools/bot.gd --record`: 42 plays; the doors in wait 4.25 and 4 s; the run takes 39 s, par 90 s (the bot threads the extra guards; a person will be slower).
 Re-recorded without the creatures (step 9): 8 plays; the run takes 30.55 s, par 80 s.
+Re-recorded at a person's painting pace (step 10): 8 plays; the run takes 50.6 s, par 80 s.

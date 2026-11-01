@@ -48,3 +48,4 @@ were placed over the old route's wet crossings and the bot passed on its first r
 
 ## Bot result
 `tools/bot.gd --record`: 41 plays; the hall crossing back waits 0.75 s and the exit 7.75 s for its pipe; the run takes 37.7 s, par 85 s.
+Re-recorded at a person's painting pace (step 10): 38 plays; the run takes 54.5 s, par 85 s.

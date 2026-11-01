@@ -36,3 +36,4 @@ a way through on the first recording (123 plays).
 
 ## Bot result
 `tools/bot.gd --record`: 123 plays; waits of 8, 3 and 9.5 s on the way in and 5.25 and 3.25 s on the way out; the run takes 58 s, par 115 s.
+Re-recorded at a person's painting pace (step 10; the terrace easel had caught the developer twice): 72 plays; the run takes 65.2 s, par 100 s.
