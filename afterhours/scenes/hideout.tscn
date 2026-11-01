@@ -35,9 +35,9 @@ texture = ExtResource("3_mime")
 
 [node name="HomeButton" type="Button" parent="."]
 offset_left = 20.0
-offset_top = 456.0
+offset_top = 440.0
 offset_right = 84.0
-offset_bottom = 520.0
+offset_bottom = 504.0
 accessibility_name = "Back to the lobby"
 icon = ExtResource("2_home")
 flat = true

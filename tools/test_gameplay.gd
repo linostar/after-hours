@@ -1425,6 +1425,14 @@ func _test_hideout_hangs_originals() -> void:
 	_check(first != null and (first.get_child(0) as Sprite2D).material != null, name, "wing 1's original is not alive through its style")
 	var home := hideout.get_node("HomeButton") as Button
 	_check(home.has_focus(true), name, "home does not have visible keyboard focus")
+	_game.safe_area_override = Rect2(65, 0, 1040, 511)
+	root.size = Vector2i(1170, 540)
+	_game.fit_screen()
+	var home_rect := home.get_global_transform_with_canvas() * Rect2(Vector2.ZERO, home.size)
+	_check(_game.safe_rect().encloses(home_rect), name, "on a notched phone home at %s leaves the safe area %s" % [home_rect, _game.safe_rect()])
+	_game.safe_area_override = Rect2()
+	root.size = BASE_WINDOW
+	_game.fit_screen()
 	await _tap_control(home)
 	await _wait_until(func() -> bool: return current_scene is Hub and not _game.is_transitioning(), 120)
 	hub = current_scene as Hub
@@ -1467,11 +1475,20 @@ func _test_pause_and_settings() -> void:
 	_check(motion.button_pressed and not (motion.get_node("Off") as CanvasItem).visible, name, "motion effects do not show on while reduce motion is off")
 	await _tap_control(motion)
 	_check(_game.setting("reduce_motion") and (motion.get_node("Off") as CanvasItem).visible, name, "crossing out motion did not turn reduce motion on")
+	var toggles_before: Dictionary = _game.save["settings"].duplicate()
 	await _press_key(KEY_SPACE)
-	_check(paused and settings.visible, name, "Space resumed with the settings open")
+	_check(paused and settings.visible and _game.save["settings"] == toggles_before, name, "Space with the settings open resumed or flipped a toggle")
 	await _tap_control(settings.get_node("Panel/BackButton") as Button)
 	_check(not settings.visible and (menu.get_node("Panel/SettingsButton") as Button).has_focus(true), name, "back did not close the settings onto the settings button")
+	root.size = Vector2i(540, 960)
+	_game.fit_screen()
+	await _press_key(KEY_SPACE)
+	_check(paused and menu.visible, name, "Space resumed the room under the rotate overlay")
+	root.size = BASE_WINDOW
+	_game.fit_screen()
+	_check(paused and menu.visible, name, "landscape again unpaused a room paused before the overlay")
 	await _tap_control(menu.get_node("Panel/HomeButton") as Button)
+	_check(not menu.visible, name, "the pause menu still shows during home's fade")
 	var home := await _wait_until(func() -> bool: return current_scene is Hub and not _game.is_transitioning(), 120)
 	_check(home and not paused, name, "home did not reach the hub with the tree running")
 	_game.save = Save.defaults()
@@ -1500,6 +1517,7 @@ func _test_hub_settings() -> void:
 func _press_key(key: Key) -> void:
 	for pressed: bool in [true, false]:
 		var event := InputEventKey.new()
+		event.keycode = key
 		event.physical_keycode = key
 		event.pressed = pressed
 		Input.parse_input_event(event)
@@ -2317,7 +2335,10 @@ func _test_screen_fit() -> void:
 		_check(visible.encloses(world), name, "%s: the room at %s is cropped by the visible %s" % [label, world, visible])
 		_check(absf(world.get_center().x - safe.get_center().x) <= 1.0, name, "%s: the room at %s is not centred on the safe area" % [label, world])
 		var buttons: Array[Control] = [results.get_node("Panel/ReplayButton"), results.get_node("Panel/HomeButton"),
-			room.get_node("EaselLayer/ForgeryCanvas/CloseButton"), room.get_node("EaselLayer/ForgeryCanvas/AssistButton")]
+			room.get_node("EaselLayer/ForgeryCanvas/CloseButton"), room.get_node("EaselLayer/ForgeryCanvas/AssistButton"),
+			room.get_node("PauseButton")]
+		for menu_button in room.pause_menu.find_children("*", "Button"):
+			buttons.append(menu_button)
 		for button in buttons:
 			var rect := button.get_global_transform_with_canvas() * Rect2(Vector2.ZERO, button.size)
 			_check(safe.grow(0.5).encloses(rect) and rect.size.x >= 44.0 and rect.size.y >= 44.0, name, "%s: %s at %s is not a 44x44 target inside the safe area" % [label, button.name, rect])

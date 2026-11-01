@@ -2,8 +2,10 @@ class_name PauseMenu
 extends Control
 ## The pause overlay, wordless: open() pauses the tree (the room stops; this runs on) and
 ## shows resume, settings (the SettingsMenu over it) and home (back to the hub, the wing
-## abandoned) on a panel over the world (Game.world_offset). Resume, or Space (read here:
-## raw input lives in scripts/ui), unpauses; Space does nothing while the settings are open.
+## abandoned; the menu hides so nothing resumes the room during the fade) on a panel over the
+## world (Game.world_offset). Resume, or Space (read here: raw input lives in scripts/ui),
+## unpauses. While the menu shows, Space is taken here: it does nothing while the settings are
+## open (it would press their focused toggle) or under the rotate overlay (that pause holds).
 
 @onready var _resume: Button = $Panel/ResumeButton
 @onready var _settings_button: Button = $Panel/SettingsButton
@@ -31,7 +33,7 @@ func open() -> void:
 
 
 func resume() -> void:
-	if not visible:
+	if not visible or _game.is_rotate_overlay_shown():
 		return
 	_settings.hide()
 	hide()
@@ -41,14 +43,17 @@ func resume() -> void:
 
 func _input(event: InputEvent) -> void:
 	var key := event as InputEventKey
-	if visible and not _settings.visible and key != null and key.pressed and not key.echo and key.physical_keycode == KEY_SPACE:
+	if visible and key != null and key.physical_keycode == KEY_SPACE:
 		get_viewport().set_input_as_handled()
-		resume()
+		if key.pressed and not key.echo and not _settings.visible:
+			resume()
 
 
 ## Leaves the wing for the hub; the tree stays paused until the hub replaces the room.
 func _home() -> void:
 	print("[Pause] Home")
+	_settings.hide()
+	hide()
 	_game.goto(GameState.Flow.HUB)
 
 
