@@ -17,10 +17,10 @@
   over the crossing to the right door (puddle at (830, 350), every 9 s) and one beside the
   exit (puddle at (150, 450), every 10 s): leaving means timing the pipe or splashing.
 - Room 1, the gallery: The Great Wave hangs in the middle. One guard walks the back row
-  under the painting; another loops the front between two partitions. A burst right over
-  the swap spot (puddle at (480, 250), every 12 s) and one before the door back (190, 340).
+  under the painting; another loops the front between two partitions. A burst beside the
+  Great Wave floods the swap spot at full size (puddle at (560, 250), every 12 s) and one before the door back (190, 340).
 
-- Room 1, the hall (new): bursts over the middle of the crossing (480, 330) and before the
+- Room 1, the hall (new): bursts over the middle of the crossing (560, 330) and before the
   far door (820, 400); two partitions; a
   guard loops the middle, another walks the lower left; a Mona Lisa to hide in.
 - The print room has a second guard looping the back half; the gallery's back-row guard
@@ -42,6 +42,9 @@ Lengthening pass: a hall, a second print-room guard and a longer gallery loop.
 ## Burst pipes pass
 The tide became burst pipes (the developer: "why is there a sea in the museum?"). The pipes
 were placed over the old route's wet crossings and the bot passed on its first recording.
+1. Bursts straight behind a painting (the hall's Mona Lisa, the Great Wave) made the water
+   seem to pour out of the painting, the reading the pipes replaced. They moved to clear
+   wall at x 560 (the gallery's puddle grew to radius 90 so it still floods the swap spot).
 
 ## Bot result
-`tools/bot.gd --record`: 50 plays; the swap waits 2.25 s, the hall crossing back 0.75 s and the exit 7.75 s for its pipe; the run takes 40 s, par 85 s.
+`tools/bot.gd --record`: 41 plays; the hall crossing back waits 0.75 s and the exit 7.75 s for its pipe; the run takes 37.7 s, par 85 s.

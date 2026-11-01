@@ -37,6 +37,10 @@ The tide in the salon and the grand gallery became burst pipes (wing 2's gimmick
 1. The salon's first puddle sat at (660, 330), on the line from its right door to the
    exit, next to the third guard's beat: wading slowly there on the way out kept the mime
    in that guard's view, and no wait got the last leg through. It moved to (480, 400).
+2. The grand gallery's burst sat behind its Mona Lisa portrait (x 480), so the water seemed
+   to pour from the painting. At (580, 330) the slow wade moved where the loop guard's left
+   leg catches the first crossing, and no wait got it through; at (420, 330), clear of the
+   portrait, it passes.
 
 ## Bot result
-`tools/bot.gd --record`: 77 plays; the doors in wait 1 and 4.5 s, the swap 8 s and the way back 4 s; the run takes 46.6 s, par 100 s.
+`tools/bot.gd --record`: 75 plays; the doors in wait 1 and 4 s, the swap 8 s and the way back 4 s; the run takes 46 s, par 100 s.

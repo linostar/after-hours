@@ -25,7 +25,7 @@ color = Color(0.52, 0.42, 0.3, 1)
 [node name="Gimmick" type="Node2D" parent="."]
 z_index = -9
 script = ExtResource("gimmick")
-puddles = PackedVector3Array(480, 330, 85, 820, 400, 65)
+puddles = PackedVector3Array(560, 330, 85, 820, 400, 65)
 beats = PackedVector2Array(9, 0.25, 7, 0.6)
 
 [node name="FrameA" parent="Frames" instance=ExtResource("frame")]

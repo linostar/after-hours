@@ -172,6 +172,7 @@ func _tests() -> Array[Callable]:
 		_test_gimmick_mix_combines,
 		_test_wing_gimmicks,
 		_test_guards_wade,
+		_test_puddles_checked_and_wired,
 		_test_unknown_painting_reports,
 		_test_screen_fit,
 		_test_rotate_overlay_pauses,
@@ -2310,6 +2311,36 @@ func _test_guards_wade() -> void:
 			await physics_frame
 		strides.append(from.distance_to(guard.position))
 	_check(strides[0] > 20.0 and is_equal_approx(strides[1] / strides[0], Puddles.SLOW), name, "a guard in water walked %.1f against %.1f on dry floor, not %.2f of it" % [strides[1], strides[0], Puddles.SLOW])
+
+
+## A pipe with broken data (radius 0, period 0) is reported once each and left dry while a
+## good one works; wing 2's rooms and wing 6's salon and grand gallery use Puddles (wing 6
+## inside its mix), and no wing uses anything named after the old tide.
+func _test_puddles_checked_and_wired() -> void:
+	var name := "puddles_checked_and_wired"
+	var pipes := Puddles.new()
+	pipes.puddles = PackedVector3Array([Vector3(200, 300, 80), Vector3(500, 300, 0), Vector3(800, 300, 60)])
+	pipes.beats = PackedVector2Array([Vector2(10, 0.5), Vector2(10, 0.5), Vector2(0, 0)])
+	var errors_before := _game.errors.size()
+	_game.quiet_errors = true
+	root.add_child(pipes)
+	_game.quiet_errors = false
+	_check(_game.errors.size() == errors_before + 2, name, "broken pipes reported %d error(s), not 2" % (_game.errors.size() - errors_before))
+	_check(pipes.wet(Vector2(200, 300)) and not pipes.wet(Vector2(500, 300)) and not pipes.wet(Vector2(800, 300)), name, "the good pipe is not wet or a broken one is")
+	pipes.tick(0.1)
+	await process_frame
+	pipes.free()
+	_game.errors.resize(errors_before)
+	(_game.get_node("ErrorLayer/ErrorBadge") as TextureRect).visible = false
+	var rooms: Array[String] = []
+	rooms.append_array((load(Content.WINGS[1]) as WingData).rooms)
+	rooms.append_array(["res://scenes/wings/wing_06_salon.tscn", "res://scenes/wings/wing_06_gallery.tscn"])
+	for path in rooms:
+		var room := (load(path) as PackedScene).instantiate()
+		var gimmick := room.get_node_or_null("Gimmick")
+		var has_pipes := gimmick is Puddles or (gimmick is GimmickMix and (gimmick as GimmickMix).parts().any(func(part: Gimmick) -> bool: return part is Puddles))
+		_check(has_pipes, name, "%s does not use Puddles" % path)
+		room.free()
 
 
 ## A frame naming an unknown painting is reported and stays empty.
