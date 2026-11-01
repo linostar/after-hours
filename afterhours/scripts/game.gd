@@ -3,7 +3,9 @@ extends Node
 ## The one autoload (Game): the flow state, screen changes (goto: a fade to the museum's
 ## dark that blocks touches while it runs), the wing being played (run: play_wing starts
 ## one in its room 0, enter_room moves to another of its rooms; ROOM's scene is the run's
-## current room) and wordless error reporting.
+## current room), the save (progress and settings: Save, in save_path; loaded at start and
+## written on every change; a corrupt one is reported, kept as backup_path() and replaced by
+## defaults) and wordless error reporting.
 ## Every error goes to the log (push_error) and shows the cracked-frame ErrorBadge,
 ## never text (CLAUDE.md, "Errors are visible without words").
 
@@ -17,6 +19,10 @@ const FADE_TIME := 0.25
 ## A desktop window opens at this share of the usable screen, kept 16:9 (the 960x540 base
 ## is tiny on a high-DPI screen, where window sizes count physical pixels).
 const WINDOW_SCREEN_SHARE := 0.85
+const SAVE_PATH := "user://save.json"
+## Tool runs (tests, the bot, the project check) start from defaults and write here, never
+## over the player's save.
+const TOOL_SAVE_PATH := "user://tool_save.json"
 
 ## Emitted when a goto's fade-in has finished.
 signal transition_finished(flow: Flow)
@@ -34,9 +40,16 @@ var errors: Array[String] = []
 ## While true, report_error logs with print instead of push_error, so a test that
 ## provokes an error on purpose does not fail validate.sh's ERROR scan.
 var quiet_errors := false
+var save_path := SAVE_PATH
+## The progress and settings (Save's shape).
+var save := Save.defaults()
 ## Assist mode (a setting, off by default): the forgery canvas offers one press that paints
 ## the fake at exactly Good quality (Forgery.ASSIST_QUALITY), never Perfect.
-var assist := false
+var assist: bool:
+	get:
+		return save["settings"]["assist"]
+	set(value):
+		set_setting("assist", value)
 var _transitioning := false
 
 @onready var _error_badge: TextureRect = $ErrorLayer/ErrorBadge
@@ -45,6 +58,94 @@ var _transitioning := false
 
 func _ready() -> void:
 	_fit_window()
+	# Tool runs drive the tree from a SceneTree script.
+	if get_tree().get_script() != null:
+		save_path = TOOL_SAVE_PATH
+		_apply_settings()
+	else:
+		load_save()
+
+
+## Reads the save from save_path (defaults when there is none). A corrupt one is reported,
+## moved to backup_path() and replaced by a fresh save.
+func load_save() -> void:
+	save = Save.defaults()
+	if not FileAccess.file_exists(save_path):
+		print("[Game] No save at %s; starting fresh" % save_path)
+		_apply_settings()
+		return
+	var problems: Array[String] = []
+	var loaded := Save.parse(FileAccess.get_file_as_string(save_path), problems)
+	if loaded.is_empty():
+		var moved := DirAccess.rename_absolute(save_path, backup_path())
+		report_error("Save '%s' is corrupt (%s); %s, and a fresh save replaces it" % [save_path, "; ".join(problems), "it was moved to '%s'" % backup_path() if moved == OK else "it could not be moved to '%s' (%s)" % [backup_path(), error_string(moved)]])
+		_apply_settings()
+		write_save()
+		return
+	save = loaded
+	print("[Game] Loaded the save from %s: %d wing(s) finished, settings %s" % [save_path, save["wings"].size(), save["settings"]])
+	_apply_settings()
+
+
+## Where a corrupt save is kept (one backup: the latest corrupt save replaces it).
+func backup_path() -> String:
+	return save_path.get_basename() + ".corrupt.json"
+
+
+## Writes the save to save_path through a temporary file, so a failed write leaves the last
+## good save; returns whether it worked (a failure is reported).
+func write_save() -> bool:
+	var temp := save_path + ".tmp"
+	var file := FileAccess.open(temp, FileAccess.WRITE)
+	if file == null:
+		report_error("Cannot open '%s' to write the save: %s; '%s' is unchanged" % [temp, error_string(FileAccess.get_open_error()), save_path])
+		return false
+	var written := file.store_string(Save.to_json(save))
+	file.close()
+	var replaced := DirAccess.rename_absolute(temp, save_path) if written else FAILED
+	if replaced != OK:
+		DirAccess.remove_absolute(temp)
+		report_error("Cannot write the save to '%s' (%s); it is unchanged" % [save_path, error_string(replaced)])
+		return false
+	print("[Game] Saved to %s: %d wing(s) finished, settings %s" % [save_path, save["wings"].size(), save["settings"]])
+	return true
+
+
+## Changes setting `key` (Save.SETTINGS), applies it and writes the save.
+func set_setting(key: String, value: bool) -> void:
+	if not Save.SETTINGS.has(key):
+		report_error("Unknown setting '%s'" % key)
+		return
+	save["settings"][key] = value
+	print("[Game] Setting %s is now %s" % [key, value])
+	_apply_settings()
+	write_save()
+
+
+func setting(key: String) -> bool:
+	return save["settings"].get(key, false)
+
+
+## Mutes the Music and SFX buses as the settings say.
+func _apply_settings() -> void:
+	for bus: String in ["Music", "SFX"]:
+		var index := AudioServer.get_bus_index(bus)
+		if index < 0:
+			report_error("Audio bus '%s' is missing (default_bus_layout.tres)" % bus)
+			continue
+		AudioServer.set_bus_mute(index, not setting("music" if bus == "Music" else "sound"))
+
+
+## Records the run's escape (its stars and time) for its wing and writes the save when it
+## is a best. A run of a room loaded on its own (no wing file) is not recorded.
+func record_escape(stars: Array[bool], time: float) -> void:
+	if run == null or run.wing.resource_path.is_empty():
+		print("[Game] Escape not recorded: the run has no wing file")
+		return
+	var id := Content.wing_id(run.wing.resource_path)
+	if Save.record(save, id, stars, time):
+		print("[Game] New best for %s: %d star(s), %.2f s" % [id, Save.stars_of(save, id), save["wings"][id]["time"]])
+		write_save()
 
 
 ## Grows the desktop window to WINDOW_SCREEN_SHARE of the usable screen at 16:9 and centres

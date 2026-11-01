@@ -20,6 +20,19 @@ const CANVAS := Vector2(320, 240)
 const BASE := Vector2(960, 540)
 
 
+## A wing's id (its save key): the name of its data file, "wing_01" for wing 1.
+static func wing_id(path: String) -> String:
+	return path.get_file().get_basename()
+
+
+## Every wing's id, in play order.
+static func wing_ids() -> Array[String]:
+	var ids: Array[String] = []
+	for path in WINGS:
+		ids.append(wing_id(path))
+	return ids
+
+
 ## What is wrong with `wing`, loaded from `path` (one line per problem; empty when valid).
 static func validate(wing: WingData, path: String) -> Array[String]:
 	if wing == null:

@@ -27,7 +27,8 @@ extends Node2D
 ## once per pass, a "?" over the painting while one does; a fake found out
 ## (Forgery.is_noticed; inspections count across the guards) turns the "?" into "!" for
 ## good, and the guard who found it out searches around it. Reaching the exit ends the
-## wing: the stars (Stars, against par_time) show in the results overlay. A guard that
+## wing: the stars (Stars, against par_time) are recorded (Game.record_escape) and show in
+## the results overlay. A guard that
 ## chases the mime down (Guard) shakes it and tosses it back to the entrance (TOSS_SHAKE,
 ## then TOSS_FLIGHT along an arc TOSS_HEIGHT high), closing the canvas if it was painting
 ## (its finished strokes are kept); taps are ignored meanwhile, then every guard starts its
@@ -545,6 +546,7 @@ func _escape() -> void:
 	mime.place_at(mime.position)
 	stars = Stars.earned(ever_seen, elapsed, par_time)
 	print("[Room] Escaped with the original at t %.2f (par %.0f, seen %s)" % [elapsed, par_time, ever_seen])
+	_game.record_escape(stars, elapsed)
 	_results.present(stars)
 
 

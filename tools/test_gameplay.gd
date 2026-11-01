@@ -103,6 +103,8 @@ func _tests() -> Array[Callable]:
 		_test_detection_suspicion,
 		_test_detection_light,
 		_test_stars,
+		_test_save_shape,
+		_test_save_load_write_and_corrupt,
 		_test_guard_brain_priorities,
 		_test_guard_brain_chase_and_noise,
 		_test_forgery_scoring,
@@ -307,6 +309,60 @@ func _test_stars() -> void:
 	_check(Stars.earned(false, 60.0, 60.0)[Stars.Star.PAR], name, "an escape exactly at par misses the par star")
 	_check(not Stars.earned(false, 60.1, 60.0)[Stars.Star.PAR], name, "an escape over par earns the par star")
 	_check(Stars.count(Stars.earned(true, 99.0, 60.0)) == 1, name, "a seen, slow escape does not earn exactly the swap star")
+
+
+func _test_save_shape() -> void:
+	var name := "save_shape"
+	var problems: Array[String] = []
+	var data := Save.defaults()
+	_check(Save.record(data, "wing_01", [true, false, true] as Array[bool], 80.0), name, "a first escape is not a best")
+	_check(not Save.record(data, "wing_01", [true, false, false] as Array[bool], 90.0), name, "a worse escape counts as a best")
+	_check(Save.record(data, "wing_01", [true, true, true] as Array[bool], 95.0) and data["wings"]["wing_01"] == {"stars": 3, "time": 80.0}, name, "the best stars and best time are not kept apart: %s" % data["wings"])
+	data["settings"]["assist"] = true
+	var back := Save.parse(Save.to_json(data), problems)
+	_check(problems.is_empty() and back == data, name, "a save does not read back as written: %s, %s" % [back, problems])
+	var ids := Content.wing_ids()
+	_check(ids[0] == "wing_01" and ids.size() == Content.WINGS.size(), name, "wing ids are %s" % [ids])
+	_check(Save.unlocked(data, ids, 0) and Save.unlocked(data, ids, 1) and not Save.unlocked(data, ids, 2) and not Save.unlocked(data, ids, 6), name, "after wing 1, only wings 1 and 2 should be open")
+	_check(Save.unlocked(Save.defaults(), ids, 0) and not Save.unlocked(Save.defaults(), ids, 1), name, "a fresh save opens more than wing 1")
+	var older := Save.parse('{"version": 1, "wings": {}, "settings": {"music": false}}', problems)
+	_check(problems.is_empty() and older["settings"] == {"music": false, "sound": true, "reduce_motion": false, "assist": false}, name, "a missing setting does not take its default: %s" % [older])
+	for bad: String in ["{", "[]", '{"version": 2, "wings": {}}', '{"version": 1, "wings": []}', '{"version": 1, "wings": {"wing_01": {"stars": 4, "time": 1}}}',
+			'{"version": 1, "wings": {"wing_01": {"stars": 1.5, "time": 1}}}', '{"version": 1, "wings": {}, "settings": {"music": 1}}']:
+		problems.clear()
+		_check(Save.parse(bad, problems).is_empty() and problems.size() == 1, name, "save '%s' is not refused with one problem: %s" % [bad, problems])
+
+
+func _test_save_load_write_and_corrupt() -> void:
+	var name := "save_load_write_and_corrupt"
+	_check(_game.save_path == GameState.TOOL_SAVE_PATH, name, "a tool run uses the save at %s" % _game.save_path)
+	var errors_before := _game.errors.size()
+	DirAccess.remove_absolute(_game.save_path)
+	DirAccess.remove_absolute(_game.backup_path())
+	_game.load_save()
+	_check(_game.save == Save.defaults(), name, "no save does not start from defaults")
+	_game.set_setting("music", false)
+	_check(FileAccess.file_exists(_game.save_path) and AudioServer.is_bus_mute(AudioServer.get_bus_index("Music")) and not AudioServer.is_bus_mute(AudioServer.get_bus_index("SFX")), name, "turning music off does not mute only the Music bus and write the save")
+	_game.save = Save.defaults()
+	_game.load_save()
+	_check(not _game.setting("music"), name, "the music setting does not survive a load")
+	var file := FileAccess.open(_game.save_path, FileAccess.WRITE)
+	file.store_string("{ not json")
+	file.close()
+	_game.quiet_errors = true
+	_game.load_save()
+	_game.quiet_errors = false
+	_check(_game.errors.size() == errors_before + 1 and _game.error_badge_visible(), name, "a corrupt save is not reported with the badge")
+	_check(FileAccess.get_file_as_string(_game.backup_path()) == "{ not json", name, "the corrupt save is not kept as %s" % _game.backup_path())
+	var problems: Array[String] = []
+	_check(Save.parse(FileAccess.get_file_as_string(_game.save_path), problems) == Save.defaults() and _game.setting("music"), name, "the corrupt save is not replaced by defaults")
+	_game.errors.resize(errors_before)
+	(_game.get_node("ErrorLayer/ErrorBadge") as TextureRect).visible = false
+	DirAccess.remove_absolute(_game.save_path)
+	DirAccess.remove_absolute(_game.backup_path())
+	_game.save = Save.defaults()
+	_game.set_setting("music", true)
+	DirAccess.remove_absolute(_game.save_path)
 
 
 ## A swirl ghost: an outward spiral of `turns` turns around `center`, 48 points a turn.
