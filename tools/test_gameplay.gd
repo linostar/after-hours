@@ -149,6 +149,7 @@ func _tests() -> Array[Callable]:
 		_test_guard_pauses_facing_its_leg,
 		_test_catches_during_swap_and_while_carrying,
 		_test_title_play_opens_hub,
+		_test_title_logo_sways,
 		_test_hub_doors_unlock_and_enter,
 		_test_hideout_hangs_originals,
 		_test_pause_and_settings,
@@ -1505,6 +1506,27 @@ func _wait_until(done: Callable, max_frames: int) -> bool:
 			return true
 		await physics_frame
 	return done.call()
+
+
+## The title hangs the logo, swaying gently on its nail; Reduce Motion holds it still.
+func _test_title_logo_sways() -> void:
+	var name := "title_logo_sways"
+	change_scene_to_file(TITLE_PATH)
+	await process_frame
+	await process_frame
+	var logo := current_scene.get_node_or_null("Logo") as TextureRect
+	_check(logo != null and logo.texture != null and logo.visible, name, "the title shows no logo")
+	if logo == null:
+		return
+	for i in 30:
+		await process_frame
+	_check(absf(logo.rotation) > 0.0, name, "the logo does not sway")
+	var limit: float = (current_scene.get_script() as Script).get_script_constant_map()["SWAY_DEGREES"]
+	_check(absf(logo.rotation) <= deg_to_rad(limit) + 0.0001, name, "the logo sways %.2f degrees, past its %.1f" % [rad_to_deg(absf(logo.rotation)), limit])
+	_game.save["settings"]["reduce_motion"] = true
+	await process_frame
+	_check(logo.rotation == 0.0, name, "the logo still sways under Reduce Motion")
+	_game.save["settings"]["reduce_motion"] = false
 
 
 ## Play on the title opens the hub; a goto during the fade is ignored.
