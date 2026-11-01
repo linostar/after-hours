@@ -17,7 +17,7 @@ void fragment() {
 		float from_centre = length(SCREEN_UV * size - size * 0.5);
 		if (closed <= 0.0 || from_centre < radius) {
 			COLOR = vec4(0.0);
-		} else if (from_centre < radius + RIM) {
+		} else if (closed < 1.0 && from_centre < radius + RIM) {
 			COLOR = rim_color;
 		} else {
 			COLOR = vec4(COLOR.rgb, 1.0);

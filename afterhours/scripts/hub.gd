@@ -111,7 +111,7 @@ func _on_floor_tapped(at: Vector2) -> void:
 
 ## E: uses the nearest door within Room.INTERACT_REACH; with none the mime shrugs.
 func _on_interacted() -> void:
-	if settings.visible:
+	if settings.visible or _game.is_transitioning():
 		return
 	var best: Node2D
 	var best_distance := Room.INTERACT_REACH

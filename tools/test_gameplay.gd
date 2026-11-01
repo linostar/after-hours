@@ -1603,6 +1603,20 @@ func _test_juice_on_actions() -> void:
 	_check(not _game.jolting() and get_root().canvas_transform.is_equal_approx(rest), name, "Reduce Motion still shakes or punches")
 	await _wait_until(func() -> bool: return not room.tossing, 180)
 	_game.set_setting("reduce_motion", false)
+	# Reduce Motion switched on mid-shake (from the pause menu) stops it at once.
+	_game.shake(Room.CAUGHT_SHAKE, 1.0)
+	_game.set_setting("reduce_motion", true)
+	_check(not _game.jolting() and get_root().canvas_transform.is_equal_approx(rest), name, "Reduce Motion did not stop a running shake")
+	_game.set_setting("reduce_motion", false)
+	# The hub ripples a tap, and E with no door in reach shrugs.
+	var hub := await _load_hub()
+	hub.mime.place_at(Vector2(480, 470))
+	await _tap_at(Vector2(560, 470))
+	_check(hub.get_node_or_null("TapRipple") != null, name, "a hub tap left no ripple")
+	await _key(KEY_E, true)
+	await _key(KEY_E, false)
+	var hub_sprite := hub.mime.get_node("Sprite") as Sprite2D
+	_check(await _wait_until(func() -> bool: return hub_sprite.scale.y < 1.0, 10), name, "E in the hub with no door in reach did not shrug")
 
 
 ## The no-flash audit (jam rule 5, under 2 Hz): every repeating effect runs slower. The

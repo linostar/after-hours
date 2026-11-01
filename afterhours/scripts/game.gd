@@ -146,7 +146,7 @@ func write_save() -> bool:
 
 
 ## Mutes the Music and SFX buses as the settings say, and makes the screen change's iris
-## a plain fade under Reduce Motion.
+## a plain fade under Reduce Motion (which also stops a running shake or punch).
 func _apply_settings() -> void:
 	for bus: String in ["Music", "SFX"]:
 		var index := AudioServer.get_bus_index(bus)
@@ -155,6 +155,10 @@ func _apply_settings() -> void:
 			continue
 		AudioServer.set_bus_mute(index, not setting("music" if bus == "Music" else "sound"))
 	(_cover.material as ShaderMaterial).set_shader_parameter("fade", setting("reduce_motion"))
+	if setting("reduce_motion") and jolting():
+		_shake_left = 0.0
+		_punch_left = 0.0
+		_place_world()
 
 
 ## Changes setting `key` (Save.SETTINGS), applies it and writes the save.
