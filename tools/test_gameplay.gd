@@ -2667,7 +2667,8 @@ func _test_gimmick_mix_combines() -> void:
 ## Each wing's gimmick keeps its rules: the window band is lit and drifts; a burst pipe's
 ## puddle grows while it gushes and dries back to a damp patch, and its water slows and
 ## splashes (also inside the finale's mix); a parasol shades and walking prints the lawn (prints
-## fade); a searchlight pool lights and reveals the mime once, to a guard in earshot only.
+## fade, and a catch wipes them); a searchlight pool lights and reveals the mime once, to a
+## guard in earshot only.
 func _test_wing_gimmicks() -> void:
 	var name := "wing_gimmicks"
 	var window := WindowLight.new()
@@ -2713,7 +2714,18 @@ func _test_wing_gimmicks() -> void:
 	mime.walking = false
 	lawn.tick(Footprints.PRINT_LIFE + 0.01)
 	_check(lawn._prints.is_empty(), name, "prints did not fade after PRINT_LIFE")
-	lawn.free()
+	# A catch wipes the trail, also through the finale's mix.
+	var trail_mix := GimmickMix.new()
+	trail_mix.add_child(lawn)
+	trail_mix.mime = mime
+	mime.position = Vector2(700, 400)
+	mime.walking = true
+	trail_mix.tick(0.1)
+	_check(lawn._prints.size() == 1, name, "the trail_mix did not pass its tick to the lawn")
+	trail_mix.forget()
+	_check(lawn._prints.is_empty(), name, "a catch (forget) did not wipe the prints through the trail_mix")
+	mime.walking = false
+	trail_mix.free()
 	var lights := Searchlights.new()
 	lights.orbits = PackedVector3Array([Vector3(400, 350, 0)])
 	lights.mime = mime

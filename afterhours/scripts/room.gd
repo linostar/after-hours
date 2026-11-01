@@ -691,6 +691,8 @@ func _end_toss() -> void:
 		each.reset()
 		each.watches_fake = fake_hung and not found_out
 	tossing = false
+	if gimmick != null:
+		gimmick.forget()
 	if ghost != null:
 		ghost.restart()
 	_game.audio.play(&"land")

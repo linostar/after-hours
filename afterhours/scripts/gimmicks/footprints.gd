@@ -1,14 +1,16 @@
 class_name Footprints
 extends Gimmick
 ## Wing 3 (Seurat): a sunny, dotted lawn under parasols. The mime's steps leave footprints
-## in the dots (one every PRINT_GAP, fading after PRINT_LIFE): a guard that sees one goes to
-## look at the newest it sees (clue_seen_by; older prints are then spent), and so follows
-## the trail. Under a parasol it is shade (light 0: guards cannot see the mime) and the
+## in the dots (one every PRINT_GAP, fading after PRINT_LIFE; a catch wipes them): a guard
+## that sees one goes to look at the newest it sees (clue_seen_by; older prints are then
+## spent), and so follows the trail. Under a parasol it is shade (light 0: guards cannot see the mime) and the
 ## grass keeps no prints. Drawn as scattered paint dots, the parasols' shade and canopies,
 ## and the fading prints.
 
 const PRINT_GAP := 26.0
-const PRINT_LIFE := 14.0
+## Short enough that a trail goes cold (14 s led guards to the mime again and again in the
+## step 9 playtest).
+const PRINT_LIFE := 6.0
 const PRINT_COLOR := Color(0.18, 0.14, 0.1, 0.55)
 const SHADE := Color(0.05, 0.08, 0.12, 0.35)
 const POLE := Color(0.25, 0.2, 0.15)
@@ -44,6 +46,12 @@ func clue_seen_by(guard: Guard) -> Vector2:
 			_prints = _prints.slice(i + 1)
 			return at
 	return Vector2.INF
+
+
+func forget() -> void:
+	_prints.clear()
+	_last_print = Vector2.INF
+	queue_redraw()
 
 
 func tick(delta: float) -> void:

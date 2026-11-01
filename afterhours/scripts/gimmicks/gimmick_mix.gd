@@ -75,6 +75,11 @@ func tick(delta: float) -> void:
 		part.tick(delta)
 
 
+func forget() -> void:
+	for part in parts():
+		part.forget()
+
+
 func _draw_glass() -> void:
 	if glass_rect.has_area():
 		_glass.draw_rect(glass_rect, SHEEN)

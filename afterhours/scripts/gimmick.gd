@@ -11,7 +11,8 @@ extends Node2D
 ## - clue_seen_by: a point `guard` now notices (a trace the mime left) and goes to look at, or
 ##   Vector2.INF for none (the room asks every frame, for each guard not chasing);
 ## and moves itself on in tick, which the room calls each physics frame it runs (not while
-## a screen change fades or after the escape), so the gimmick and the room keep time.
+## a screen change fades or after the escape), so the gimmick and the room keep time. After a
+## catch the room calls forget: traces the mime left go (the room starts afresh).
 
 ## Seconds between two noisy footsteps.
 const STEP_NOISE_GAP := 0.5
@@ -42,4 +43,8 @@ func clue_seen_by(_guard: Guard) -> Vector2:
 
 
 func tick(_delta: float) -> void:
+	pass
+
+
+func forget() -> void:
 	pass
