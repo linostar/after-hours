@@ -11,6 +11,9 @@ const FILL_FAR := 0.8
 const FILL_NEAR := 2.2
 ## Suspicion lost per second while the mime is not seen.
 const DRAIN := 0.35
+## From this suspicion (the eye half full) the mime counts as seen, costing the unseen star:
+## a glimpse below it is forgiven (decided after the step 9 playtest).
+const SEEN_AT := 0.5
 
 
 ## Whether `target` lies inside the cone at `origin` facing `facing` (any length), with
@@ -34,6 +37,11 @@ static func suspicion_after(current: float, seen: bool, distance: float, cone_ra
 		return maxf(current - DRAIN * delta, 0.0)
 	var closeness := 1.0 - clampf(distance / cone_range, 0.0, 1.0)
 	return minf(current + (FILL_FAR + FILL_NEAR * closeness) * light * delta, 1.0)
+
+
+## Whether `suspicion` has risen far enough for the mime to count as seen (SEEN_AT).
+static func is_seen(suspicion: float) -> bool:
+	return suspicion >= SEEN_AT
 
 
 ## Full suspicion: the guard gives chase (GuardBrain).

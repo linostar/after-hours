@@ -125,6 +125,7 @@ func _tests() -> Array[Callable]:
 		_test_room_tap_on_wall_stops_at_floor,
 		_test_guard_patrols,
 		_test_guard_sees_and_tosses,
+		_test_glimpse_keeps_unseen_star,
 		_test_guard_partition_blocks_sight,
 		_test_guard_ignores_behind,
 		_test_guard_chase_search_return,
@@ -946,6 +947,23 @@ func _test_guard_patrols() -> void:
 	var moved := room.guard.position - start
 	_check(moved.length() > 0.5 * Guard.PATROL_SPEED and is_equal_approx(moved.normalized().dot(leg), 1.0), name, "after 1 s the guard moved %s, not along its first leg %s" % [moved, leg])
 	_check(room.guard.facing.is_equal_approx(leg), name, "the guard faces %s while walking %s" % [room.guard.facing, leg])
+
+
+## A glimpse (suspicion below Detection.SEEN_AT) keeps the unseen star; seen until the eye
+## is half full, the mime counts as seen.
+func _test_glimpse_keeps_unseen_star() -> void:
+	var name := "glimpse_keeps_unseen_star"
+	var room := await _load_room()
+	if room == null:
+		return
+	_stage_guard(room, Vector2(200, 460), Vector2.RIGHT, Vector2(370, 460))
+	await _wait_until(func() -> bool: return room.guard.suspicion > 0.1, 60)
+	room.mime.visible = false
+	await physics_frame
+	_check(room.guard.suspicion > 0.0 and not room.ever_seen, name, "a glimpse (suspicion %.2f) cost the unseen star" % room.guard.suspicion)
+	room.mime.visible = true
+	var seen := await _wait_until(func() -> bool: return room.ever_seen, 120)
+	_check(seen and room.guard.suspicion >= Detection.SEEN_AT and room.guard.suspicion < 1.0, name, "the mime was not counted as seen when the eye reached half (suspicion %.2f, seen %s)" % [room.guard.suspicion, room.ever_seen])
 
 
 ## Seen in the open, the mime is caught and tossed to the entrance; taps are ignored

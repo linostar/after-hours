@@ -424,6 +424,8 @@ func _look(delta: float) -> void:
 	elif senses.chasing and not _knows_hiding:
 		senses.lost_sight_for += delta
 	if before == 0.0 and suspicion > 0.0:
+		print("[Guard] %s glimpses the mime at %s" % [name, target.global_position.round()])
+	if not Detection.is_seen(before) and Detection.is_seen(suspicion):
 		print("[Guard] %s spots the mime at %s" % [name, target.global_position.round()])
 		spotted.emit()
 	if suspicion != before:
