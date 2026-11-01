@@ -1,9 +1,9 @@
 class_name GameState
 extends Node
-## The one autoload (Game): the flow state, screen changes (goto: a fade to the museum's
-## dark that blocks touches while it runs), the wing being played (run: play_wing starts
-## one in its room 0, enter_room moves to another of its rooms; ROOM's scene is the run's
-## current room), the save (progress and settings: Save, in save_path; loaded at start and
+## The one autoload (Game): the flow state, screen changes (goto: an iris wipe to the
+## museum's dark, a fade under Reduce Motion, that blocks touches while it runs), the wing
+## being played (run: play_wing starts one in its room 0, enter_room moves to another of its
+## rooms; ROOM's scene is the run's current room), the save (progress and settings: Save, in save_path; loaded at start and
 ## written on every change; a corrupt one is reported, kept as backup_path() and replaced by
 ## defaults), the screen fit (visible_rect, safe_rect; the museum's worlds, laid out on the
 ## 960x540 base, are centred on the safe area through the canvas transform; a portrait screen
@@ -16,7 +16,7 @@ enum Flow { TITLE, ROOM, HUB, HIDEOUT }
 ## Scripts reach the autoload through this path (get_node(GameState.AUTOLOAD_PATH)), never
 ## the bare Game name, which tool runs (--script) cannot compile against.
 const AUTOLOAD_PATH := ^"/root/Game"
-## Seconds to fade out, and again to fade in, on a screen change.
+## Seconds to close the wipe, and again to open it, on a screen change.
 const FADE_TIME := 0.25
 ## A desktop window opens at this share of the usable screen, kept 16:9 (the 960x540 base
 ## is tiny on a high-DPI screen, where window sizes count physical pixels).
@@ -132,6 +132,18 @@ func write_save() -> bool:
 	return true
 
 
+## Mutes the Music and SFX buses as the settings say, and makes the screen change's iris
+## a plain fade under Reduce Motion.
+func _apply_settings() -> void:
+	for bus: String in ["Music", "SFX"]:
+		var index := AudioServer.get_bus_index(bus)
+		if index < 0:
+			report_error("Audio bus '%s' is missing (default_bus_layout.tres)" % bus)
+			continue
+		AudioServer.set_bus_mute(index, not setting("music" if bus == "Music" else "sound"))
+	(_cover.material as ShaderMaterial).set_shader_parameter("fade", setting("reduce_motion"))
+
+
 ## Changes setting `key` (Save.SETTINGS), applies it and writes the save.
 func set_setting(key: String, value: bool) -> void:
 	if not Save.SETTINGS.has(key):
@@ -145,16 +157,6 @@ func set_setting(key: String, value: bool) -> void:
 
 func setting(key: String) -> bool:
 	return save["settings"].get(key, false)
-
-
-## Mutes the Music and SFX buses as the settings say.
-func _apply_settings() -> void:
-	for bus: String in ["Music", "SFX"]:
-		var index := AudioServer.get_bus_index(bus)
-		if index < 0:
-			report_error("Audio bus '%s' is missing (default_bus_layout.tres)" % bus)
-			continue
-		AudioServer.set_bus_mute(index, not setting("music" if bus == "Music" else "sound"))
 
 
 ## Records the run's escape (its stars and time) for its wing and writes the save when it
@@ -266,7 +268,8 @@ func _update_rotate_overlay() -> void:
 		_paused_by_rotate = false
 
 
-## Changes to `flow`'s scene behind a fade (touches are blocked until it has faded in).
+## Changes to `flow`'s scene behind a wipe: an iris closing to the museum's dark and opening
+## again (a fade under Reduce Motion; touches are blocked until it has opened).
 ## Ignored while another change runs; a missing scene is reported and nothing changes.
 func goto(flow: Flow) -> void:
 	var to_name: String = Flow.keys()[flow]

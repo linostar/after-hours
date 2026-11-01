@@ -150,6 +150,7 @@ func _tests() -> Array[Callable]:
 		_test_catches_during_swap_and_while_carrying,
 		_test_title_play_opens_hub,
 		_test_title_logo_sways,
+		_test_wipe_follows_reduce_motion,
 		_test_hub_doors_unlock_and_enter,
 		_test_hideout_hangs_originals,
 		_test_pause_and_settings,
@@ -1527,6 +1528,20 @@ func _test_title_logo_sways() -> void:
 	await process_frame
 	_check(logo.rotation == 0.0, name, "the logo still sways under Reduce Motion")
 	_game.save["settings"]["reduce_motion"] = false
+
+
+## Screen changes wipe with the iris shader; Reduce Motion makes it a plain fade.
+func _test_wipe_follows_reduce_motion() -> void:
+	var name := "wipe_follows_reduce_motion"
+	var material := (_game.get_node("CoverLayer/Cover") as ColorRect).material as ShaderMaterial
+	_check(material != null and material.shader.resource_path == "res://shaders/iris_wipe.gdshader", name, "the cover has no iris wipe")
+	if material == null:
+		return
+	_check(material.get_shader_parameter("fade") == false, name, "the wipe fades with Reduce Motion off")
+	_game.set_setting("reduce_motion", true)
+	_check(material.get_shader_parameter("fade") == true, name, "the wipe is still an iris under Reduce Motion")
+	_game.set_setting("reduce_motion", false)
+	_check(material.get_shader_parameter("fade") == false, name, "the iris did not come back with Reduce Motion off")
 
 
 ## Play on the title opens the hub; a goto during the fade is ignored.
