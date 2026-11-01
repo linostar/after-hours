@@ -5,7 +5,9 @@ extends Node
 ## one in its room 0, enter_room moves to another of its rooms; ROOM's scene is the run's
 ## current room), the save (progress and settings: Save, in save_path; loaded at start and
 ## written on every change; a corrupt one is reported, kept as backup_path() and replaced by
-## defaults) and wordless error reporting.
+## defaults), the screen fit (visible_rect, safe_rect; the museum's worlds, laid out on the
+## 960x540 base, are centred on the safe area through the canvas transform; a portrait screen
+## shows the wordless rotate overlay and pauses the tree) and wordless error reporting.
 ## Every error goes to the log (push_error) and shows the cracked-frame ErrorBadge,
 ## never text (CLAUDE.md, "Errors are visible without words").
 
@@ -26,6 +28,8 @@ const TOOL_SAVE_PATH := "user://tool_save.json"
 
 ## Emitted when a goto's fade-in has finished.
 signal transition_finished(flow: Flow)
+## Emitted when the visible area or its safe part changes (world_offset() with them).
+signal screen_fit_changed
 
 ## The scene each flow state runs (run_main.gd checks the running scene against it).
 var scene_paths: Dictionary[Flow, String] = {
@@ -40,6 +44,9 @@ var errors: Array[String] = []
 ## While true, report_error logs with print instead of push_error, so a test that
 ## provokes an error on purpose does not fail validate.sh's ERROR scan.
 var quiet_errors := false
+## Tests set this (base units) to stand in for a notched screen's safe area; it applies from
+## the next fit_screen(). An empty rect means the display's own safe area.
+var safe_area_override := Rect2()
 var save_path := SAVE_PATH
 ## The progress and settings (Save's shape).
 var save := Save.defaults()
@@ -51,13 +58,20 @@ var assist: bool:
 	set(value):
 		set_setting("assist", value)
 var _transitioning := false
+var _visible_rect := Rect2()
+var _safe_rect := Rect2()
+## Whether the rotate overlay paused the tree (it then unpauses on hiding).
+var _paused_by_rotate := false
 
 @onready var _error_badge: TextureRect = $ErrorLayer/ErrorBadge
 @onready var _cover: ColorRect = $CoverLayer/Cover
+@onready var _rotate_overlay: Control = $RotateLayer/RotateOverlay
 
 
 func _ready() -> void:
 	_fit_window()
+	get_viewport().size_changed.connect(fit_screen)
+	fit_screen()
 	# Tool runs drive the tree from a SceneTree script.
 	if get_tree().get_script() != null:
 		save_path = TOOL_SAVE_PATH
@@ -162,6 +176,89 @@ func _fit_window() -> void:
 	print("[Game] Window %s on a usable screen of %s" % [window.size, usable.size])
 
 
+## The visible area in base units: 960x540, or larger on one axis (aspect expand).
+func visible_rect() -> Rect2:
+	return _visible_rect
+
+
+## The part of the visible area clear of notches and rounded corners, in base units.
+func safe_rect() -> Rect2:
+	return _safe_rect
+
+
+## Where the 960x540 base sits on screen: centred on the safe area (whole units), but kept
+## inside the visible area, so a safe area shorter than the base (a phone's home-indicator
+## inset) never crops the world.
+func world_offset() -> Vector2:
+	var centred := (_safe_rect.get_center() - Content.BASE / 2.0).round()
+	return centred.clamp(_visible_rect.position, (_visible_rect.end - Content.BASE).max(_visible_rect.position))
+
+
+## Converts the screen-pixel safe area to base units and clips it to `visible`. An empty
+## safe area (headless, some browsers) means the whole visible rect.
+static func safe_rect_in(visible: Rect2, safe_pixels: Rect2i, window_position: Vector2i, stretch: Transform2D) -> Rect2:
+	if safe_pixels.size.x <= 0 or safe_pixels.size.y <= 0:
+		return visible
+	var local := Rect2(Vector2(safe_pixels.position - window_position), Vector2(safe_pixels.size))
+	var clipped := (stretch.affine_inverse() * local).intersection(visible)
+	return clipped if clipped.has_area() else visible
+
+
+## Whether a visible area of `area` needs the rotate overlay: taller than wide.
+static func is_portrait(area: Vector2) -> bool:
+	return area.y > area.x
+
+
+func is_rotate_overlay_shown() -> bool:
+	return _rotate_overlay.visible
+
+
+## Measures the visible area and its safe part again (on every viewport resize), moves the
+## world to world_offset() and shows or hides the rotate overlay.
+func fit_screen() -> void:
+	var window := get_window()
+	var visible := get_viewport().get_visible_rect()
+	var safe := safe_area_override if safe_area_override.has_area() else safe_rect_in(visible, DisplayServer.get_display_safe_area(), window.position, window.get_final_transform())
+	if visible.is_equal_approx(_visible_rect) and safe.is_equal_approx(_safe_rect):
+		return
+	_visible_rect = visible
+	_safe_rect = safe
+	print("[Game] Screen fit: visible %s, safe %s, world at %s" % [visible, safe, world_offset()])
+	_place_world()
+	_update_rotate_overlay()
+	screen_fit_changed.emit()
+
+
+## The museum's worlds (every flow but the title, a Control that fills the screen) are
+## drawn at world_offset(); the title at the origin.
+func _place_world() -> void:
+	var offset := world_offset() if state != Flow.TITLE else Vector2.ZERO
+	get_viewport().canvas_transform = Transform2D(0.0, offset)
+
+
+## Shows the rotate overlay and pauses the tree while the visible area is portrait; hides
+## it and restores the pause state when it is landscape again.
+func _update_rotate_overlay() -> void:
+	var portrait := is_portrait(_visible_rect.size)
+	if portrait == _rotate_overlay.visible:
+		return
+	var tree := get_tree()
+	if portrait:
+		_paused_by_rotate = not tree.paused
+		tree.paused = true
+		_rotate_overlay.show()
+		# Keys must not press a focused button hidden behind the overlay.
+		get_viewport().gui_disable_input = true
+		print("[Game] Rotate overlay shown (visible %s); tree paused" % _visible_rect.size)
+	else:
+		_rotate_overlay.hide()
+		get_viewport().gui_disable_input = false
+		if _paused_by_rotate:
+			tree.paused = false
+		print("[Game] Rotate overlay hidden (visible %s); tree %s" % [_visible_rect.size, "unpaused" if _paused_by_rotate else "stays paused"])
+		_paused_by_rotate = false
+
+
 ## Changes to `flow`'s scene behind a fade (touches are blocked until it has faded in).
 ## Ignored while another change runs; a missing scene is reported and nothing changes.
 func goto(flow: Flow) -> void:
@@ -234,6 +331,7 @@ func _fade(alpha: float) -> void:
 ## Called by each flow state's scene once it is ready.
 func arrive(flow: Flow) -> void:
 	state = flow
+	_place_world()
 	print("[Game] Arrived at %s (%s)" % [Flow.keys()[flow], scene_paths[flow]])
 
 

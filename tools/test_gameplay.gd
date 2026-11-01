@@ -167,6 +167,8 @@ func _tests() -> Array[Callable]:
 		_test_gimmick_mix_combines,
 		_test_wing_gimmicks,
 		_test_unknown_painting_reports,
+		_test_screen_fit,
+		_test_rotate_overlay_pauses,
 	]
 
 
@@ -2127,3 +2129,67 @@ func _check(condition: bool, test_name: String, detail: String) -> void:
 	_checks += 1
 	if not condition:
 		_failures.append("%s: %s" % [test_name, detail])
+
+
+## On 16:9, 19.5:9 and 4:3 windows (and a notched safe area) the room is centred on the safe
+## area, nothing of its 960x540 is cropped, a tap lands where the world is drawn, and every
+## button of the results and the forgery canvas is at least 44x44 inside the safe area.
+func _test_screen_fit() -> void:
+	var name := "screen_fit"
+	var room := await _load_room()
+	room.guard.active = false
+	var results := room.get_node("ResultsLayer/Results") as Results
+	results.present([true, true, true] as Array[bool])
+	var cases: Array[Array] = [
+		[Vector2i(960, 540), Rect2()],
+		[Vector2i(1170, 540), Rect2()],
+		[Vector2i(720, 540), Rect2()],
+		# A notched phone on its side: insets left and right, the home indicator below.
+		[Vector2i(1170, 540), Rect2(65, 0, 1040, 511)],
+	]
+	for each in cases:
+		_game.safe_area_override = each[1]
+		root.size = each[0]
+		_game.fit_screen()
+		await process_frame
+		var visible := _game.visible_rect()
+		var safe := _game.safe_rect()
+		var label := "window %s, safe %s" % [each[0], safe]
+		var world := Rect2(root.canvas_transform * Vector2.ZERO, Content.BASE)
+		_check(visible.encloses(world), name, "%s: the room at %s is cropped by the visible %s" % [label, world, visible])
+		_check(absf(world.get_center().x - safe.get_center().x) <= 1.0, name, "%s: the room at %s is not centred on the safe area" % [label, world])
+		var buttons: Array[Control] = [results.get_node("Panel/ReplayButton"), results.get_node("Panel/HomeButton"),
+			room.get_node("EaselLayer/ForgeryCanvas/CloseButton"), room.get_node("EaselLayer/ForgeryCanvas/AssistButton")]
+		for button in buttons:
+			var rect := button.get_global_transform_with_canvas() * Rect2(Vector2.ZERO, button.size)
+			_check(safe.grow(0.5).encloses(rect) and rect.size.x >= 44.0 and rect.size.y >= 44.0, name, "%s: %s at %s is not a 44x44 target inside the safe area" % [label, button.name, rect])
+	results.hide()
+	room.mime.place_at(Vector2(200, 400))
+	await _tap_at(root.canvas_transform * Vector2(300, 420))
+	await _wait_until(func() -> bool: return not room.mime.walking, 120)
+	_check(room.mime.position.distance_to(Vector2(300, 420)) <= 4.0, name, "a tap on the drawn floor at (300, 420) walked the mime to %s" % room.mime.position)
+	_game.safe_area_override = Rect2()
+	root.size = BASE_WINDOW
+	_game.fit_screen()
+	_check(root.canvas_transform == Transform2D.IDENTITY, name, "back at 960x540 the room is not at the origin")
+
+
+## A portrait window shows the rotate overlay and pauses the tree; landscape hides it and
+## unpauses (a tree paused before stays paused).
+func _test_rotate_overlay_pauses() -> void:
+	var name := "rotate_overlay_pauses"
+	root.size = Vector2i(540, 960)
+	_game.fit_screen()
+	_check(_game.is_rotate_overlay_shown() and paused, name, "a portrait window does not show the overlay and pause")
+	var icon := _game.get_node("RotateLayer/RotateOverlay/Icon") as TextureRect
+	_check(icon.texture != null and _game.visible_rect().encloses(icon.get_global_rect()), name, "the rotate icon is missing or off screen")
+	root.size = BASE_WINDOW
+	_game.fit_screen()
+	_check(not _game.is_rotate_overlay_shown() and not paused, name, "landscape again does not hide the overlay and unpause")
+	paused = true
+	root.size = Vector2i(540, 960)
+	_game.fit_screen()
+	root.size = BASE_WINDOW
+	_game.fit_screen()
+	_check(paused, name, "a tree paused before the overlay was unpaused by it")
+	paused = false

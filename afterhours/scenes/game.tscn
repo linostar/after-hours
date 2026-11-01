@@ -1,7 +1,8 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/game.gd" id="1_game"]
 [ext_resource type="Texture2D" path="res://art/svg/error_badge.svg" id="2_badge"]
+[ext_resource type="Texture2D" path="res://art/svg/icon_rotate.svg" id="3_rotate"]
 
 [node name="Game" type="Node"]
 process_mode = 3
@@ -18,6 +19,35 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 color = Color(0.067, 0.063, 0.11, 0)
+
+[node name="RotateLayer" type="CanvasLayer" parent="."]
+layer = 110
+
+[node name="RotateOverlay" type="ColorRect" parent="RotateLayer"]
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.067, 0.063, 0.11, 1)
+
+[node name="Icon" type="TextureRect" parent="RotateLayer/RotateOverlay"]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -120.0
+offset_top = -120.0
+offset_right = 120.0
+offset_bottom = 120.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("3_rotate")
+expand_mode = 1
+stretch_mode = 5
 
 [node name="ErrorLayer" type="CanvasLayer" parent="."]
 layer = 128
