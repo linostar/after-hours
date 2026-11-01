@@ -59,7 +59,7 @@ var assist: bool:
 		return save["settings"]["assist"]
 	set(value):
 		set_setting("assist", value)
-## The game's sound (sound effects; music from step 8.3).
+## The game's sound: effects and music (arrive plays each flow's loop, music_for).
 var audio: Audio
 var _transitioning := false
 var _visible_rect := Rect2()
@@ -358,7 +358,16 @@ func _fade(alpha: float) -> void:
 func arrive(flow: Flow) -> void:
 	state = flow
 	_place_world()
+	audio.play_music(music_for(flow))
 	print("[Game] Arrived at %s (%s)" % [Flow.keys()[flow], scene_paths[flow]])
+
+
+## The loop of `flow`: in a wing's rooms its era's (wing_NN by its painting's place in
+## Paintings.IDS, the wings' order), the caper everywhere else.
+func music_for(flow: Flow) -> String:
+	if flow == Flow.ROOM and run != null:
+		return "wing_%02d" % (Paintings.IDS.find(StringName(run.wing.painting)) + 1)
+	return "caper"
 
 
 func report_error(message: String) -> void:

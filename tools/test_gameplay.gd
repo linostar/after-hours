@@ -322,8 +322,11 @@ func _test_stars() -> void:
 	_check(Stars.count(Stars.earned(true, 99.0, 60.0)) == 1, name, "a seen, slow escape does not earn exactly the swap star")
 
 
-## Audio.SFX_IDS and the files tools/sfx.py writes agree; every sound loads as audio on the
-## SFX bus's players; play logs the id; an unknown id is reported and plays nothing.
+## Audio.SFX_IDS and the files tools/sfx.py writes agree, as do Audio.MUSIC_TRACKS and
+## tools/music.py's loops (each imported looping); every sound loads as audio on the SFX bus's
+## players, the music on the Music bus's; play logs the id; an unknown sound or track is
+## reported and changes nothing; music_for picks the caper outside the wings and each wing's
+## era in its rooms.
 func _test_sfx_files() -> void:
 	var name := "sfx_files"
 	var files: Array[StringName] = []
@@ -337,7 +340,7 @@ func _test_sfx_files() -> void:
 	for id in Audio.SFX_IDS:
 		_check(load(Audio.SFX_PATH % id) is AudioStream, name, "sound %s does not load as audio" % id)
 	var audio := _game.audio
-	_check(audio.get_child_count() == Audio.VOICES and (audio.get_child(0) as AudioStreamPlayer).bus == Audio.SFX_BUS, name, "the sound players are not on the SFX bus")
+	_check((audio.get_node("Sfx0") as AudioStreamPlayer).bus == Audio.SFX_BUS and (audio.get_node("Sfx%d" % (Audio.VOICES - 1)) as AudioStreamPlayer).bus == Audio.SFX_BUS, name, "the sound players are not on the SFX bus")
 	audio.play(&"tilt")
 	_check(audio.played.back() == &"tilt", name, "play does not log the sound")
 	var errors_before := _game.errors.size()
@@ -345,6 +348,30 @@ func _test_sfx_files() -> void:
 	audio.play(&"no_such_sound")
 	_game.quiet_errors = false
 	_check(_game.errors.size() == errors_before + 1 and audio.played.back() == &"tilt", name, "an unknown sound is not reported, or it was played")
+	var loops: Array[String] = []
+	for file in DirAccess.get_files_at("res://audio/music"):
+		if file.get_extension() == "mp3":
+			loops.append(file.get_basename())
+	var tracks := Audio.MUSIC_TRACKS.duplicate()
+	tracks.sort()
+	loops.sort()
+	_check(loops == tracks, name, "audio/music holds %s, Audio.MUSIC_TRACKS lists %s" % [loops, tracks])
+	for track in Audio.MUSIC_TRACKS:
+		var stream := load(Audio.MUSIC_PATH % track) as AudioStreamMP3
+		_check(stream != null and stream.loop, name, "loop %s does not load as a looping MP3" % track)
+	_check((audio.get_node("Music0") as AudioStreamPlayer).bus == Audio.MUSIC_BUS and (audio.get_node("Music1") as AudioStreamPlayer).bus == Audio.MUSIC_BUS, name, "the music players are not on the Music bus")
+	var playing := audio.music
+	_game.quiet_errors = true
+	audio.play_music("no_such_track")
+	_game.quiet_errors = false
+	_check(_game.errors.size() == errors_before + 2 and audio.music == playing, name, "an unknown track is not reported, or the music changed")
+	var was_run := _game.run
+	_game.run = null
+	_check(_game.music_for(GameState.Flow.HUB) == "caper" and _game.music_for(GameState.Flow.ROOM) == "caper", name, "outside a wing the caper does not play")
+	for i in Content.WINGS.size():
+		_game.run = WingRun.new(load(Content.WINGS[i]) as WingData)
+		_check(_game.music_for(GameState.Flow.ROOM) == "wing_%02d" % (i + 1), name, "wing %d's rooms play %s" % [i + 1, _game.music_for(GameState.Flow.ROOM)])
+	_game.run = was_run
 	_game.errors.resize(errors_before)
 	(_game.get_node("ErrorLayer/ErrorBadge") as TextureRect).visible = false
 
@@ -358,6 +385,7 @@ func _test_sfx_on_actions() -> void:
 	var room := await _load_room()
 	if room == null:
 		return
+	_check(_game.audio.music == "wing_04", name, "the slice room (The Starry Night) plays %s, not wing_04's loop" % _game.audio.music)
 	var played := _game.audio.played
 	played.clear()
 	room.mime.walk_to(room.mime.position + Vector2(-60, 0))
@@ -379,6 +407,7 @@ func _test_sfx_on_actions() -> void:
 	room._escape()
 	await create_timer((Results.STAR_GAP + Results.POP_TIME) * 3.0 + 0.1).timeout
 	_check(played.count(&"escape") == 1 and played.count(&"star") + played.count(&"no_star") == 3, name, "the escape and its three stars did not sound once each: %s" % [played])
+	_check(_game.audio.music == "results", name, "the results play %s, not the results loop" % _game.audio.music)
 	# The swap and escape are this room's run's: the next room starts a fresh one. The
 	# results overlay would cover the next test's loose canvas, so the room goes.
 	_game.run = null

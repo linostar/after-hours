@@ -33,6 +33,7 @@ func _fit(game: GameState) -> void:
 ## Shows the overlay and pops in `stars` (Stars.Star order).
 func present(stars: Array[bool]) -> void:
 	show()
+	(get_node(GameState.AUTOLOAD_PATH) as GameState).audio.play_music("results")
 	_replay.grab_focus()
 	var pops := create_tween()
 	for i in _stars.size():

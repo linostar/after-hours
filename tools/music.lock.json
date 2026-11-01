@@ -1,0 +1,58 @@
+{
+  "caper": {
+    "samples": 975238,
+    "seconds": 30.476,
+    "sha256": "fbb8eb954ba04619c0852e3badf0b5a401040e06c6782936d9b0eb108f58c4bb",
+    "mp3_sha256": "032554655081621ab9d57ec8b91daf991bcae93dd58ace590588b3585fe7e7cc",
+    "mp3_bytes": 305640
+  },
+  "wing_01": {
+    "samples": 1228800,
+    "seconds": 38.4,
+    "sha256": "7300274fb27c85135e67f0cafb6a20eeaae6916c9ca7a62b952c7bf581390a6f",
+    "mp3_sha256": "83479568894f0113b609e0f39819e2733729d3ed21cd07d2047bdab7ec706036",
+    "mp3_bytes": 384840
+  },
+  "wing_02": {
+    "samples": 1462857,
+    "seconds": 45.714,
+    "sha256": "3aa752ab040edd41166c4d17092359fa6e79cdb01352274df41e27fd0a23fa9f",
+    "mp3_sha256": "e61e0b0971498cb56cff46868cb2355a45df50e29b94ff3067bcad549df3397f",
+    "mp3_bytes": 457920
+  },
+  "wing_03": {
+    "samples": 930909,
+    "seconds": 29.091,
+    "sha256": "edacbf54dfe85bb897f9ac13aeafe767950dbdaa730a48aa0201d381535e6264",
+    "mp3_sha256": "e74fb47c9c2b46c9507782e78e1f0f33eadd66be908b28b002ef49f0b0b03df0",
+    "mp3_bytes": 291960
+  },
+  "wing_04": {
+    "samples": 1280000,
+    "seconds": 40.0,
+    "sha256": "31f6f4a07b791b64ed1f48057618ebfc1e210e0cb66a93c61d781e9e7a3321e1",
+    "mp3_sha256": "61337231423c03732a28d3b27926f00215c4dd53fbf5a169c2fe35a50ea70235",
+    "mp3_bytes": 401040
+  },
+  "wing_05": {
+    "samples": 1097143,
+    "seconds": 34.286,
+    "sha256": "ac3678ac5c8e6351265d9e54c68475695632f3db01693bc48f2488d33730f333",
+    "mp3_sha256": "36b3ce5548dacd1832c9582e4e36c8f4c372c05d2f5dc4a9d6a5f194cb0dac63",
+    "mp3_bytes": 343800
+  },
+  "wing_06": {
+    "samples": 1335652,
+    "seconds": 41.739,
+    "sha256": "959c6ed243f8e17cbb812e99ba0f3c0a74a1ac4251540363ef909bb3bb5822d5",
+    "mp3_sha256": "0f34771899a99bf6cefa43e29c32bab8c9a3869c08f528ec0475ff451a1e3c23",
+    "mp3_bytes": 418320
+  },
+  "results": {
+    "samples": 731429,
+    "seconds": 22.857,
+    "sha256": "1ff3acb9800a8c6742f1d29ff419138720d492232f0635790b4bbcba8d0ed31c",
+    "mp3_sha256": "7418bcf641adb2805e6e7942f0a233c26c394a4a20e25f9b758825300c295397",
+    "mp3_bytes": 229320
+  }
+}
