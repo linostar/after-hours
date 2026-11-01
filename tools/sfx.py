@@ -366,11 +366,6 @@ def fx_creature(rng):
     return mix((chirp, 0, 1.0), (chirp, 0.12, 0.8))
 
 
-def fx_carry(rng):
-    """The original in hand, the exit glowing: a sly rising vibraphone figure."""
-    return arpeggio([C5, Eb5, F5, Gb5], 0.08, 0.5, 8.0, VIBES)
-
-
 def fx_escape(rng):
     """Out with the original: a jaunty pizzicato-and-vibes run up to a held F."""
     return mix((arpeggio([C5, Eb5, F5, A5, C6], 0.09, 0.4, 9.0, PIZZ), 0, 1.0),
@@ -452,7 +447,6 @@ EFFECTS = {
     "fake_found": (fx_fake_found, 0.43, "stinger"),
     "searchlight": (fx_searchlight, 0.25, "event"),
     "creature": (fx_creature, 0.2, "event"),
-    "carry": (fx_carry, 0.34, "event"),
     "escape": (fx_escape, 0.5, "stinger"),
     "star": (fx_star, 0.42, "stinger"),
     "no_star": (fx_no_star, 0.57, "event"),

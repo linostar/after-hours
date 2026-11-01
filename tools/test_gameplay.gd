@@ -101,6 +101,7 @@ func _tests() -> Array[Callable]:
 		_test_title_arrives,
 		_test_report_error_shows_badge,
 		_test_sfx_files,
+		_test_sfx_on_actions,
 		_test_detection_cone,
 		_test_detection_suspicion,
 		_test_detection_light,
@@ -346,6 +347,43 @@ func _test_sfx_files() -> void:
 	_check(_game.errors.size() == errors_before + 1 and audio.played.back() == &"tilt", name, "an unknown sound is not reported, or it was played")
 	_game.errors.resize(errors_before)
 	(_game.get_node("ErrorLayer/ErrorBadge") as TextureRect).visible = false
+
+
+## Every action sounds (AC 35): walking tiptoes; a tilt; hiding and stepping out; the swap;
+## a guard's chase alert; a catch's bonk, toss and landing; the pause button's tap with the
+## pause and resume; the escape and each results star.
+func _test_sfx_on_actions() -> void:
+	var name := "sfx_on_actions"
+	_game.run = null
+	var room := await _load_room()
+	if room == null:
+		return
+	var played := _game.audio.played
+	played.clear()
+	room.mime.walk_to(room.mime.position + Vector2(-60, 0))
+	for i in 30:
+		await physics_frame
+	room._tilt(room.get_node("Frames").get_child(0) as TiltFrame)
+	room._hide_in(room.get_node("Portraits").get_child(0) as HidingPortrait)
+	room._step_out()
+	room._swap()
+	room.guard.intent = GuardBrain.Intent.CHASE
+	room.guard._show_intent()
+	room._on_caught()
+	await create_timer(Room.TOSS_SHAKE + Room.TOSS_FLIGHT + 0.2).timeout
+	(room.get_node("PauseButton") as Button).pressed.emit()
+	room.pause_menu.resume()
+	for id: StringName in [&"tiptoe", &"tilt", &"hide", &"unhide", &"swap", &"guard_alert", &"caught", &"toss", &"land", &"ui_tap", &"pause", &"resume"]:
+		_check(id in played, name, "%s did not sound; played %s" % [id, played])
+	played.clear()
+	room._escape()
+	await create_timer((Results.STAR_GAP + Results.POP_TIME) * 3.0 + 0.1).timeout
+	_check(played.count(&"escape") == 1 and played.count(&"star") + played.count(&"no_star") == 3, name, "the escape and its three stars did not sound once each: %s" % [played])
+	# The swap and escape are this room's run's: the next room starts a fresh one. The
+	# results overlay would cover the next test's loose canvas, so the room goes.
+	_game.run = null
+	room.queue_free()
+	await process_frame
 
 
 func _test_save_shape() -> void:

@@ -29,6 +29,7 @@ func open() -> void:
 	get_tree().paused = true
 	show()
 	_resume.grab_focus()
+	_game.audio.play(&"pause")
 	print("[Pause] Paused")
 
 
@@ -38,6 +39,7 @@ func resume() -> void:
 	_settings.hide()
 	hide()
 	get_tree().paused = false
+	_game.audio.play(&"resume")
 	print("[Pause] Resumed")
 
 

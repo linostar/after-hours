@@ -32,6 +32,11 @@ func noise_at(_point: Vector2) -> float:
 	return 0.0
 
 
+## The sound of a loud footstep at `point` (where noise_at is above 0).
+func noise_sound(_point: Vector2) -> StringName:
+	return &"tiptoe"
+
+
 func clue_seen_by(_guard: Guard) -> Vector2:
 	return Vector2.INF
 

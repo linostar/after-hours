@@ -52,6 +52,15 @@ func noise_at(point: Vector2) -> float:
 	return loudest
 
 
+## The loudest part's footstep sound.
+func noise_sound(point: Vector2) -> StringName:
+	var loudest: Gimmick = null
+	for part in parts():
+		if loudest == null or part.noise_at(point) > loudest.noise_at(point):
+			loudest = part
+	return loudest.noise_sound(point) if loudest != null else &"tiptoe"
+
+
 func clue_seen_by(guard: Guard) -> Vector2:
 	for part in parts():
 		var clue := part.clue_seen_by(guard)

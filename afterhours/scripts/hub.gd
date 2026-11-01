@@ -79,6 +79,7 @@ func _physics_process(delta: float) -> void:
 	if _target != null and not mime.walking and mime.position.distance_to(_target.position) <= Door.REACH:
 		var door := _target
 		_target = null
+		_game.audio.play(&"door")
 		if door == hideout_door:
 			print("[Hub] Into the hideout")
 			_game.goto(GameState.Flow.HIDEOUT)

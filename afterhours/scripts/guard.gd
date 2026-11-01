@@ -67,6 +67,14 @@ const INTENT_ICONS: Dictionary[GuardBrain.Intent, Texture2D] = {
 	GuardBrain.Intent.SEARCH: preload("res://art/svg/icon_query.svg"),
 	GuardBrain.Intent.CHASE: preload("res://art/svg/icon_alarm.svg"),
 }
+## The sound each intent's icon pops in with (Audio.SFX_IDS).
+const INTENT_SOUNDS: Dictionary[GuardBrain.Intent, StringName] = {
+	GuardBrain.Intent.INVESTIGATE: &"guard_hear",
+	GuardBrain.Intent.STRAIGHTEN: &"guard_hear",
+	GuardBrain.Intent.INSPECT: &"guard_suspect",
+	GuardBrain.Intent.SEARCH: &"guard_suspect",
+	GuardBrain.Intent.CHASE: &"guard_alert",
+}
 const ICON_SCALE := 0.6
 const ICON_POP := 0.2
 
@@ -227,8 +235,10 @@ func nav_path() -> PackedVector2Array:
 	return _agent.get_current_navigation_path()
 
 
-## Pops in the icon of the current intent (none while patrolling).
+## Pops in the icon of the current intent (none while patrolling) with its sound.
 func _show_intent() -> void:
+	if INTENT_SOUNDS.has(intent):
+		Audio.play_for(self, INTENT_SOUNDS[intent])
 	_icon.visible = INTENT_ICONS.has(intent)
 	if not _icon.visible:
 		return
@@ -320,6 +330,7 @@ func _straighten(delta: float) -> void:
 	if _straighten_left > 0.0:
 		return
 	_straighten_frame.straighten()
+	Audio.play_for(self, &"straighten")
 	if senses.noise_heard and noise_point.distance_to(_straighten_frame.view_point()) < NOISE_EXPLAINED:
 		senses.noise_heard = false
 	print("[Guard] %s straightens the frame at %s" % [name, _straighten_frame.position.round()])
@@ -334,6 +345,7 @@ func _search(delta: float) -> void:
 	facing = facing.rotated(SEARCH_TURN * delta)
 	if senses.search_left <= 0.0:
 		print("[Guard] %s gives up the search" % name)
+		Audio.play_for(self, &"guard_lost")
 
 
 func _inspect(delta: float) -> void:

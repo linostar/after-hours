@@ -59,6 +59,7 @@ func rect() -> Rect2:
 
 ## Shakes the chain of a locked door.
 func rattle() -> void:
+	Audio.play_for(self, &"chain_rattle")
 	var swing := create_tween()
 	for angle: float in [RATTLE_ANGLE, -RATTLE_ANGLE, RATTLE_ANGLE / 2.0, 0.0]:
 		swing.tween_property(self, "_rattle", angle, RATTLE_TIME / 4.0)

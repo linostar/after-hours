@@ -8,6 +8,9 @@ extends Node2D
 
 ## Walking speed in base units per second.
 const SPEED := 170.0
+## A quiet tiptoe sounds every this many seconds of walking, but not on noisy floor (the room
+## plays the gimmick's loud step there).
+const TIPTOE_GAP := 0.32
 const RING_CENTER := Vector2(34, -84)
 const RING_RADIUS := 14.0
 const RING_TRACK := Color(0.1, 0.08, 0.13, 0.7)
@@ -47,6 +50,8 @@ var painting := "starry_night":
 			_carried.painting = value
 
 @onready var _carried: FramedPainting = $Carried
+var _tiptoe_wait := 0.0
+var _tiptoes := 0
 
 
 func _ready() -> void:
@@ -73,6 +78,7 @@ func nudge(direction: Vector2, delta: float) -> void:
 		return
 	position = NavigationServer2D.map_get_closest_point(map, step)
 	_agent.target_position = position
+	_tiptoe(delta)
 
 
 ## Walking speed where it stands: SPEED, slowed by the gimmick.
@@ -102,6 +108,19 @@ func _physics_process(delta: float) -> void:
 		return
 	var next := _agent.get_next_path_position()
 	position = position.move_toward(next, speed() * delta)
+	_tiptoe(delta)
+
+
+## Counts down walking time to the next tiptoe (pitched up and down in turn).
+func _tiptoe(delta: float) -> void:
+	_tiptoe_wait -= delta
+	if _tiptoe_wait > 0.0:
+		return
+	_tiptoe_wait = TIPTOE_GAP
+	if gimmick != null and gimmick.noise_at(position) > 0.0:
+		return
+	_tiptoes += 1
+	Audio.play_for(self, &"tiptoe", 0.92 if _tiptoes % 2 == 0 else 1.08)
 
 
 func _draw() -> void:

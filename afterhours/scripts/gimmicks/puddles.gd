@@ -103,8 +103,19 @@ func noise_at(point: Vector2) -> float:
 	return LOUD if wet(point) else 0.0
 
 
+func noise_sound(_point: Vector2) -> StringName:
+	return &"splash"
+
+
+## Moves time on; a pipe that starts gushing sounds its burst.
 func tick(delta: float) -> void:
+	var was: Array[bool] = []
+	for i in puddles.size():
+		was.append(usable(i) and gushing(i))
 	_time += delta
+	for i in puddles.size():
+		if usable(i) and gushing(i) and not was[i]:
+			Audio.play_for(self, &"pipe_burst")
 	queue_redraw()
 	if _spray != null:
 		_spray.queue_redraw()

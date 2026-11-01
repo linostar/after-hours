@@ -35,6 +35,11 @@ const GRADE_ICONS: Dictionary[Forgery.Grade, Texture2D] = {
 	Forgery.Grade.GOOD: preload("res://art/svg/grade_good.svg"),
 	Forgery.Grade.PERFECT: preload("res://art/svg/grade_perfect.svg"),
 }
+const GRADE_SOUNDS: Dictionary[Forgery.Grade, StringName] = {
+	Forgery.Grade.SLOPPY: &"grade_sloppy",
+	Forgery.Grade.GOOD: &"grade_good",
+	Forgery.Grade.PERFECT: &"grade_perfect",
+}
 
 ## The painting's ghost strokes in canvas units (pad-local), traced in order.
 @export var ghosts: Array[PackedVector2Array] = []
@@ -153,6 +158,8 @@ func _on_stroke_started(at: Vector2) -> void:
 		return
 	_painting = true
 	_current = PackedVector2Array([at])
+	# A ghost of one point is a dab; any other is dragged.
+	_game.audio.play(&"dab" if ghosts[traced.size()].size() == 1 else &"brush")
 
 
 func _on_stroke_moved(at: Vector2) -> void:
@@ -169,6 +176,7 @@ func _on_stroke_ended(at: Vector2) -> void:
 	traced.append(_current)
 	print("[Forgery] Stroke %d of %d traced (%d points, quality %.2f)" % [traced.size(), ghosts.size(), _current.size(), Forgery.stroke_quality(ghost, _current)])
 	_current = PackedVector2Array()
+	_game.audio.play(&"stroke_done", pow(2.0, float(traced.size() - 1) / 12.0))
 	if is_finished():
 		_finish(Forgery.quality(ghosts, traced))
 
@@ -190,6 +198,7 @@ func _finish(fake_quality: float) -> void:
 	var fake_grade := Forgery.grade(fake_quality)
 	print("[Forgery] Fake painted: quality %.2f, %s" % [fake_quality, Forgery.Grade.keys()[fake_grade]])
 	_grade.texture = GRADE_ICONS[fake_grade]
+	_game.audio.play(GRADE_SOUNDS[fake_grade])
 	_grade.scale = Vector2.ZERO
 	_grade.show()
 	_assist.hide()

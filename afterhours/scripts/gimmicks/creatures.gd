@@ -38,6 +38,10 @@ func noise_at(point: Vector2) -> float:
 	return 0.0
 
 
+func noise_sound(_point: Vector2) -> StringName:
+	return &"creature"
+
+
 func tick(delta: float) -> void:
 	_time += delta
 	queue_redraw()

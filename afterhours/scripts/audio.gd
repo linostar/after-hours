@@ -3,6 +3,7 @@ extends Node
 ## The game's sound, a child of Game (Game.audio; not an autoload of its own). play(id) plays
 ## sound effect audio/sfx/<id>.wav (tools/sfx.py) on the SFX bus from a pool of VOICES players
 ## taken in turn, and logs "[Audio] SFX <id>". It runs while the tree is paused (menu sounds).
+## Every button in the tree sounds when used: a toggle its on or off tick, any other the tap.
 
 const SFX_PATH := "res://audio/sfx/%s.wav"
 ## Every sound effect: tools/sfx.py EFFECTS makes one file per id (a test checks both agree).
@@ -10,10 +11,12 @@ const SFX_IDS: Array[StringName] = [
 	&"tiptoe", &"splash", &"pipe_burst", &"tilt", &"straighten", &"hide", &"unhide", &"brush",
 	&"dab", &"stroke_done", &"grade_perfect", &"grade_good", &"grade_sloppy", &"swap", &"door",
 	&"chain_rattle", &"caught", &"toss", &"land", &"guard_hear", &"guard_suspect", &"guard_alert",
-	&"guard_lost", &"fake_found", &"searchlight", &"creature", &"carry", &"escape", &"star",
+	&"guard_lost", &"fake_found", &"searchlight", &"creature", &"escape", &"star",
 	&"no_star", &"ui_tap", &"toggle_on", &"toggle_off", &"pause", &"resume", &"error",
 ]
 const SFX_BUS := &"SFX"
+## The audio driver of headless runs: sounds are only logged there.
+const SILENT_DRIVER := "Dummy"
 const VOICES := 8
 ## played keeps the ids of this many latest sounds (tests read it).
 const LOG_SIZE := 64
@@ -34,6 +37,14 @@ func _ready() -> void:
 		player.bus = SFX_BUS
 		add_child(player)
 		_players.append(player)
+	get_tree().node_added.connect(_on_node_added)
+
+
+## Plays sound `id` for `node` (Game.audio.play); a node outside the tree (a test's loose
+## gimmick) is not in the game and makes no sound.
+static func play_for(node: Node, id: StringName, pitch := 1.0) -> void:
+	if node.is_inside_tree():
+		(node.get_node(GameState.AUTOLOAD_PATH) as GameState).audio.play(id, pitch)
 
 
 ## Plays sound effect `id` (one of SFX_IDS) at `pitch`; an unknown or missing sound is
@@ -50,7 +61,19 @@ func play(id: StringName, pitch := 1.0) -> void:
 	_next = (_next + 1) % VOICES
 	player.stream = stream
 	player.pitch_scale = pitch
-	player.play()
+	# The Dummy driver (headless runs) never mixes, so a started sound would never finish.
+	if AudioServer.get_driver_name() != SILENT_DRIVER:
+		player.play()
+
+
+func _on_node_added(node: Node) -> void:
+	var button := node as BaseButton
+	if button == null:
+		return
+	if button.toggle_mode:
+		button.toggled.connect(func(on: bool) -> void: play(&"toggle_on" if on else &"toggle_off"))
+	else:
+		button.pressed.connect(play.bind(&"ui_tap"))
 
 
 func _stream(id: StringName) -> AudioStream:

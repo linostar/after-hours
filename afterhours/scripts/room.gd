@@ -340,6 +340,7 @@ func _step_noise(delta: float) -> void:
 	if not mime.walking or loudness <= 0.0 or _step_noise_wait > 0.0:
 		return
 	_step_noise_wait = Gimmick.STEP_NOISE_GAP
+	_game.audio.play(gimmick.noise_sound(mime.position))
 	var heard := nearest_in_earshot(mime.position, GuardBrain.HEARING_RANGE * loudness)
 	if heard != null:
 		heard.hear(mime.position)
@@ -369,6 +370,7 @@ func _leave(door: Door) -> void:
 	mime.place_at(mime.position)
 	_give_run()
 	print("[Room] Through the door to room %d at t %.2f" % [door.to_room, elapsed])
+	_game.audio.play(&"door")
 	_game.enter_room(door.to_room)
 
 
@@ -480,10 +482,12 @@ func _hide_in(portrait: HidingPortrait) -> void:
 	else:
 		_style_view.show()
 	print("[Room] Hid in the portrait at %s at t %.2f (seen going in: %s)" % [portrait.position.round(), elapsed, seen])
+	_game.audio.play(&"hide")
 
 
 func _step_out() -> void:
 	print("[Room] Stepped out of the portrait at %s at t %.2f" % [hidden_in.position.round(), elapsed])
+	_game.audio.play(&"unhide")
 	hidden_in.occupied = false
 	hidden_in = null
 	mime.visible = true
@@ -493,6 +497,7 @@ func _step_out() -> void:
 func _tilt(frame: TiltFrame) -> void:
 	tilt_target = null
 	frame.tilt()
+	_game.audio.play(&"tilt")
 	var heard := nearest_in_earshot(frame.view_point())
 	if heard != null:
 		heard.hear(frame.view_point())
@@ -533,6 +538,7 @@ func _swap() -> void:
 	if exit_door != null:
 		exit_door.glowing = true
 	print("[Room] Swapped the forgery for the original at t %.2f (fake %s)" % [elapsed, Forgery.Grade.keys()[Forgery.grade(fake_quality)]])
+	_game.audio.play(&"swap")
 
 
 func _on_inspected(by: Guard) -> void:
@@ -543,6 +549,7 @@ func _on_inspected(by: Guard) -> void:
 	if not noticed:
 		return
 	found_out = true
+	_game.audio.play(&"fake_found")
 	_fake_icon.texture = ALARM_ICON
 	_fake_icon.show()
 	for each in guards:
@@ -557,6 +564,7 @@ func _escape() -> void:
 	mime.place_at(mime.position)
 	stars = Stars.earned(ever_seen, elapsed, par_time)
 	print("[Room] Escaped with the original at t %.2f (par %.0f, seen %s)" % [elapsed, par_time, ever_seen])
+	_game.audio.play(&"escape")
 	_game.record_escape(stars, elapsed)
 	_results.present(stars)
 
@@ -578,9 +586,11 @@ func _on_caught() -> void:
 	var from := mime.position
 	mime.place_at(from)
 	print("[Room] Caught (%d) at t %.2f: tossing the mime from %s to the entrance" % [catches, elapsed, from.round()])
+	_game.audio.play(&"caught")
 	var toss := create_tween()
 	for angle: float in [SHAKE_ANGLE, -SHAKE_ANGLE, SHAKE_ANGLE, 0.0]:
 		toss.tween_property(mime, "rotation", angle, TOSS_SHAKE / 4.0)
+	toss.tween_callback(_game.audio.play.bind(&"toss"))
 	toss.tween_method(_toss_step.bind(from), 0.0, 1.0, TOSS_FLIGHT)
 	toss.finished.connect(_end_toss)
 
@@ -598,4 +608,5 @@ func _end_toss() -> void:
 		each.reset()
 		each.watches_fake = fake_hung and not found_out
 	tossing = false
+	_game.audio.play(&"land")
 	print("[Room] The mime is back at the entrance at t %.2f" % elapsed)

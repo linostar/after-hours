@@ -71,6 +71,7 @@ func clue_seen_by(guard: Guard) -> Vector2:
 	if guard.global_position.distance_to(mime.position) >= GuardBrain.HEARING_RANGE:
 		return Vector2.INF
 	_revealed = true
+	Audio.play_for(self, &"searchlight")
 	return mime.position
 
 

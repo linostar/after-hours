@@ -40,6 +40,7 @@ func present(stars: Array[bool]) -> void:
 		star.texture = STAR_EARNED if stars[i] else STAR_MISSED
 		star.scale = Vector2.ZERO
 		pops.tween_interval(STAR_GAP)
+		pops.tween_callback(Audio.play_for.bind(self, &"star" if stars[i] else &"no_star", pow(2.0, i * 4.0 / 12.0)))
 		pops.tween_property(star, "scale", Vector2.ONE, POP_TIME).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	print("[Results] Stars %s (%d of 3)" % [stars, Stars.count(stars)])
 	# Where the buttons landed (screen base units), for the web smoke test's taps.
