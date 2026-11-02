@@ -78,6 +78,16 @@ func _ready() -> void:
 	get_tree().node_added.connect(_on_node_added)
 
 
+## At quit every player stops and lets go of its stream: a stream still playing when the
+## autoload is torn down leaks its playback (seen quitting mid-room in the step 10 playtest).
+func _exit_tree() -> void:
+	if _fade != null:
+		_fade.kill()
+	for player: AudioStreamPlayer in _players + _music_players + [_voice]:
+		player.stop()
+		player.stream = null
+
+
 ## Plays sound `id` for `node` (Game.audio.play); a node outside the tree (a test's loose
 ## gimmick) is not in the game and makes no sound.
 static func play_for(node: Node, id: StringName, pitch := 1.0) -> void:
