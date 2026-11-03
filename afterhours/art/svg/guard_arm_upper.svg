@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="12" height="18" viewBox="0 0 12 18">
+  <defs>
+    <linearGradient id="tunic" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#3b4c86"/>
+      <stop offset="0.45" stop-color="#2c3a6b"/>
+      <stop offset="1" stop-color="#1c2650"/>
+    </linearGradient>
+  </defs>
+  <rect x="1" y="0.6" width="10" height="16.8" rx="5" fill="url(#tunic)" stroke="#141022" stroke-width="1.1"/>
+  <path d="M3.6 4 L3.6 12" stroke="#46548a" stroke-width="0.9" stroke-linecap="round"/>
+</svg>

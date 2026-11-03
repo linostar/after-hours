@@ -191,6 +191,7 @@ func _tests() -> Array[Callable]:
 		_test_juice_on_actions,
 		_test_rig_views,
 		_test_rig_walk_cycle,
+		_test_rig_joints_bend,
 		_test_mime_faces_its_way,
 		_test_ghost_faces_travel,
 		_test_no_flash_rates,
@@ -1694,8 +1695,10 @@ func _test_rig_views() -> void:
 	root.add_child(rig)
 	rig.face(Vector2.LEFT)
 	_check(rig.scale.x == -1.0 and (rig.get_node("Body") as Sprite2D).texture == rig.body_side, name, "facing left does not mirror the side view")
+	_check((rig.get_node("Leg1/Shin") as Sprite2D).texture == rig.leg_lower_side, name, "the side view's shin is not the side shoe")
 	rig.face(Vector2.UP)
 	_check(rig.scale.x == 1.0 and (rig.get_node("Body") as Sprite2D).texture == rig.body_back, name, "facing up does not show the back")
+	_check((rig.get_node("Leg1/Shin") as Sprite2D).texture == rig.leg_lower, name, "the back view's shin is not the front-and-back shoe")
 	rig.free()
 
 
@@ -1720,6 +1723,45 @@ func _test_rig_walk_cycle() -> void:
 		rig.walk(0.0, 1.0 / 60.0)
 	_check(rig.phase == phase and rig.stride == 0.0 and leg.rotation == 0.0, name, "standing still the cycle moved or the limbs did not settle (stride %.2f, leg %.2f)" % [rig.stride, leg.rotation])
 	rig.free()
+
+
+## Every limb of both rigs is two parts at a joint (upper arm and forearm, thigh and shin),
+## drawn from SVGs imported at ART_SCALE; walking bends every knee and elbow in every view
+## (front, back, side, mirrored left), and standing still straightens them all; the bend
+## leaves the footfalls' timing as it was.
+func _test_rig_joints_bend() -> void:
+	var name := "rig_joints_bend"
+	const V := CharacterRig.View
+	for path: String in ["res://scenes/rig_mime.tscn", "res://scenes/rig_guard.tscn"]:
+		var rig := (load(path) as PackedScene).instantiate() as CharacterRig
+		root.add_child(rig)
+		var joints: Array[Sprite2D] = []
+		for limb: String in ["Arm0/Forearm", "Arm1/Forearm", "Leg0/Shin", "Leg1/Shin"]:
+			var lower := rig.get_node_or_null(limb) as Sprite2D
+			_check(lower != null and lower.get_parent() is Sprite2D, name, "%s has no %s on an upper part" % [path, limb])
+			if lower != null:
+				joints.append(lower)
+		if joints.size() < 4:
+			rig.free()
+			continue
+		var body := rig.get_node("Body") as Sprite2D
+		# Imported at 1x the body would be no taller than its feet anchor in base units.
+		_check(body.scale == Vector2.ONE / CharacterRig.ART_SCALE and rig.body_front.get_height() > rig.feet_at.y * CharacterRig.ART_SCALE * 0.9, name, "%s's body is not imported at ART_SCALE and drawn back at its inverse (%s, scale %s)" % [path, rig.body_front.get_size(), body.scale])
+		for view: V in [V.FRONT, V.BACK, V.RIGHT, V.LEFT]:
+			rig.face(([Vector2.DOWN, Vector2.UP, Vector2.RIGHT, Vector2.LEFT] as Array[Vector2])[view])
+			_check(rig.view == view, name, "%s did not turn to %s" % [path, V.keys()[view]])
+			var bent: Array[float] = [0.0, 0.0, 0.0, 0.0]
+			for i in 120:
+				rig.walk(rig.step_length / 15.0, 1.0 / 60.0)
+				for j in 4:
+					bent[j] = maxf(bent[j], absf(joints[j].rotation))
+			for j in 4:
+				_check(bent[j] > 0.15, name, "%s walking %s: %s bent only %.2f rad" % [path, V.keys()[view], joints[j].get_parent().name + "/" + joints[j].name, bent[j]])
+			for i in 30:
+				rig.walk(0.0, 1.0 / 60.0)
+			for j in 4:
+				_check(joints[j].rotation == 0.0 and (joints[j].get_parent() as Sprite2D).rotation == 0.0, name, "%s standing %s: %s is not straight (%.2f)" % [path, V.keys()[view], joints[j].get_parent().name, joints[j].rotation])
+		rig.free()
 
 
 ## The mime faces the way it walks (a path walk and a keyboard nudge), keeps its facing when

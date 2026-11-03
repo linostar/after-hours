@@ -1,19 +1,28 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://scripts/character_rig.gd" id="1_rig"]
 [ext_resource type="Texture2D" path="res://art/svg/guard_body_front.svg" id="2_front"]
 [ext_resource type="Texture2D" path="res://art/svg/guard_body_back.svg" id="3_back"]
 [ext_resource type="Texture2D" path="res://art/svg/guard_body_side.svg" id="4_side"]
-[ext_resource type="Texture2D" path="res://art/svg/guard_arm.svg" id="5_arm"]
-[ext_resource type="Texture2D" path="res://art/svg/guard_leg.svg" id="6_leg"]
+[ext_resource type="Texture2D" path="res://art/svg/guard_arm_upper.svg" id="5_arm_upper"]
+[ext_resource type="Texture2D" path="res://art/svg/guard_arm_lower.svg" id="6_arm_lower"]
+[ext_resource type="Texture2D" path="res://art/svg/guard_leg_upper.svg" id="7_leg_upper"]
+[ext_resource type="Texture2D" path="res://art/svg/guard_leg_lower.svg" id="8_leg_lower"]
+[ext_resource type="Texture2D" path="res://art/svg/guard_leg_lower_side.svg" id="9_leg_lower_side"]
 
 [node name="Rig" type="Node2D"]
+texture_filter = 4
 script = ExtResource("1_rig")
 body_front = ExtResource("2_front")
 body_back = ExtResource("3_back")
 body_side = ExtResource("4_side")
-arm = ExtResource("5_arm")
-leg = ExtResource("6_leg")
+arm_upper = ExtResource("5_arm_upper")
+arm_lower = ExtResource("6_arm_lower")
+leg_upper = ExtResource("7_leg_upper")
+leg_lower = ExtResource("8_leg_lower")
+leg_lower_side = ExtResource("9_leg_lower_side")
+elbow = 14.0
+knee = 14.5
 feet_at = Vector2(28, 96)
 hip = Vector2(6.5, -30)
 shoulder = Vector2(21.5, -54)
@@ -24,3 +33,6 @@ arm_swing = 0.3
 lift = 4.0
 bob = 1.5
 shadow_radius = 18.0
+knee_bend = 0.7
+elbow_rest = 0.15
+elbow_bend = 0.4

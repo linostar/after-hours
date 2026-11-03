@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="12" height="20" viewBox="0 0 12 20">
+  <defs>
+    <linearGradient id="cloth" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#3a3546"/>
+      <stop offset="0.45" stop-color="#25212e"/>
+      <stop offset="1" stop-color="#16131c"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="0" width="8" height="16" rx="3.8" fill="url(#cloth)" stroke="#1b1622" stroke-width="1.1"/>
+  <path d="M4.2 3 L4.2 13" stroke="#4a4458" stroke-width="0.8" stroke-linecap="round"/>
+  <ellipse cx="6" cy="17" rx="5.4" ry="2.8" fill="#121016" stroke="#1b1622" stroke-width="0.9"/>
+  <ellipse cx="4.6" cy="16" rx="2" ry="0.9" fill="#4a4458"/>
+</svg>
