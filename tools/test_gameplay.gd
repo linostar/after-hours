@@ -148,6 +148,7 @@ func _tests() -> Array[Callable]:
 		_test_intent_icons_and_overlay,
 		_test_keyboard_walks_and_interacts,
 		_test_guard_pauses_facing_its_leg,
+		_test_guard_turns_smoothly,
 		_test_catches_during_swap_and_while_carrying,
 		_test_title_play_opens_hub,
 		_test_title_logo_sways,
@@ -1027,10 +1028,42 @@ func _test_guard_pauses_facing_its_leg() -> void:
 	for i in roundi(Guard.WAYPOINT_PAUSE * 60.0) - 4:
 		await physics_frame
 	_check(room.guard.position == corner and room.guard.facing.is_equal_approx(first_leg), name, "during the pause the guard faces %s, not its finished leg %s" % [room.guard.facing, first_leg])
-	for i in 12:
+	for i in 6:
 		await physics_frame
 	var next_leg := (room.guard.route[2] - corner).normalized()
-	_check(room.guard.facing.is_equal_approx(next_leg), name, "after the pause the guard faces %s, not its next leg %s" % [room.guard.facing, next_leg])
+	# It turns toward the next leg at TURN_RATE: not snapped, and there within the turn's time.
+	_check(not room.guard.facing.is_equal_approx(next_leg), name, "the guard snapped to its next leg instead of turning")
+	for i in ceili(absf(first_leg.angle_to(next_leg)) / Guard.TURN_RATE * 60.0) + 2:
+		await physics_frame
+	_check(room.guard.facing.is_equal_approx(next_leg), name, "after the pause and its turn the guard faces %s, not its next leg %s" % [room.guard.facing, next_leg])
+
+
+## A guard turns toward a new heading at TURN_RATE, never snapping: a noise behind it turns
+## it round on the spot first (a turn sharper than TURN_IN_PLACE), then it walks; its sight
+## and its drawing turn with it.
+func _test_guard_turns_smoothly() -> void:
+	var name := "guard_turns_smoothly"
+	var room := await _load_room()
+	if room == null:
+		return
+	room.mime.place_at(Vector2(70, 470))
+	room.mime.visible = false
+	_stand(room.guard, Vector2(700, 470), Vector2.RIGHT)
+	await physics_frame
+	var noise := Vector2(400, 470)
+	room.guard.hear(noise)
+	await physics_frame
+	await physics_frame
+	var turned := absf(Vector2.RIGHT.angle_to(room.guard.facing))
+	_check(turned > 0.0 and turned < PI / 2.0, name, "two frames after a noise behind it the guard has turned %.2f rad (snapped, or not turning)" % turned)
+	_check(room.guard.position == Vector2(700, 470), name, "the guard walked off before turning round (at %s)" % room.guard.position)
+	_check(room.guard.can_see(Vector2(780, 470)), name, "mid-turn the guard no longer sees straight ahead where it still half faces")
+	for i in ceili(PI / Guard.TURN_RATE * 60.0) + 2:
+		await physics_frame
+	_check(room.guard.facing.is_equal_approx(Vector2.LEFT) and room.guard.position.x < 700.0, name, "after a half turn's time the guard faces %s at %s, not walking left to the noise" % [room.guard.facing, room.guard.position])
+	_check(room.guard.can_see(Vector2(620, 470)) and not room.guard.can_see(Vector2(780, 470)), name, "the guard's sight did not turn with it")
+	_check(room.guard.rig.view == CharacterRig.View.LEFT and room.guard.rig.stride > 0.0, name, "walking left the guard's drawing shows %s (stride %.2f)" % [CharacterRig.View.keys()[room.guard.rig.view], room.guard.rig.stride])
+	room.mime.visible = true
 
 
 ## A catch mid-swap cancels the swap. A catch while carrying keeps the original (only the

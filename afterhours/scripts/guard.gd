@@ -39,6 +39,10 @@ const INSPECT_TIME := 1.2
 const SEARCH_TIME := 4.0
 ## How fast a searching guard turns to look around (radians per second).
 const SEARCH_TURN := 2.2
+## How fast a guard turns toward a new heading (radians per second: a half turn in 0.3 s);
+## the cone turns with it. A turn sharper than TURN_IN_PLACE is made standing before it walks.
+const TURN_RATE := PI / 0.3
+const TURN_IN_PLACE := PI / 2.0
 ## A chase re-plans its path only once the mime has moved this far from the path's goal.
 const CHASE_REPATH := 8.0
 ## Seconds the guard stands at each waypoint, still facing the leg it walked, before it
@@ -103,12 +107,19 @@ var voice: StringName = &"watchman"
 var patrolling := true
 ## Whether it moves and looks at all (off from a catch until the room resets it).
 var active := true
-var facing := Vector2.RIGHT
+## Where it looks (the cone and sight). Set directly it snaps (a reset, the search's look
+## around, a test); the intents aim a heading instead (_aim) and the guard turns to it.
+var facing := Vector2.RIGHT:
+	set(value):
+		facing = value
+		_heading = value
 var suspicion := 0.0
 ## The hung fake's inspection point, while the room has it watched.
 var watches_fake := false
 var fake_point := Vector2.ZERO
 var inspecting := false
+## The heading the guard is turning toward (TURN_RATE).
+var _heading := Vector2.RIGHT
 ## The room's gimmick (null for none): how lit the mime is where it stands, and how fast
 ## the guard itself walks where it stands (slow_at: it wades through water as the mime does).
 var gimmick: Gimmick
@@ -136,6 +147,8 @@ var _pause := 0.0
 @onready var _cone: Polygon2D = $Cone
 @onready var _agent: NavigationAgent2D = $Agent
 @onready var _icon: Sprite2D = $IntentIcon
+## Its drawing: faces where it looks and strides as it walks.
+@onready var rig: CharacterRig = $Rig
 
 
 ## Back to the start of the route, calm, facing its first leg, its senses cleared. A
@@ -207,7 +220,9 @@ func can_see(point: Vector2) -> bool:
 
 func _physics_process(delta: float) -> void:
 	if not active:
+		rig.walk(0.0, delta)
 		return
+	var from := position
 	_look(delta)
 	_sense_fake()
 	_sense_frames()
@@ -237,7 +252,10 @@ func _physics_process(delta: float) -> void:
 			_straighten(delta)
 		GuardBrain.Intent.PATROL:
 			_patrol(delta)
+	_turn(delta)
 	_update_cone()
+	rig.face(facing)
+	rig.walk(position.distance_to(from), delta)
 
 
 ## Says this guard's next line for `event` in its voice (Audio.say); outside the tree (a
@@ -276,7 +294,30 @@ func _leave(left: GuardBrain.Intent) -> void:
 		_inspect_left = 0.0
 
 
-## Walks the navmesh towards `goal` at `speed`, facing the way it walks; returns whether
+## Aims the guard toward `direction` (it turns there at TURN_RATE); a zero direction keeps
+## the heading (a zero facing would see all round).
+func _aim(direction: Vector2) -> void:
+	if not direction.is_zero_approx():
+		_heading = direction.normalized()
+
+
+## Turns `facing` toward the aimed heading by at most TURN_RATE * `delta`.
+func _turn(delta: float) -> void:
+	var left := facing.angle_to(_heading)
+	if is_zero_approx(left):
+		return
+	var heading := _heading
+	facing = facing.rotated(clampf(left, -TURN_RATE * delta, TURN_RATE * delta))
+	_heading = heading
+
+
+## Whether it faces near enough the aimed heading to walk on (a sharper turn is made
+## standing).
+func _can_step() -> bool:
+	return absf(facing.angle_to(_heading)) <= TURN_IN_PLACE
+
+
+## Walks the navmesh towards `goal` at `speed`, turning the way it walks; returns whether
 ## it has arrived (at the reachable point nearest `goal`).
 func _travel(goal: Vector2, speed: float, delta: float) -> bool:
 	# The agent stays "finished" until a target is submitted again, so a goal reached
@@ -289,10 +330,9 @@ func _travel(goal: Vector2, speed: float, delta: float) -> bool:
 	if _agent.is_navigation_finished():
 		return true
 	var next := _agent.get_next_path_position()
-	# A zero step keeps the old facing: a zero facing would see all round.
-	if not next.is_equal_approx(position):
-		facing = (next - position).normalized()
-	position = position.move_toward(next, speed * _pace() * delta)
+	_aim(next - position)
+	if _can_step():
+		position = position.move_toward(next, speed * _pace() * delta)
 	return false
 
 
@@ -311,8 +351,9 @@ func _patrol(delta: float) -> void:
 	if _returning:
 		_returning = not _travel(goal, PATROL_SPEED, delta)
 		return
-	if not position.is_equal_approx(goal):
-		facing = (goal - position).normalized()
+	_aim(goal - position)
+	if not _can_step():
+		return
 	position = position.move_toward(goal, PATROL_SPEED * _pace() * delta)
 	if position.is_equal_approx(goal):
 		position = goal
@@ -337,7 +378,7 @@ func _investigate(delta: float) -> void:
 	if not _travel(noise_point, INVESTIGATE_SPEED, delta):
 		return
 	senses.noise_heard = false
-	facing = (noise_point - position).normalized() if not noise_point.is_equal_approx(position) else Vector2.UP
+	_aim(noise_point - position if not noise_point.is_equal_approx(position) else Vector2.UP)
 	print("[Guard] %s investigated the noise at %s" % [name, noise_point.round()])
 
 
@@ -345,7 +386,7 @@ func _straighten(delta: float) -> void:
 	if not _travel(_straighten_frame.view_point(), INVESTIGATE_SPEED, delta):
 		_straighten_left = STRAIGHTEN_TIME
 		return
-	facing = Vector2.UP
+	_aim(Vector2.UP)
 	_straighten_left -= delta
 	if _straighten_left > 0.0:
 		return
@@ -374,8 +415,7 @@ func _inspect(delta: float) -> void:
 		inspecting = true
 		_inspect_left = INSPECT_TIME
 		print("[Guard] %s inspects %s" % [name, fake_point.round()])
-	if not fake_point.is_equal_approx(position):
-		facing = (fake_point - position).normalized()
+	_aim(fake_point - position)
 	_inspect_left -= delta
 	if _inspect_left <= 0.0:
 		inspecting = false
