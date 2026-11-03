@@ -31,14 +31,18 @@ const SHADOW := Color(0.0, 0.0, 0.0, 0.35)
 const SHADOW_FLATTEN := 0.27
 ## The rig parts' SVG import scale (svg/scale in their .import files).
 const ART_SCALE := 2.0
-## How far below its top edge a lower part's joint sits (SVG units): its rounded cap.
+## How far below its top edge a forearm's elbow sits (SVG units): its rounded cap.
 const JOINT_CAP := 3.0
+## How far below its top edge a shin's knee sits (SVG units): the centre of its knee
+## circle, the thigh's width across. The thigh ends in a half circle round the same point,
+## unoutlined, and the shin is drawn behind it, so the leg bends as one at the knee.
+const KNEE_CAP := 5.6
 
 @export var body_front: Texture2D
 @export var body_back: Texture2D
 @export var body_side: Texture2D
 ## The limbs, each drawn hanging from its joint: the upper part from shoulder or hip, the
-## lower part from elbow or knee (JOINT_CAP below its top).
+## lower part from elbow or knee (JOINT_CAP or KNEE_CAP below its top).
 @export var arm_upper: Texture2D
 @export var arm_lower: Texture2D
 @export var leg_upper: Texture2D
@@ -116,7 +120,8 @@ static func view_for(heading: Vector2, current: View) -> View:
 func _ready() -> void:
 	for i in 2:
 		_legs.append(_limb("Leg%d" % i, leg_upper))
-		_shins.append(_lower(_legs[i], "Shin", leg_lower, knee))
+		_shins.append(_lower(_legs[i], "Shin", leg_lower, knee, KNEE_CAP))
+		_shins[i].show_behind_parent = true
 	_body = Sprite2D.new()
 	_body.name = "Body"
 	_body.centered = false
@@ -125,7 +130,7 @@ func _ready() -> void:
 	add_child(_body)
 	for i in 2:
 		_arms.append(_limb("Arm%d" % i, arm_upper))
-		_forearms.append(_lower(_arms[i], "Forearm", arm_lower, elbow))
+		_forearms.append(_lower(_arms[i], "Forearm", arm_lower, elbow, JOINT_CAP))
 	_apply()
 
 
@@ -141,13 +146,14 @@ func _limb(limb_name: String, texture: Texture2D) -> Sprite2D:
 	return limb
 
 
-## `upper`'s lower part, hanging from the joint `joint` SVG units down it.
-func _lower(upper: Sprite2D, part_name: String, texture: Texture2D, joint: float) -> Sprite2D:
+## `upper`'s lower part, hanging from the joint `joint` SVG units down it, `cap` SVG units
+## below its own top edge.
+func _lower(upper: Sprite2D, part_name: String, texture: Texture2D, joint: float, cap: float) -> Sprite2D:
 	var lower := Sprite2D.new()
 	lower.name = part_name
 	lower.texture = texture
 	lower.centered = false
-	lower.offset = Vector2(-texture.get_width() / 2.0, -JOINT_CAP * ART_SCALE)
+	lower.offset = Vector2(-texture.get_width() / 2.0, -cap * ART_SCALE)
 	lower.position = Vector2(0.0, joint * ART_SCALE)
 	upper.add_child(lower)
 	return lower
