@@ -1746,12 +1746,15 @@ func _test_room_at_night() -> void:
 
 
 ## Each wing's rooms are floored in that wing's own tile (tools/floors.py), repeating across
-## the floor; no two wings share one.
+## the floor, and their display walls (Partition) are built in the wing's own style, never
+## the plain museum one; no two wings share a tile or a style.
 func _test_wing_floors() -> void:
 	var name := "wing_floors"
 	var tiles: Array[Texture2D] = []
+	var styles: Array[Partition.Style] = []
 	for wing: String in Content.WINGS:
 		var tile: Texture2D = null
+		var style := Partition.Style.MUSEUM
 		for path: String in (load(wing) as WingData).rooms:
 			var room := (load(path) as PackedScene).instantiate()
 			var ground := room.get_node("Floor") as Polygon2D
@@ -1759,9 +1762,16 @@ func _test_wing_floors() -> void:
 			if tile == null:
 				tile = ground.texture
 			_check(ground.texture == tile, name, "%s's floor is not its wing's tile" % path.get_file())
+			for each in room.get_node("Actors").get_children():
+				if each is Partition:
+					if style == Partition.Style.MUSEUM:
+						style = (each as Partition).style
+					_check((each as Partition).style == style and style != Partition.Style.MUSEUM, name, "%s's %s is not built in its wing's style" % [path.get_file(), each.name])
 			room.free()
 		_check(not tile in tiles, name, "%s shares its floor tile with another wing" % wing.get_file())
 		tiles.append(tile)
+		_check(not style in styles, name, "%s shares its display walls' style with another wing" % wing.get_file())
+		styles.append(style)
 
 
 ## A rig's view follows the heading: down front, up back, right and left the side view

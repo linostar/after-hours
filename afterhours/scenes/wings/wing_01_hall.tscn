@@ -49,6 +49,7 @@ face = Vector2(0, -24)
 [node name="Partition0" type="StaticBody2D" parent="Actors"]
 position = Vector2(330, 330)
 script = ExtResource("partition")
+style = 1
 width = 130
 depth = 50
 height = 80
@@ -56,6 +57,7 @@ height = 80
 [node name="Partition1" type="StaticBody2D" parent="Actors"]
 position = Vector2(640, 440)
 script = ExtResource("partition")
+style = 1
 width = 130
 depth = 50
 height = 80
