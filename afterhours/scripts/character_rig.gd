@@ -192,6 +192,8 @@ func _apply() -> void:
 	var shin := leg_lower_side if is_side() and leg_lower_side != null else leg_lower
 	for each in _shins:
 		each.texture = shin
+		# The side shin is wider (the toe forward): centre its knee on the joint again.
+		each.offset.x = -shin.get_width() / 2.0
 	if is_side():
 		_body.texture = body_side
 		for i in 2:

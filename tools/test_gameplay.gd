@@ -1742,9 +1742,14 @@ func _test_rig_views() -> void:
 	rig.face(Vector2.LEFT)
 	_check(rig.scale.x == -1.0 and (rig.get_node("Body") as Sprite2D).texture == rig.body_side, name, "facing left does not mirror the side view")
 	_check((rig.get_node("Leg1/Shin") as Sprite2D).texture == rig.leg_lower_side, name, "the side view's shin is not the side shoe")
+	# Each shin's knee sits on the joint, whichever (and however wide) its texture.
+	var side_shin := rig.get_node("Leg1/Shin") as Sprite2D
+	_check(side_shin.offset.x == -side_shin.texture.get_width() / 2.0, name, "the side view's shin hangs %s off its knee" % (side_shin.offset.x + side_shin.texture.get_width() / 2.0))
 	rig.face(Vector2.UP)
 	_check(rig.scale.x == 1.0 and (rig.get_node("Body") as Sprite2D).texture == rig.body_back, name, "facing up does not show the back")
 	_check((rig.get_node("Leg1/Shin") as Sprite2D).texture == rig.leg_lower, name, "the back view's shin is not the front-and-back shoe")
+	var back_shin := rig.get_node("Leg1/Shin") as Sprite2D
+	_check(back_shin.offset.x == -back_shin.texture.get_width() / 2.0, name, "the back view's shin hangs %s off its knee" % (back_shin.offset.x + back_shin.texture.get_width() / 2.0))
 	rig.free()
 
 
