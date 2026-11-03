@@ -5,7 +5,7 @@ extends Node2D
 ## left) with a jointed arm and leg each side, over a floor shadow. Each limb is an upper
 ## part (upper arm, thigh) pivoting at shoulder or hip with its lower part (forearm and
 ## hand, shin and shoe) as a child at the elbow or knee. face() picks the view from a
-## heading (view_for, with hysteresis so a diagonal does not flicker); walk() advances the
+## heading (view_for: a diagonal is side on, with hysteresis so it does not flicker); walk() advances the
 ## walk cycle by the distance moved, swinging the limbs (side view) or lifting the feet in
 ## turn (front and back), bending knees and elbows with the cycle, bobbing the body and
 ## emitting stepped at every footfall (setting off from rest, then each step_length); with
@@ -17,8 +17,11 @@ signal stepped
 
 enum View { FRONT, BACK, RIGHT, LEFT }
 
-## A heading must lean this many times more toward the other axis before the view changes.
-const HYSTERESIS := 1.3
+## A front or back view turns to the side once the heading's across exceeds this share of
+## its along (about 35 degrees off vertical), so a diagonal walks side on; a side view turns
+## back only under SIDE_LEAVE (about 24 degrees), the band between keeping it from flickering.
+const SIDE_ENTER := 0.7
+const SIDE_LEAVE := 0.45
 ## How fast the stride grows when walking starts and fades when it stops (per second).
 const SETTLE_RATE := 10.0
 ## The side view's far arm and leg are shaded this much.
@@ -88,8 +91,8 @@ var _shins: Array[Sprite2D] = []
 var _forearms: Array[Sprite2D] = []
 
 
-## The view for `heading`, staying `current` for a zero heading and across the hysteresis
-## band between the horizontal and the vertical views.
+## The view for `heading`, staying `current` for a zero heading and across the band
+## between SIDE_LEAVE and SIDE_ENTER; a diagonal is side on.
 static func view_for(heading: Vector2, current: View) -> View:
 	if heading.is_zero_approx():
 		return current
@@ -97,9 +100,9 @@ static func view_for(heading: Vector2, current: View) -> View:
 	var along := absf(heading.y)
 	var horizontal: bool
 	if current == View.RIGHT or current == View.LEFT:
-		horizontal = along <= across * HYSTERESIS
+		horizontal = across >= along * SIDE_LEAVE
 	else:
-		horizontal = across > along * HYSTERESIS
+		horizontal = across > along * SIDE_ENTER
 	if horizontal:
 		return View.RIGHT if heading.x > 0.0 else View.LEFT
 	return View.BACK if heading.y < 0.0 else View.FRONT

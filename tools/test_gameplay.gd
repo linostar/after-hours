@@ -1722,15 +1722,16 @@ func _test_juice_on_actions() -> void:
 
 
 ## A rig's view follows the heading: down front, up back, right and left the side view
-## (mirrored for left); a diagonal near the boundary keeps the current view (hysteresis); a
-## zero heading keeps it too.
+## (mirrored for left); a diagonal is side on from any view; a heading between SIDE_LEAVE
+## and SIDE_ENTER keeps the current view (hysteresis); a zero heading keeps it too.
 func _test_rig_views() -> void:
 	var name := "rig_views"
 	const V := CharacterRig.View
 	var cases: Array[Array] = [
 		[Vector2.DOWN, V.FRONT, V.FRONT], [Vector2.UP, V.FRONT, V.BACK], [Vector2.RIGHT, V.FRONT, V.RIGHT],
-		[Vector2.LEFT, V.FRONT, V.LEFT], [Vector2.ZERO, V.LEFT, V.LEFT], [Vector2(1, 0.9), V.RIGHT, V.RIGHT],
-		[Vector2(1, 0.9), V.FRONT, V.FRONT], [Vector2(1, 1.4), V.RIGHT, V.FRONT], [Vector2(1.4, -1), V.BACK, V.RIGHT],
+		[Vector2.LEFT, V.FRONT, V.LEFT], [Vector2.ZERO, V.LEFT, V.LEFT], [Vector2(1, 1), V.FRONT, V.RIGHT],
+		[Vector2(-1, -1), V.BACK, V.LEFT], [Vector2(1, 0.9), V.RIGHT, V.RIGHT], [Vector2(0.6, 1), V.FRONT, V.FRONT],
+		[Vector2(0.6, 1), V.RIGHT, V.RIGHT], [Vector2(0.3, 1), V.RIGHT, V.FRONT], [Vector2(1.4, -1), V.BACK, V.RIGHT],
 		[Vector2(-1, 0.2), V.RIGHT, V.LEFT],
 	]
 	for each in cases:
