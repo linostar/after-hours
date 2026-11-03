@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/room_base.tscn" id="base"]
 [ext_resource type="PackedScene" path="res://scenes/tilt_frame.tscn" id="frame"]
@@ -6,6 +6,7 @@
 [ext_resource type="Script" path="res://scripts/partition.gd" id="partition"]
 [ext_resource type="PackedScene" path="res://scenes/guard.tscn" id="guard"]
 [ext_resource type="PackedScene" path="res://scenes/door.tscn" id="door"]
+[ext_resource type="Texture2D" path="res://art/svg/floor_gothic.svg" id="floor_tile"]
 
 [node name="Room" instance=ExtResource("base")]
 
@@ -19,7 +20,9 @@ color = Color(0.62, 0.78, 0.7, 1)
 color = Color(0.32, 0.5, 0.3, 1)
 
 [node name="Floor" parent="."]
-color = Color(0.55, 0.62, 0.3, 1)
+color = Color(0.9, 0.94, 0.6, 1)
+texture_repeat = 2
+texture = ExtResource("floor_tile")
 
 [node name="FrameA" parent="Frames" instance=ExtResource("frame")]
 position = Vector2(250, 75)

@@ -192,6 +192,7 @@ func _tests() -> Array[Callable]:
 		_test_juice_on_actions,
 		_test_rig_views,
 		_test_room_at_night,
+		_test_wing_floors,
 		_test_rig_walk_cycle,
 		_test_rig_joints_bend,
 		_test_mime_faces_its_way,
@@ -1742,6 +1743,25 @@ func _test_room_at_night() -> void:
 			lefts += 1 if (door as Node2D).position.x < 480.0 else 0
 		_check(first.get_children().all(func(each: Node) -> bool: return not each.name.begins_with("DoorArt")) and lefts == 1, name, "%s's first room shows an entry doorway or has %d doors on the left" % [wing.get_file(), lefts])
 		first.free()
+
+
+## Each wing's rooms are floored in that wing's own tile (tools/floors.py), repeating across
+## the floor; no two wings share one.
+func _test_wing_floors() -> void:
+	var name := "wing_floors"
+	var tiles: Array[Texture2D] = []
+	for wing: String in Content.WINGS:
+		var tile: Texture2D = null
+		for path: String in (load(wing) as WingData).rooms:
+			var room := (load(path) as PackedScene).instantiate()
+			var ground := room.get_node("Floor") as Polygon2D
+			_check(ground.texture != null and ground.texture_repeat == CanvasItem.TEXTURE_REPEAT_ENABLED, name, "%s's floor is not tiled" % path.get_file())
+			if tile == null:
+				tile = ground.texture
+			_check(ground.texture == tile, name, "%s's floor is not its wing's tile" % path.get_file())
+			room.free()
+		_check(not tile in tiles, name, "%s shares its floor tile with another wing" % wing.get_file())
+		tiles.append(tile)
 
 
 ## A rig's view follows the heading: down front, up back, right and left the side view
