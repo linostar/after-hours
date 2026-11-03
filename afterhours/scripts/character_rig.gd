@@ -57,19 +57,24 @@ const JOINT_CAP := 3.0
 @export var side_spread := 3.0
 ## Base units walked per step (two steps a cycle).
 @export var step_length := 50.0
-## At full stride: the legs' and arms' swing (radians, side view), how far a foot lifts
-## (front and back views) and how high the body bobs.
+## At full stride (side view): how far the legs reach fore and aft at a footfall (radians
+## off vertical) and the arms swing; how high the swinging foot clears the floor (side) or
+## the lifted foot rises (front and back); how far the body sinks at each footfall (lowest
+## with the legs spread, back up as they pass); how far it leans into the walk (radians) and
+## sways over the planted foot (front and back).
 @export var leg_swing := 0.5
 @export var arm_swing := 0.4
 @export var lift := 5.0
 @export var bob := 2.0
+@export var lean := 0.05
+@export var sway := 1.0
 @export var shadow_radius := 15.0
-## At full stride: how far a knee bends as its foot swings forward (radians, side view; half
-## of it outward front and back), how far elbows stay bent while walking, and how much more
-## the elbow of the arm swinging forward bends.
-@export var knee_bend := 0.9
+## At full stride: how far elbows stay bent while walking, how much more the elbow of the
+## arm swinging forward bends, and how far the forearm trails its upper arm's swing (the
+## follow-through, as a share of the swing).
 @export var elbow_rest := 0.2
 @export var elbow_bend := 0.5
+@export var elbow_lag := 0.35
 
 var view := View.FRONT
 ## A squash and stretch on top of the drawing (the mime's shrug), kept apart from the mirror.
@@ -217,37 +222,104 @@ func _mirror() -> void:
 	scale = Vector2(-squash.x if view == View.LEFT else squash.x, squash.y)
 
 
-## Poses the limbs for the phase and stride. Positive rotation swings a hanging part's end
-## back (to -x). In the side view the near leg and far arm swing with `swing`, the others
-## against it; a knee bends (the shin back) while its foot swings forward (`swing` falling
-## for the near leg) and an elbow (the forearm forward) more while its arm swings forward.
-## Front and back, a lifted foot's knee bends outward and the elbows bend in. At rest
-## (stride 0) every joint is straight.
+## Poses the limbs for the phase and stride, a walk cycle with a footfall (contact) at
+## phase 0 and 0.5, where stepped is emitted: at 0 leg 1 (the near leg) reaches forward and
+## leg 0 back; each foot is planted for half the cycle (sliding back under the hip) and swings
+## through for the other half, highest as it passes the planted one. Positive rotation
+## swings a hanging part's end back (to -x). Side view: each leg reaches its foot's spot by
+## bending at the knee (two-bone reach, the knee forward), the arms counter-swing with the
+## forearms trailing, and the body sinks at contact and leans into the walk. Front and back:
+## the lifted leg steps toward or away from the camera, its thigh and shin foreshortened so
+## the foot rises under the knee, the arms alternate against the legs (the forward hand
+## rising) and the body sways over the planted foot. At rest (stride 0) every joint is
+## straight.
 func _pose() -> void:
-	var swing := sin(phase * TAU) * stride
-	var turning := cos(phase * TAU) * stride
-	_body.position.y = -absf(swing) * bob
+	var p := phase * TAU
+	# Body sink: lowest at each contact (legs spread), back to standing height as they pass.
+	var drop := bob * stride * (1.0 + cos(2.0 * p)) / 2.0
 	if is_side():
-		_legs[1].rotation = swing * leg_swing
-		_legs[0].rotation = -swing * leg_swing
-		_shins[1].rotation = maxf(-turning, 0.0) * knee_bend
-		_shins[0].rotation = maxf(turning, 0.0) * knee_bend
-		_arms[1].rotation = -swing * arm_swing
-		_arms[0].rotation = swing * arm_swing
-		_forearms[1].rotation = -(stride * elbow_rest + maxf(swing, 0.0) * elbow_bend)
-		_forearms[0].rotation = -(stride * elbow_rest + maxf(-swing, 0.0) * elbow_bend)
-		for each in _legs:
-			each.position.y = hip.y
+		_pose_side(p, drop)
 	else:
-		var lifted: Array[float] = [maxf(swing, 0.0), maxf(-swing, 0.0)]
-		for i in 2:
-			var side := -1.0 if i == 0 else 1.0
-			var out := lifted[i] * knee_bend * 0.5
-			_legs[i].position.y = hip.y - lifted[i] * lift
-			_legs[i].rotation = -side * out
-			_shins[i].rotation = side * out * 2.0
-			_arms[i].rotation = swing * arm_swing * 0.4
-			_forearms[i].rotation = side * (stride * elbow_rest + absf(swing) * elbow_bend * 0.5)
+		_pose_front(p, drop)
+
+
+func _pose_side(p: float, drop: float) -> void:
+	var tilt := lean * stride
+	_body.rotation = tilt
+	_body.position = Vector2(0.0, drop)
+	var leg := -hip.y
+	var reach := leg * sin(leg_swing) * stride
+	for i in 2:
+		var near := i == 1
+		var at := Vector2(side_spread * (1.0 if near else -1.0) / 2.0, hip.y).rotated(tilt) + Vector2(0.0, drop)
+		_legs[i].position = at
+		_legs[i].scale = Vector2.ONE / ART_SCALE
+		_shins[i].scale = Vector2.ONE
+		# Leg 1 lands at phase 0, leg 0 half a cycle later.
+		var u := fposmod(phase + (0.0 if near else 0.5), 1.0)
+		var foot: Vector2
+		if u < 0.5:
+			foot = Vector2(reach * (1.0 - 4.0 * u), 0.0)
+		else:
+			var s := (u - 0.5) * 2.0
+			foot = Vector2(reach * (2.0 * s * s * (3.0 - 2.0 * s) - 1.0), -lift * stride * sin(PI * pow(s, 0.8)))
+		_reach(_legs[i], _shins[i], foot + Vector2(at.x, 0.0) - at)
+		# The near arm swings against the near leg: back as it reaches forward.
+		var arm := (1.0 if near else -1.0) * arm_swing * stride
+		_arms[i].position = Vector2(0.0, shoulder.y).rotated(tilt) + Vector2(0.0, drop)
+		_arms[i].rotation = arm * cos(p)
+		_arms[i].scale = Vector2.ONE / ART_SCALE
+		_forearms[i].scale = Vector2.ONE
+		var forward := maxf(-cos(p) * (1.0 if near else -1.0), 0.0)
+		var trail := arm * (cos(p - 0.9) - cos(p)) * elbow_lag
+		_forearms[i].rotation = minf(trail - stride * elbow_rest - forward * stride * elbow_bend, 0.0)
+
+
+## Bends `thigh` and `shin` so the foot reaches `to` (from the hip), the knee forward; a foot
+## out of reach is reached for with the leg straight.
+func _reach(thigh: Sprite2D, shin: Sprite2D, to: Vector2) -> void:
+	var upper := knee
+	var lower := -hip.y - knee
+	var d := to.length()
+	var aim := atan2(-to.x, to.y)
+	if d >= upper + lower or d < 0.001:
+		thigh.rotation = aim
+		shin.rotation = 0.0
+		return
+	var at_hip := acos(clampf((upper * upper + d * d - lower * lower) / (2.0 * upper * d), -1.0, 1.0))
+	var at_foot := acos(clampf((lower * lower + d * d - upper * upper) / (2.0 * lower * d), -1.0, 1.0))
+	thigh.rotation = aim - at_hip
+	shin.rotation = at_hip + at_foot
+
+
+func _pose_front(p: float, drop: float) -> void:
+	var shift := Vector2(sway * stride * sin(p), drop)
+	_body.rotation = 0.0
+	_body.position = shift
+	var upper := knee
+	var lower := -hip.y - knee
+	for i in 2:
+		var side := -1.0 if i == 0 else 1.0
+		# Leg 0 swings through while phase is in 0..0.5, leg 1 in 0.5..1.
+		var s := sin(p) * -side
+		var lifted := s * s if s > 0.0 else 0.0
+		lifted *= stride
+		_legs[i].position = Vector2(hip.x * side, hip.y) + shift
+		# Lifting the foot `lift`: the thigh coming toward (or going from) the camera
+		# foreshortens three quarters of it, the shin the rest; the knee stays over the foot.
+		var thigh_short := 1.0 - lifted * lift * 0.75 / upper
+		_legs[i].scale = Vector2(1.0, thigh_short) / ART_SCALE
+		_shins[i].scale = Vector2(1.0, (1.0 - lifted * lift * 0.25 / lower) / thigh_short)
+		_legs[i].rotation = side * 0.08 * lifted
+		_shins[i].rotation = -side * 0.12 * lifted
+		# The arm opposite the lifted leg comes forward: its hand rises toward the camera.
+		var forward := -cos(p) * side * stride
+		_arms[i].position = Vector2(shoulder.x * side, shoulder.y) + shift
+		_arms[i].rotation = -side * 0.05 * stride
+		_arms[i].scale = Vector2(1.0, 1.0 - 0.12 * absf(forward)) / ART_SCALE
+		var raised := maxf(forward, 0.0)
+		_forearms[i].scale = Vector2(1.0, 1.0 - raised * arm_swing)
+		_forearms[i].rotation = side * (stride * elbow_rest + raised * elbow_bend * 0.5)
 
 
 func _draw() -> void:

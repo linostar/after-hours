@@ -1666,7 +1666,7 @@ func _test_juice_on_actions() -> void:
 	for i in 20:
 		await physics_frame
 		await process_frame
-		bobbed = bobbed or room.get_node("Actors/Mime/Rig/Body").position.y < 0.0
+		bobbed = bobbed or room.get_node("Actors/Mime/Rig/Body").position.y != 0.0
 	_check(bobbed, name, "the walking mime does not bob")
 	await _walk_trace(room.mime, 300)
 	for i in 6:
@@ -1772,9 +1772,10 @@ func _test_rig_walk_cycle() -> void:
 
 
 ## Every limb of both rigs is two parts at a joint (upper arm and forearm, thigh and shin),
-## drawn from SVGs imported at ART_SCALE; walking bends every knee and elbow in every view
-## (front, back, side, mirrored left), and standing still straightens them all; the bend
-## leaves the footfalls' timing as it was.
+## drawn from SVGs imported at ART_SCALE; walking bends (or, front and back, foreshortens)
+## every knee and elbow in every view (front, back, side, mirrored left), and standing still
+## straightens them all; the body sinks lowest at a footfall (contact, legs spread) and rises
+## as the legs pass; the bend leaves the footfalls' timing as it was.
 func _test_rig_joints_bend() -> void:
 	var name := "rig_joints_bend"
 	const V := CharacterRig.View
@@ -1793,6 +1794,10 @@ func _test_rig_joints_bend() -> void:
 		var body := rig.get_node("Body") as Sprite2D
 		# Imported at 1x the body would be no taller than its feet anchor in base units.
 		_check(body.scale == Vector2.ONE / CharacterRig.ART_SCALE and rig.body_front.get_height() > rig.feet_at.y * CharacterRig.ART_SCALE * 0.9, name, "%s's body is not imported at ART_SCALE and drawn back at its inverse (%s, scale %s)" % [path, rig.body_front.get_size(), body.scale])
+		# A joint's bend: its turn plus how far its upper and lower parts are foreshortened.
+		var bend := func(lower: Sprite2D) -> float:
+			var upper := lower.get_parent() as Sprite2D
+			return absf(lower.rotation) + absf(1.0 - lower.scale.y * upper.scale.y * CharacterRig.ART_SCALE) + absf(1.0 - upper.scale.y * CharacterRig.ART_SCALE)
 		for view: V in [V.FRONT, V.BACK, V.RIGHT, V.LEFT]:
 			rig.face(([Vector2.DOWN, Vector2.UP, Vector2.RIGHT, Vector2.LEFT] as Array[Vector2])[view])
 			_check(rig.view == view, name, "%s did not turn to %s" % [path, V.keys()[view]])
@@ -1800,13 +1805,21 @@ func _test_rig_joints_bend() -> void:
 			for i in 120:
 				rig.walk(rig.step_length / 15.0, 1.0 / 60.0)
 				for j in 4:
-					bent[j] = maxf(bent[j], absf(joints[j].rotation))
+					bent[j] = maxf(bent[j], bend.call(joints[j]))
 			for j in 4:
-				_check(bent[j] > 0.15, name, "%s walking %s: %s bent only %.2f rad" % [path, V.keys()[view], joints[j].get_parent().name + "/" + joints[j].name, bent[j]])
+				_check(bent[j] > 0.15, name, "%s walking %s: %s bent only %.2f" % [path, V.keys()[view], joints[j].get_parent().name + "/" + joints[j].name, bent[j]])
+			# Just past a footfall (contact) the body is lower than as the legs pass.
+			var heights: Array[float] = []
+			for at: float in [0.0, 0.25]:
+				rig.phase = at
+				rig.walk(0.001, 0.0)
+				heights.append(body.position.y)
+			_check(heights[0] > heights[1] + rig.bob * 0.8, name, "%s walking %s: the body is not lowest at contact (%.2f there, %.2f passing)" % [path, V.keys()[view], heights[0], heights[1]])
 			for i in 30:
 				rig.walk(0.0, 1.0 / 60.0)
 			for j in 4:
-				_check(joints[j].rotation == 0.0 and (joints[j].get_parent() as Sprite2D).rotation == 0.0, name, "%s standing %s: %s is not straight (%.2f)" % [path, V.keys()[view], joints[j].get_parent().name, joints[j].rotation])
+				var upper := joints[j].get_parent() as Sprite2D
+				_check(joints[j].rotation == 0.0 and upper.rotation == 0.0 and bend.call(joints[j]) == 0.0, name, "%s standing %s: %s is not straight (%.2f)" % [path, V.keys()[view], upper.name, joints[j].rotation])
 		rig.free()
 
 
