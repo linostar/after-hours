@@ -68,6 +68,12 @@ const SHAKE_ANGLE := 0.3
 const CAUGHT_SHAKE := 7.0
 const SWAP_PUNCH := 0.04
 const PUNCH_TIME := 0.3
+## The museum after dark: a CanvasModulate tints the whole room moonlit blue. What gives
+## light (the guards' cones and eyes, the easel's glow, the gimmicks' lamps, windows and
+## pools: GLOW, an unshaded material) and what the player reads or taps (the pause button,
+## the fake's icon, tap ripples) is drawn at full brightness, against the dark.
+const NIGHT := Color(0.44, 0.49, 0.76)
+const GLOW := preload("res://art/glow.tres")
 
 ## The par time for the third star, in seconds.
 @export var par_time := 45.0
@@ -137,6 +143,12 @@ func _ready() -> void:
 	# The navmesh: the floor outline less every partition (the nav_obstacles group), baked
 	# now so each room scene only places its partitions.
 	($Navigation as NavigationRegion2D).bake_navigation_polygon(false)
+	var night := CanvasModulate.new()
+	night.name = "Night"
+	night.color = NIGHT
+	add_child(night)
+	($PauseButton as CanvasItem).material = GLOW
+	_fake_icon.material = GLOW
 	entrance = ($Entrance as Node2D).position
 	easel = get_node_or_null("Actors/Easel") as Easel
 	gimmick = get_node_or_null("Gimmick") as Gimmick

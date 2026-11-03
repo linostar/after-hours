@@ -27,6 +27,7 @@ const STARS := 22
 const BIG_STARS := 7
 const SKY_STROKES: Array[Color] = [Color(0.35, 0.5, 0.85, 0.55), Color(0.2, 0.3, 0.65, 0.6), Color(0.55, 0.7, 0.95, 0.45), Color(0.12, 0.18, 0.45, 0.55)]
 const NIGHT_STROKES: Array[Color] = [Color(0.08, 0.12, 0.35, 0.35), Color(0.15, 0.22, 0.5, 0.25), Color(0.05, 0.08, 0.22, 0.35)]
+const GLOW := preload("res://art/glow.tres")
 const WALL_TOP := 4.0
 const WALL_BOTTOM := 124.0
 const FLOOR_TOP := 172.0
@@ -44,6 +45,9 @@ var _revealed := false
 
 
 func _ready() -> void:
+	# The pools (drawn here) light the room's night at full brightness; the sky and the
+	# night's strokes (layers of their own) stay in it.
+	material = GLOW
 	_sky = Node2D.new()
 	_sky.z_as_relative = false
 	_sky.z_index = -10

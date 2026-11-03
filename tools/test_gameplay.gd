@@ -191,6 +191,7 @@ func _tests() -> Array[Callable]:
 		_test_rotate_overlay_pauses,
 		_test_juice_on_actions,
 		_test_rig_views,
+		_test_room_at_night,
 		_test_rig_walk_cycle,
 		_test_rig_joints_bend,
 		_test_mime_faces_its_way,
@@ -1719,6 +1720,28 @@ func _test_juice_on_actions() -> void:
 	await _key(KEY_E, true)
 	await _key(KEY_E, false)
 	_check(await _wait_until(func() -> bool: return hub.mime.rig.squash.y < 1.0, 10), name, "E in the hub with no door in reach did not shrug")
+
+
+## Every room is at night (a CanvasModulate of Room.NIGHT) and what gives light or is
+## read (the guard's cone and eyes, the pause button, the fake's icon) is unshaded; a wing's
+## first room has no entry doorway, only its exit door on the left.
+func _test_room_at_night() -> void:
+	var name := "room_at_night"
+	var room := await _load_room()
+	if room == null:
+		return
+	var night := room.get_node_or_null("Night") as CanvasModulate
+	_check(night != null and night.color == Room.NIGHT, name, "the room has no night tint")
+	for path: String in ["PauseButton", "FakeIcon", "Actors/Guard", "Actors/Guard/Cone"]:
+		var item := room.get_node(path) as CanvasItem
+		_check(item.material == Room.GLOW, name, "%s is not lit against the night" % path)
+	for wing: String in Content.WINGS:
+		var first := (load((load(wing) as WingData).rooms[0]) as PackedScene).instantiate()
+		var lefts := 0
+		for door in first.get_node("Doors").get_children():
+			lefts += 1 if (door as Node2D).position.x < 480.0 else 0
+		_check(first.get_children().all(func(each: Node) -> bool: return not each.name.begins_with("DoorArt")) and lefts == 1, name, "%s's first room shows an entry doorway or has %d doors on the left" % [wing.get_file(), lefts])
+		first.free()
 
 
 ## A rig's view follows the heading: down front, up back, right and left the side view

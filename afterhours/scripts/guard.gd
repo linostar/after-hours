@@ -56,7 +56,7 @@ const CONE_HALF_ANGLE := PI * 32.0 / 180.0
 const CONE_RAYS := 24
 ## Physics layers that block sight (walls, partitions).
 const SIGHT_MASK := 1
-const CONE_COLOR := Color(1.0, 0.92, 0.55, 0.18)
+const CONE_COLOR := Color(1.0, 0.92, 0.55, 0.26)
 const CONE_ALERT_COLOR := Color(1.0, 0.35, 0.25, 0.3)
 ## The suspicion eye, drawn above the head (guard-local).
 const EYE_CENTER := Vector2(0, -116)

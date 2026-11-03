@@ -8,6 +8,7 @@ const FROM_RADIUS := 5.0
 const TO_RADIUS := 22.0
 const COLOR := Color(1.0, 0.95, 0.8, 0.8)
 const WIDTH := 3.0
+const GLOW := preload("res://art/glow.tres")
 
 var _age := 0.0
 
@@ -18,6 +19,8 @@ static func spawn(parent: Node, at: Vector2) -> TapRipple:
 	ripple.name = "TapRipple"
 	ripple.position = at
 	ripple.z_index = 50
+	# Full brightness in a room's night (Room.NIGHT).
+	ripple.material = GLOW
 	parent.add_child(ripple)
 	return ripple
 

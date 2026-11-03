@@ -1,13 +1,14 @@
 class_name WindowLight
 extends Gimmick
-## Wing 1 (Vermeer): daylight from a tall window in the back wall falls across the floor in
-## a slanted band that drifts slowly from side to side, like clouds passing. In the band the
-## mime is lit (guards grow suspicious LIT times as fast); elsewhere the gallery is dim
-## (DIM). Drawn after Vermeer's interiors: a deep wooden window with a stone sill and
-## diamond-leaded panes, pale where the sky shows through; a soft shaft of warm light from
-## the glass down to the floor, where the band lies with a bright core (exactly the lit
-## width) and soft edges; dust motes drift in the shaft (decoration: under 2 Hz, still
-## under Reduce Motion).
+## Wing 1 (Vermeer): moonlight from a tall window in the back wall falls across the floor in
+## a slanted band that drifts slowly from side to side, like clouds passing the moon. In the
+## band the mime is lit (guards grow suspicious LIT times as fast); elsewhere the gallery is
+## dim (DIM). Drawn after Vermeer's interiors: a deep wooden window with a stone sill and
+## diamond-leaded panes, the moonlit sky through them; a soft shaft of cool light from the
+## glass down to the floor, where the band lies with a bright core (exactly the lit width)
+## and soft edges; dust motes drift in the shaft (decoration: under 2 Hz, still under
+## Reduce Motion). The light (glass, shaft, band, motes) is drawn on a layer of its own at
+## full brightness in the room's night (Room.GLOW), behind the frame, lead and sill.
 
 const LIT := 1.8
 const DIM := 0.6
@@ -18,17 +19,19 @@ const FLOOR_TOP := 172.0
 const FLOOR_BOTTOM := 540.0
 ## How far the band leans right per unit down the floor.
 const SLANT := 0.45
-## Vermeer's palette: walnut frame, grey stone sill, lead, pale daylit glass, warm light.
+## Vermeer's palette by night: walnut frame, grey stone sill, lead, moonlit glass, cool light.
 const FRAME := Color(0.3, 0.2, 0.12)
 const FRAME_LIGHT := Color(0.5, 0.36, 0.22)
 const SILL := Color(0.62, 0.6, 0.55)
 const LEAD := Color(0.2, 0.2, 0.22, 0.85)
-const GLASS_TOP := Color(0.93, 0.95, 0.9)
-const GLASS_BOTTOM := Color(0.72, 0.8, 0.84)
-const LIGHT := Color(1.0, 0.93, 0.7)
+const GLASS_TOP := Color(0.62, 0.72, 0.92)
+const GLASS_BOTTOM := Color(0.4, 0.5, 0.78)
+const LIGHT := Color(0.82, 0.9, 1.0)
 ## The band's soft edges: each ring wider than the lit core, fainter.
 const HALO_WIDTHS: Array[float] = [1.5, 1.25, 1.0]
-const HALO_ALPHAS: Array[float] = [0.05, 0.07, 0.12]
+const HALO_ALPHAS: Array[float] = [0.07, 0.11, 0.2]
+const SHAFT_ALPHAS: Array[float] = [0.18, 0.07]
+const GLOW := preload("res://art/glow.tres")
 ## The leaded panes' diagonal spacing.
 const LEAD_GAP := 14.0
 const MOTES := 16
@@ -43,6 +46,16 @@ const MOTE_HZ := 0.12
 @export var width := 130.0
 
 var _time := 0.0
+var _light: Node2D
+
+
+func _ready() -> void:
+	_light = Node2D.new()
+	_light.name = "Light"
+	_light.material = GLOW
+	_light.show_behind_parent = true
+	_light.draw.connect(_draw_light)
+	add_child(_light)
 
 
 ## The band's middle at floor height `y`.
@@ -57,21 +70,36 @@ func light_at(point: Vector2) -> float:
 func tick(delta: float) -> void:
 	_time += delta
 	queue_redraw()
+	if _light != null:
+		_light.queue_redraw()
 
 
+func _glass() -> Rect2:
+	return Rect2(WINDOW_RECT.position + Vector2(window_x, 0.0), WINDOW_RECT.size)
+
+
+## The window's wood, lead and stone (in the room's night).
 func _draw() -> void:
-	var glass := Rect2(WINDOW_RECT.position + Vector2(window_x, 0.0), WINDOW_RECT.size)
-	_draw_window(glass)
+	_draw_window(_glass())
+
+
+## The light (Light layer, full brightness, behind the window's wood): the moonlit glass,
+## the shaft through the air from the glass to where the band meets the wall, the band, and
+## the motes in the shaft.
+func _draw_light() -> void:
+	var glass := _glass()
+	_light.draw_polygon(PackedVector2Array([glass.position, Vector2(glass.end.x, glass.position.y), glass.end, Vector2(glass.position.x, glass.end.y)]), PackedColorArray([GLASS_TOP, GLASS_TOP, GLASS_BOTTOM, GLASS_BOTTOM]))
 	var top := band_x(FLOOR_TOP)
 	var bottom := band_x(FLOOR_BOTTOM)
-	# The shaft through the air, from the glass to where the band meets the wall.
 	var shaft := PackedVector2Array([glass.position + Vector2(0, glass.size.y), glass.end, Vector2(top + width / 2.0, FLOOR_TOP), Vector2(top - width / 2.0, FLOOR_TOP)])
-	draw_polygon(shaft, PackedColorArray([Color(LIGHT, 0.12), Color(LIGHT, 0.12), Color(LIGHT, 0.05), Color(LIGHT, 0.05)]))
+	var high := Color(LIGHT, SHAFT_ALPHAS[0])
+	var low := Color(LIGHT, SHAFT_ALPHAS[1])
+	_light.draw_polygon(shaft, PackedColorArray([high, high, low, low]))
 	for k in HALO_WIDTHS.size():
 		var half := width / 2.0 * HALO_WIDTHS[k]
 		var near := Color(LIGHT, HALO_ALPHAS[k] * 1.4)
 		var far := Color(LIGHT, HALO_ALPHAS[k] * 0.7)
-		draw_polygon(PackedVector2Array([
+		_light.draw_polygon(PackedVector2Array([
 			Vector2(top - half, FLOOR_TOP), Vector2(top + half, FLOOR_TOP),
 			Vector2(bottom + half, FLOOR_BOTTOM), Vector2(bottom - half, FLOOR_BOTTOM),
 		]), PackedColorArray([near, near, far, far]))
@@ -83,15 +111,19 @@ func _draw() -> void:
 		var across := motes.randf_range(-0.45, 0.45)
 		var drift := sin(TAU * (t * MOTE_HZ + motes.randf())) * 6.0
 		var at := shaft[3].lerp(shaft[0], 1.0 - down).lerp(shaft[2].lerp(shaft[1], 1.0 - down), 0.5 + across) + Vector2(drift * 0.5, drift)
-		draw_circle(at, motes.randf_range(0.7, 1.4), Color(LIGHT, 0.55))
+		_light.draw_circle(at, motes.randf_range(0.7, 1.4), Color(LIGHT, 0.55))
 
 
-## The window: a walnut frame with a lit inner edge, the sky graded down the glass, the
-## lead in a diamond lattice across it, a mullion and transom, and a stone sill below.
+## The window: a walnut frame round the glass (the glass itself is on the Light layer behind
+## it) with a lit inner edge, the lead in a diamond lattice across it, a mullion and transom,
+## and a stone sill below.
 func _draw_window(glass: Rect2) -> void:
-	draw_rect(glass.grow(SASH_WIDTH + 2.0), FRAME)
+	var rim := SASH_WIDTH + 2.0
+	draw_rect(Rect2(glass.position - Vector2(rim, rim), Vector2(glass.size.x + rim * 2.0, rim)), FRAME)
+	draw_rect(Rect2(glass.position.x - rim, glass.end.y, glass.size.x + rim * 2.0, rim), FRAME)
+	draw_rect(Rect2(glass.position.x - rim, glass.position.y, rim, glass.size.y), FRAME)
+	draw_rect(Rect2(glass.end.x, glass.position.y, rim, glass.size.y), FRAME)
 	draw_rect(Rect2(glass.position - Vector2(SASH_WIDTH, SASH_WIDTH), Vector2(glass.size.x + SASH_WIDTH * 2.0, 2.0)), FRAME_LIGHT)
-	draw_polygon(PackedVector2Array([glass.position, Vector2(glass.end.x, glass.position.y), glass.end, Vector2(glass.position.x, glass.end.y)]), PackedColorArray([GLASS_TOP, GLASS_TOP, GLASS_BOTTOM, GLASS_BOTTOM]))
 	var outline := PackedVector2Array([glass.position, Vector2(glass.end.x, glass.position.y), glass.end, Vector2(glass.position.x, glass.end.y)])
 	var c := -glass.size.y
 	while c < glass.size.x + glass.size.y:
