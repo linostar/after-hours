@@ -33,7 +33,8 @@ const VOICE_EVENTS: Array[StringName] = [&"hear", &"straighten", &"inspect", &"s
 const LINES_PER_EVENT := 2
 ## Events whose line cuts off one being spoken.
 const URGENT: Array[StringName] = [&"chase", &"found_fake", &"caught"]
-## The audio driver of headless runs: sounds are only logged there.
+## The audio driver of headless runs: sounds are only logged there (unless --write-movie
+## records them: the movie writer mixes through the same driver).
 const SILENT_DRIVER := "Dummy"
 const VOICES := 8
 ## played keeps the ids of this many latest sounds (tests read it).
@@ -88,6 +89,11 @@ func _exit_tree() -> void:
 		player.stream = null
 
 
+## Whether sounds are heard: not on the Dummy driver, except while --write-movie records.
+static func mixing() -> bool:
+	return AudioServer.get_driver_name() != SILENT_DRIVER or not Engine.get_write_movie_path().is_empty()
+
+
 ## Plays sound `id` for `node` (Game.audio.play); a node outside the tree (a test's loose
 ## gimmick) is not in the game and makes no sound.
 static func play_for(node: Node, id: StringName, pitch := 1.0) -> void:
@@ -110,7 +116,7 @@ func play(id: StringName, pitch := 1.0) -> void:
 	player.stream = stream
 	player.pitch_scale = pitch
 	# The Dummy driver (headless runs) never mixes, so a started sound would never finish.
-	if AudioServer.get_driver_name() != SILENT_DRIVER:
+	if mixing():
 		player.play()
 
 
@@ -135,7 +141,7 @@ func play_music(track: String) -> void:
 	var player := _music_players[_music_current]
 	player.stream = stream
 	player.volume_linear = 0.0
-	if AudioServer.get_driver_name() != SILENT_DRIVER:
+	if mixing():
 		player.play()
 	_fade = create_tween().set_parallel()
 	_fade.tween_property(player, "volume_linear", 1.0, CROSSFADE)
@@ -165,7 +171,7 @@ func say(voice: StringName, event: StringName) -> void:
 		said.pop_front()
 	print("[Audio] Voice %s" % id)
 	_voice.stream = stream
-	if AudioServer.get_driver_name() != SILENT_DRIVER:
+	if mixing():
 		_voice.play()
 
 
