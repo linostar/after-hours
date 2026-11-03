@@ -3,7 +3,8 @@ extends Node2D
 ## A museum guard run by a GuardBrain. Each physics tick it senses (its target through a
 ## vision cone that walls cut short, rays against SIGHT_MASK; a hung fake to inspect),
 ## scores its intents and acts on the winner (logged when it changes):
-## - PATROL: walks its route in straight legs (a closed loop of waypoints, pausing
+## - PATROL: walks its route leg by leg on the navmesh, round any display wall in the way
+##   (a closed loop of waypoints, pausing
 ##   WAYPOINT_PAUSE at each, facing the way it walks); after any excursion it first walks
 ##   the navmesh back to its next waypoint.
 ## - INSPECT: once per pass (re-armed when it no longer sees it), stands facing the hung
@@ -322,7 +323,7 @@ func _can_step() -> bool:
 ## it has arrived (at the reachable point nearest `goal`).
 func _travel(goal: Vector2, speed: float, delta: float) -> bool:
 	# The agent stays "finished" until a target is submitted again, so a goal reached
-	# before must be resubmitted once the guard has walked off (straight patrol legs move
+	# before must be resubmitted once the guard has walked off (the last of a patrol leg moves
 	# it without the agent). Compared with where its last path ended, not with `goal`: a
 	# goal off the navmesh is reached at its nearest point.
 	var walked_off := _agent.is_navigation_finished() and position.distance_to(_agent.get_final_position()) > _agent.target_desired_distance
@@ -351,6 +352,11 @@ func _patrol(delta: float) -> void:
 	var goal := route[_next]
 	if _returning:
 		_returning = not _travel(goal, PATROL_SPEED, delta)
+		return
+	# Each leg follows the navmesh, so it goes round a display wall in its way (a clear leg
+	# is the same straight line); the agent stops short of the waypoint (within its
+	# target_desired_distance), and the last of the leg is walked straight onto it.
+	if not _travel(goal, PATROL_SPEED, delta):
 		return
 	_aim(goal - position)
 	if not _can_step():

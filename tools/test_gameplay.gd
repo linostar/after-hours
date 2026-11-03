@@ -194,6 +194,7 @@ func _tests() -> Array[Callable]:
 		_test_room_at_night,
 		_test_wing_floors,
 		_test_puddles_clear_of_partitions,
+		_test_guards_patrol_round_partitions,
 		_test_rig_walk_cycle,
 		_test_rig_joints_bend,
 		_test_mime_faces_its_way,
@@ -1064,9 +1065,11 @@ func _test_guard_partition_blocks_sight() -> void:
 
 
 ## At a waypoint the guard pauses still facing the leg it walked, then turns to the next
-## standing before it walks on.
+## standing before it walks on. Facing is compared within FACING_TOLERANCE radians: the leg
+## follows the navmesh's path, whose points carry float noise far below a visible angle.
 func _test_guard_pauses_facing_its_leg() -> void:
 	var name := "guard_pauses_facing_its_leg"
+	const FACING_TOLERANCE := 0.001
 	var room := await _load_room()
 	if room == null:
 		return
@@ -1077,16 +1080,16 @@ func _test_guard_pauses_facing_its_leg() -> void:
 	var first_leg := (corner - room.guard.route[0]).normalized()
 	for i in roundi(Guard.WAYPOINT_PAUSE * 60.0) - 4:
 		await physics_frame
-	_check(room.guard.position == corner and room.guard.facing.is_equal_approx(first_leg), name, "during the pause the guard faces %s, not its finished leg %s" % [room.guard.facing, first_leg])
+	_check(room.guard.position == corner and absf(room.guard.facing.angle_to(first_leg)) < FACING_TOLERANCE, name, "during the pause the guard faces %s, not its finished leg %s" % [room.guard.facing, first_leg])
 	for i in 6:
 		await physics_frame
 	var next_leg := (room.guard.route[2] - corner).normalized()
 	# It turns toward the next leg at TURN_RATE: not snapped, and there within the turn's time.
-	_check(not room.guard.facing.is_equal_approx(next_leg), name, "the guard snapped to its next leg instead of turning")
+	_check(absf(room.guard.facing.angle_to(next_leg)) > FACING_TOLERANCE, name, "the guard snapped to its next leg instead of turning")
 	_check(room.guard.position == corner, name, "the guard walked off at %s mid-turn (sideways to the way it faces)" % room.guard.position)
 	for i in ceili(absf(first_leg.angle_to(next_leg)) / Guard.TURN_RATE * 60.0) + 2:
 		await physics_frame
-	_check(room.guard.facing.is_equal_approx(next_leg), name, "after the pause and its turn the guard faces %s, not its next leg %s" % [room.guard.facing, next_leg])
+	_check(absf(room.guard.facing.angle_to(next_leg)) < FACING_TOLERANCE, name, "after the pause and its turn the guard faces %s, not its next leg %s" % [room.guard.facing, next_leg])
 
 
 ## A guard turns toward a new heading at TURN_RATE, never snapping: a noise behind it turns
@@ -1804,6 +1807,45 @@ func _test_puddles_clear_of_partitions() -> void:
 						var hidden := centre.y < wall.position.y and _ellipse_meets(centre, puddle.z, face)
 						_check(not standing and not hidden, name, "%s: %s %s the puddle at %s" % [path.get_file(), wall.name, "stands in" if standing else "hides", puddle])
 			room.free()
+
+
+## Guards patrol round display walls, never through them: in wing 2's hall the guard's legs
+## down x 700 and up x 260 run straight across a partition; over two of its loops' legs no
+## guard ever stands inside a partition's footprint, and the guard still reaches the
+## waypoints past them.
+func _test_guards_patrol_round_partitions() -> void:
+	var name := "guards_patrol_round_partitions"
+	const HALL := "res://scenes/wings/wing_02_hall.tscn"
+	if change_scene_to_file(HALL) != OK:
+		_check(false, name, "cannot load %s" % HALL)
+		return
+	for i in 3:
+		await physics_frame
+	var room := current_scene as Room
+	var map := room.get_world_2d().navigation_map
+	if not await _wait_until(func() -> bool: return NavigationServer2D.map_get_closest_point_owner(map, room.mime.position).is_valid(), 60):
+		_check(false, name, "the hall's navigation map never synced")
+		return
+	var feet: Array[Rect2] = []
+	for each in room.get_node("Actors").get_children():
+		if each is Partition:
+			var wall := each as Partition
+			feet.append(Rect2(wall.position.x - wall.width / 2.0, wall.position.y - wall.depth, wall.width, wall.depth))
+	for guard in room.guards:
+		guard.target = null
+	var inside := []
+	var reached := {}
+	for frame in 1500:
+		await physics_frame
+		for guard in room.guards:
+			for foot in feet:
+				if foot.has_point(guard.position):
+					inside.append([guard.name, guard.position.round()])
+		for point: Vector2 in [Vector2(700, 480), Vector2(260, 250)]:
+			if room.guard.position.distance_to(point) < 1.0:
+				reached[point] = true
+	_check(inside.is_empty(), name, "guards walked through a partition at %s" % [inside.slice(0, 3)])
+	_check(reached.size() == 2, name, "the hall guard did not reach the waypoints past the partitions (reached %s)" % [reached.keys()])
 
 
 ## Whether the flat puddle ellipse round `centre` (`r` across, Puddles.FLATTEN of it deep)
