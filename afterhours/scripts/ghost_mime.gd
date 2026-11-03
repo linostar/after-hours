@@ -5,7 +5,8 @@ extends Node2D
 ## sample every gap_frames physics frames of room time) through the room it is in, a step
 ## ahead of the player, while the wing has never been escaped from. It walks the bot's
 ## route at the bot's pace, fades out while the bot hid in a portrait, and fades away at
-## the end of its visit. The room plays the samples of the matching visit (the n-th time
+## the end of its visit; drawn by the mime's CharacterRig, it faces and walks along its
+## direction of travel. The room plays the samples of the matching visit (the n-th time
 ## the mime comes into this room, the bot's n-th stay there) and restarts it after a toss.
 
 ## Where the bot keeps the ghost replays of the wings in WINGS_DIR (a wing elsewhere, a test
@@ -22,7 +23,7 @@ var period := 0.1
 ## Seconds into the visit.
 var time := 0.0
 
-@onready var _sprite: Sprite2D = $Sprite
+@onready var rig: CharacterRig = $Rig
 
 
 ## The ghost replay's path for the wing at `wing_path` (where tools/bot.gd records it).
@@ -89,8 +90,8 @@ static func room_after(trail: Array, room: int, visit: int) -> int:
 
 
 func _ready() -> void:
-	_sprite.modulate = TINT
-	_sprite.modulate.a = 0.0
+	rig.modulate = TINT
+	rig.modulate.a = 0.0
 	restart()
 
 
@@ -116,6 +117,9 @@ func advance(delta: float) -> void:
 	var index := mini(floori(at), samples.size() - 1)
 	var next := mini(index + 1, samples.size() - 1)
 	var from := Vector2(samples[index][0], samples[index][1])
-	position = from.lerp(Vector2(samples[next][0], samples[next][1]), clampf(at - index, 0.0, 1.0))
+	var to := from.lerp(Vector2(samples[next][0], samples[next][1]), clampf(at - index, 0.0, 1.0))
+	rig.face(to - position)
+	rig.walk(position.distance_to(to), delta)
+	position = to
 	var shown: bool = not is_done() and not samples[index][2]
-	_sprite.modulate.a = move_toward(_sprite.modulate.a, TINT.a if shown else 0.0, FADE_RATE * delta)
+	rig.modulate.a = move_toward(rig.modulate.a, TINT.a if shown else 0.0, FADE_RATE * delta)

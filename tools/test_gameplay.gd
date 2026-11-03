@@ -191,6 +191,7 @@ func _tests() -> Array[Callable]:
 		_test_rig_views,
 		_test_rig_walk_cycle,
 		_test_mime_faces_its_way,
+		_test_ghost_faces_travel,
 		_test_no_flash_rates,
 		_test_ghost_replay_visits,
 		_test_ghost_mime_until_escape,
@@ -1718,6 +1719,25 @@ func _test_mime_faces_its_way() -> void:
 	var toward := room.easel.position - room.mime.position
 	_check(canvas.visible and rig.view == CharacterRig.view_for(toward, rig.view), name, "painting the mime shows %s, not facing the easel (%s away)" % [CharacterRig.View.keys()[rig.view], toward])
 	canvas.close()
+
+
+## The ghost mime faces and walks along its replay's travel: right on a rightward stretch,
+## its back on an upward one, limbs at rest where the bot stood.
+func _test_ghost_faces_travel() -> void:
+	var name := "ghost_faces_travel"
+	var ghost := (load("res://scenes/ghost_mime.tscn") as PackedScene).instantiate() as GhostMime
+	ghost.samples = [[100.0, 300.0, false], [120.0, 300.0, false], [140.0, 300.0, false], [140.0, 280.0, false], [140.0, 260.0, false], [140.0, 260.0, false], [140.0, 260.0, false], [140.0, 260.0, false]] as Array[Array]
+	root.add_child(ghost)
+	for i in 10:
+		ghost.advance(1.0 / 60.0)
+	_check(ghost.rig.view == CharacterRig.View.RIGHT and ghost.rig.stride > 0.0, name, "moving right the ghost shows %s (stride %.2f)" % [CharacterRig.View.keys()[ghost.rig.view], ghost.rig.stride])
+	for i in 15:
+		ghost.advance(1.0 / 60.0)
+	_check(ghost.rig.view == CharacterRig.View.BACK, name, "moving up the ghost shows %s" % CharacterRig.View.keys()[ghost.rig.view])
+	for i in 20:
+		ghost.advance(1.0 / 60.0)
+	_check(ghost.rig.stride == 0.0, name, "standing where the bot stood the ghost still strides (%.2f)" % ghost.rig.stride)
+	ghost.free()
 
 
 ## The no-flash audit (jam rule 5, under 2 Hz): every repeating effect runs slower. The
