@@ -190,6 +190,7 @@ func _tests() -> Array[Callable]:
 		_test_juice_on_actions,
 		_test_rig_views,
 		_test_rig_walk_cycle,
+		_test_mime_faces_its_way,
 		_test_no_flash_rates,
 		_test_ghost_replay_visits,
 		_test_ghost_mime_until_escape,
@@ -1403,11 +1404,11 @@ func _test_keyboard_walks_and_interacts() -> void:
 	room.mime.place_at(lonely)
 	await _key(KEY_E, true)
 	await _key(KEY_E, false)
-	var sprite := room.mime.get_node("Sprite") as Sprite2D
-	var shrugged := await _wait_until(func() -> bool: return sprite.scale.y < 1.0, 10)
+	var rig := room.mime.rig
+	var shrugged := await _wait_until(func() -> bool: return rig.squash.y < 1.0, 10)
 	_check(shrugged and _game.audio.played.slice(-4).has(&"shrug"), name, "E with nothing in reach did not shrug with its sound")
 	_check(not room.mime.walking, name, "E with nothing in reach walked the mime")
-	_check(await _wait_until(func() -> bool: return sprite.scale == Vector2.ONE, ceili(Mime.SHRUG_TIME * 60.0) + 10), name, "the shrug did not settle")
+	_check(await _wait_until(func() -> bool: return rig.squash == Vector2.ONE, ceili(Mime.SHRUG_TIME * 60.0) + 10), name, "the shrug did not settle")
 
 
 ## A guard that saw the mime hide loses it like any other once it steps out and gets away
@@ -1583,12 +1584,12 @@ func _test_juice_on_actions() -> void:
 	for i in 20:
 		await physics_frame
 		await process_frame
-		bobbed = bobbed or room.get_node("Actors/Mime/Sprite").position.y < 0.0
+		bobbed = bobbed or room.get_node("Actors/Mime/Rig/Body").position.y < 0.0
 	_check(bobbed, name, "the walking mime does not bob")
 	await _walk_trace(room.mime, 300)
 	for i in 6:
 		await process_frame
-	_check(room.get_node("Actors/Mime/Sprite").position.y == 0.0, name, "the mime still bobs standing still")
+	_check(room.get_node("Actors/Mime/Rig/Body").position.y == 0.0, name, "the mime still bobs standing still")
 	_check(room.get_node_or_null("TapRipple") == null, name, "the ripple outlived its %.2f s" % TapRipple.LIFE)
 	var pause_button := room.get_node("PauseButton") as Button
 	pause_button.button_down.emit()
@@ -1635,8 +1636,7 @@ func _test_juice_on_actions() -> void:
 	_check(hub.get_node_or_null("TapRipple") != null, name, "a hub tap left no ripple")
 	await _key(KEY_E, true)
 	await _key(KEY_E, false)
-	var hub_sprite := hub.mime.get_node("Sprite") as Sprite2D
-	_check(await _wait_until(func() -> bool: return hub_sprite.scale.y < 1.0, 10), name, "E in the hub with no door in reach did not shrug")
+	_check(await _wait_until(func() -> bool: return hub.mime.rig.squash.y < 1.0, 10), name, "E in the hub with no door in reach did not shrug")
 
 
 ## A rig's view follows the heading: down front, up back, right and left the side view
@@ -1663,7 +1663,7 @@ func _test_rig_views() -> void:
 	rig.free()
 
 
-## A rig's walk cycle moves only with distance: a footfall every step_length, limbs swinging
+## A rig's walk cycle moves only with distance: a footfall setting off and every step_length, limbs swinging
 ## while walking and settling to rest once it stops.
 func _test_rig_walk_cycle() -> void:
 	var name := "rig_walk_cycle"
@@ -1677,13 +1677,47 @@ func _test_rig_walk_cycle() -> void:
 	for i in 60:
 		rig.walk(rig.step_length / 10.0, 1.0 / 60.0)
 		swung = maxf(swung, absf(leg.rotation))
-	_check(steps[0] == 6, name, "walking 6 steps' length gave %d footfalls" % steps[0])
+	_check(steps[0] == 7, name, "setting off and walking 6 steps' length gave %d footfalls, not 7" % steps[0])
 	_check(swung > rig.leg_swing * 0.8, name, "the side view's leg swung only %.2f rad" % swung)
 	var phase := rig.phase
 	for i in 30:
 		rig.walk(0.0, 1.0 / 60.0)
 	_check(rig.phase == phase and rig.stride == 0.0 and leg.rotation == 0.0, name, "standing still the cycle moved or the limbs did not settle (stride %.2f, leg %.2f)" % [rig.stride, leg.rotation])
 	rig.free()
+
+
+## The mime faces the way it walks (a path walk and a keyboard nudge), keeps its facing when
+## it stops, and faces the easel it paints at; its footfalls are tiptoes.
+func _test_mime_faces_its_way() -> void:
+	var name := "mime_faces_its_way"
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.active = false
+	var rig := room.mime.rig
+	room.mime.place_at(Vector2(300, 470))
+	room.mime.walk_to(Vector2(600, 470))
+	await _walk_trace(room.mime, 300)
+	_check(rig.view == CharacterRig.View.RIGHT, name, "walking right the mime shows %s" % CharacterRig.View.keys()[rig.view])
+	for i in 10:
+		await physics_frame
+	_check(rig.view == CharacterRig.View.RIGHT, name, "standing still the mime turned to %s" % CharacterRig.View.keys()[rig.view])
+	var played := _game.audio.played.size()
+	Input.action_press("ui_left")
+	for i in 30:
+		await physics_frame
+	Input.action_release("ui_left")
+	_check(rig.view == CharacterRig.View.LEFT and rig.scale.x < 0.0, name, "walking left by keyboard the mime shows %s" % CharacterRig.View.keys()[rig.view])
+	_check(played > 0 and _game.audio.played.slice(-6).has(&"tiptoe"), name, "the keyboard walk's footfalls were not tiptoes")
+	room.mime.walk_to(Vector2(400, 200))
+	await _walk_trace(room.mime, 300)
+	_check(rig.view == CharacterRig.View.BACK, name, "walking up the mime shows %s" % CharacterRig.View.keys()[rig.view])
+	await _tap_at(room.easel.rect().get_center())
+	var canvas := room.get_node("EaselLayer/ForgeryCanvas") as ForgeryCanvas
+	await _wait_until(func() -> bool: return canvas.visible, 300)
+	var toward := room.easel.position - room.mime.position
+	_check(canvas.visible and rig.view == CharacterRig.view_for(toward, rig.view), name, "painting the mime shows %s, not facing the easel (%s away)" % [CharacterRig.View.keys()[rig.view], toward])
+	canvas.close()
 
 
 ## The no-flash audit (jam rule 5, under 2 Hz): every repeating effect runs slower. The

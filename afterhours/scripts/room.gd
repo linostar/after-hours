@@ -364,6 +364,7 @@ func _physics_process(delta: float) -> void:
 		mime.nudge(walk, delta)
 	if paint_intent and not tossing and not mime.walking and mime.position.distance_to(easel.spot()) <= SWAP_REACH:
 		paint_intent = false
+		mime.face_toward(easel.position)
 		_canvas.open()
 	if tilt_target != null and not tossing and not mime.walking and mime.position.distance_to(tilt_target.spot()) <= SWAP_REACH:
 		_tilt(tilt_target)
@@ -372,6 +373,7 @@ func _physics_process(delta: float) -> void:
 	if fake_hung and not found_out:
 		_fake_icon.visible = guards.any(func(each: Guard) -> bool: return each.inspecting)
 	if swap_intent and not tossing and not mime.walking and mime.position.distance_to(swap_spot()) <= SWAP_REACH:
+		mime.face_toward(masterpiece.position)
 		mime.swap_progress = minf(mime.swap_progress + delta / SWAP_TIME, 1.0)
 		if mime.swap_progress >= 1.0:
 			_swap()
@@ -545,6 +547,7 @@ func _cancel_swap() -> void:
 
 func _hide_in(portrait: HidingPortrait) -> void:
 	hide_target = null
+	mime.face_toward(portrait.position)
 	var seen := false
 	for each in guards:
 		if each.active and each.can_see(mime.global_position):
@@ -576,6 +579,7 @@ func _step_out() -> void:
 
 func _tilt(frame: TiltFrame) -> void:
 	tilt_target = null
+	mime.face_toward(frame.position)
 	frame.tilt()
 	_game.audio.play(&"tilt")
 	var heard := nearest_in_earshot(frame.view_point())

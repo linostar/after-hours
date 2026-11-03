@@ -1,25 +1,23 @@
 class_name Mime
 extends Node2D
 ## The player's mime: walks a navmesh path (NavigationAgent2D) to wherever the room sends
-## it, at SPEED (times the room gimmick's slow_at where it stands). Its origin is its feet, so the room y-sorts it with the guards and props.
+## it, at SPEED (times the room gimmick's slow_at where it stands). Its origin is its feet, so
+## the room y-sorts it with the guards and props. Drawn by its CharacterRig: it faces the way
+## it moves (a path walk or a keyboard nudge; face and face_toward turn it toward what it
+## uses) and keeps its last facing standing still; the rig's high-stepping walk cycle runs on
+## the distance moved, and every footfall is a quiet tiptoe (not on noisy floor, where the
+## room plays the gimmick's loud step).
 ## While swapping it draws a ring beside its head (clear of the painting above it) that
 ## fills (swap_progress 0..1); while it carries the fake (paler, unframed-looking) or the
 ## original, the little painting shows at its side.
 
 ## Walking speed in base units per second.
 const SPEED := 170.0
-## A quiet tiptoe sounds every this many seconds of walking, but not on noisy floor (the room
-## plays the gimmick's loud step there).
-const TIPTOE_GAP := 0.32
 const RING_CENTER := Vector2(34, -84)
 const RING_RADIUS := 14.0
 const RING_TRACK := Color(0.1, 0.08, 0.13, 0.7)
 const RING_FILL := Color(0.95, 0.85, 0.4)
-## The sprite bobs this high once per tiptoe while it walks, and settles once it has
-## stood still for BOB_SETTLE.
-const BOB_HEIGHT := 3.0
-const BOB_SETTLE := 0.06
-## A shrug (E with nothing in reach): the sprite sinks and widens to SHRUG_SCALE and back,
+## A shrug (E with nothing in reach): the drawing sinks and widens to SHRUG_SCALE and back,
 ## twice, over SHRUG_TIME.
 const SHRUG_SCALE := Vector2(1.14, 0.88)
 const SHRUG_TIME := 0.4
@@ -58,18 +56,18 @@ var painting := "starry_night":
 			_carried.painting = value
 
 @onready var _carried: FramedPainting = $Carried
-@onready var _sprite: Sprite2D = $Sprite
-var _tiptoe_wait := 0.0
+@onready var rig: CharacterRig = $Rig
 var _tiptoes := 0
-## Walking time along the current bob, and time stood still since the last step.
-var _bob := 0.0
-var _still := 0.0
+## Distance moved this physics frame (path walk and nudges), and whether a nudge moved it.
+var _moved := 0.0
+var _nudged := false
 var _shrug: Tween
 
 
 func _ready() -> void:
 	_carried.painting = painting
 	_sync_carried()
+	rig.stepped.connect(_on_step)
 
 
 ## Walks to the navmesh point closest to `point`.
@@ -89,9 +87,12 @@ func nudge(direction: Vector2, delta: float) -> void:
 	var step := position + direction * speed() * delta
 	if not NavigationServer2D.map_get_closest_point_owner(map, step).is_valid():
 		return
-	position = NavigationServer2D.map_get_closest_point(map, step)
+	var to := NavigationServer2D.map_get_closest_point(map, step)
+	_moved += position.distance_to(to)
+	_nudged = true
+	face(direction)
+	position = to
 	_agent.target_position = position
-	_tiptoe(delta)
 
 
 ## Walking speed where it stands: SPEED, slowed by the gimmick.
@@ -106,14 +107,24 @@ func place_at(point: Vector2) -> void:
 	walking = false
 
 
+## Turns toward `heading` (the rig picks its view); a zero heading keeps the facing.
+func face(heading: Vector2) -> void:
+	rig.face(heading)
+
+
+## Turns toward `point` (what it is about to use).
+func face_toward(point: Vector2) -> void:
+	face(point - position)
+
+
 ## Shrugs with a sound: E found nothing in reach to use.
 func shrug() -> void:
 	if _shrug != null:
 		_shrug.kill()
 	_shrug = create_tween()
 	for i in 2:
-		_shrug.tween_property(_sprite, "scale", SHRUG_SCALE, SHRUG_TIME / 4.0)
-		_shrug.tween_property(_sprite, "scale", Vector2.ONE, SHRUG_TIME / 4.0)
+		_shrug.tween_property(rig, "squash", SHRUG_SCALE, SHRUG_TIME / 4.0)
+		_shrug.tween_property(rig, "squash", Vector2.ONE, SHRUG_TIME / 4.0)
 	Audio.play_for(self, &"shrug")
 	print("[Mime] Shrugged: nothing in reach")
 
@@ -123,40 +134,30 @@ func _sync_carried() -> void:
 	_carried.modulate = Color.WHITE if carrying else FAKE_TINT
 
 
+# The room nudges the mime from its own _physics_process, which runs before this one (the
+# room is an ancestor), so a frame's nudges are counted here with the path walk.
 func _physics_process(delta: float) -> void:
-	if not walking:
-		return
-	if _agent.is_navigation_finished():
-		walking = false
-		print("[Mime] Arrived at %s" % position.round())
-		arrived.emit(position)
-		return
-	var next := _agent.get_next_path_position()
-	position = position.move_toward(next, speed() * delta)
-	_tiptoe(delta)
+	if walking:
+		if _agent.is_navigation_finished():
+			walking = false
+			print("[Mime] Arrived at %s" % position.round())
+			arrived.emit(position)
+		else:
+			var next := _agent.get_next_path_position()
+			var to := position.move_toward(next, speed() * delta)
+			_moved += position.distance_to(to)
+			face(to - position)
+			position = to
+	rig.walk(_moved, delta)
+	_moved = 0.0
+	_nudged = false
 
 
-func _process(delta: float) -> void:
-	_still += delta
-	if _still >= BOB_SETTLE:
-		_bob = 0.0
-		_sprite.position.y = 0.0
-
-
-## Counts down walking time to the next tiptoe (pitched up and down in turn) and bobs the
-## sprite once per tiptoe.
-func _tiptoe(delta: float) -> void:
-	_still = 0.0
-	_bob = fmod(_bob + delta / TIPTOE_GAP, 1.0)
-	_sprite.position.y = -absf(sin(_bob * PI)) * BOB_HEIGHT
-	_tiptoe_wait -= delta
-	if _tiptoe_wait > 0.0:
-		return
-	_tiptoe_wait = TIPTOE_GAP
+## A footfall: a quiet tiptoe (pitched up and down in turn), or on noisy floor the floor's
+## sound for a keyboard step (a path walk's loud step is the room's, with the noise guards hear).
+func _on_step() -> void:
 	if gimmick != null and gimmick.noise_at(position) > 0.0:
-		# A path walk's loud step is the room's (with the noise guards hear); a keyboard step,
-		# which the room does not count, still sounds like the floor.
-		if not walking:
+		if _nudged:
 			Audio.play_for(self, gimmick.noise_sound(position))
 		return
 	_tiptoes += 1

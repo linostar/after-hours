@@ -6,7 +6,8 @@ extends Node2D
 ## face() picks the view from a heading (view_for, with hysteresis so a diagonal does not
 ## flicker); walk() advances the walk cycle by the distance moved, swinging the limbs (side
 ## view) or lifting the feet in turn (front and back), bobbing the body and emitting stepped
-## at every footfall (each step_length); with no distance the limbs settle to rest.
+## at every footfall (setting off from rest, then each step_length); with no distance the
+## limbs settle to rest.
 
 ## Emitted at each footfall while walking.
 signal stepped
@@ -46,6 +47,11 @@ const SHADOW_FLATTEN := 0.27
 @export var shadow_radius := 15.0
 
 var view := View.FRONT
+## A squash and stretch on top of the drawing (the mime's shrug), kept apart from the mirror.
+var squash := Vector2.ONE:
+	set(value):
+		squash = value
+		_mirror()
 ## The walk cycle, 0..1 per two steps.
 var phase := 0.0
 ## How far into a stride the limbs are: 0 at rest, 1 walking.
@@ -111,7 +117,8 @@ func walk(distance: float, delta: float) -> void:
 	if distance > 0.0:
 		var before := phase
 		phase = fmod(phase + distance / (2.0 * step_length), 1.0)
-		if floori(before * 2.0) != floori(phase * 2.0):
+		# The first foot leaving the floor is a footfall too, then one every step.
+		if stride == 0.0 or floori(before * 2.0) != floori(phase * 2.0):
 			stepped.emit()
 		stride = minf(stride + SETTLE_RATE * delta, 1.0)
 	else:
@@ -125,7 +132,7 @@ func is_side() -> bool:
 
 ## Lays the parts out for the view: textures, pivots, draw order and the mirror.
 func _apply() -> void:
-	scale.x = -1.0 if view == View.LEFT else 1.0
+	_mirror()
 	if is_side():
 		_body.texture = body_side
 		for i in 2:
@@ -156,6 +163,10 @@ func _apply() -> void:
 		move_child(_arms[0], 3)
 		move_child(_arms[1], 4)
 	_pose()
+
+
+func _mirror() -> void:
+	scale = Vector2(-squash.x if view == View.LEFT else squash.x, squash.y)
 
 
 func _pose() -> void:
