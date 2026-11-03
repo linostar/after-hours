@@ -20,11 +20,6 @@ color = Color(0.15, 0.17, 0.21, 1)
 [node name="Floor" parent="."]
 color = Color(0.42, 0.36, 0.28, 1)
 
-[node name="DoorArt0" type="Polygon2D" parent="."]
-z_index = -10
-color = Color(0.12, 0.09, 0.1, 1)
-polygon = PackedVector2Array(0, 290, 24, 290, 24, 370, 0, 370)
-
 [node name="FrameA" parent="Frames" instance=ExtResource("frame")]
 position = Vector2(450, 75)
 painting = "great_wave"
