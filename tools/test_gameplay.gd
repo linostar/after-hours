@@ -188,6 +188,8 @@ func _tests() -> Array[Callable]:
 		_test_screen_fit,
 		_test_rotate_overlay_pauses,
 		_test_juice_on_actions,
+		_test_rig_views,
+		_test_rig_walk_cycle,
 		_test_no_flash_rates,
 		_test_ghost_replay_visits,
 		_test_ghost_mime_until_escape,
@@ -1635,6 +1637,53 @@ func _test_juice_on_actions() -> void:
 	await _key(KEY_E, false)
 	var hub_sprite := hub.mime.get_node("Sprite") as Sprite2D
 	_check(await _wait_until(func() -> bool: return hub_sprite.scale.y < 1.0, 10), name, "E in the hub with no door in reach did not shrug")
+
+
+## A rig's view follows the heading: down front, up back, right and left the side view
+## (mirrored for left); a diagonal near the boundary keeps the current view (hysteresis); a
+## zero heading keeps it too.
+func _test_rig_views() -> void:
+	var name := "rig_views"
+	const V := CharacterRig.View
+	var cases: Array[Array] = [
+		[Vector2.DOWN, V.FRONT, V.FRONT], [Vector2.UP, V.FRONT, V.BACK], [Vector2.RIGHT, V.FRONT, V.RIGHT],
+		[Vector2.LEFT, V.FRONT, V.LEFT], [Vector2.ZERO, V.LEFT, V.LEFT], [Vector2(1, 0.9), V.RIGHT, V.RIGHT],
+		[Vector2(1, 0.9), V.FRONT, V.FRONT], [Vector2(1, 1.4), V.RIGHT, V.FRONT], [Vector2(1.4, -1), V.BACK, V.RIGHT],
+		[Vector2(-1, 0.2), V.RIGHT, V.LEFT],
+	]
+	for each in cases:
+		var got := CharacterRig.view_for(each[0], each[1])
+		_check(got == each[2], name, "heading %s from %s gives %s, not %s" % [each[0], V.keys()[each[1]], V.keys()[got], V.keys()[each[2]]])
+	var rig := (load("res://scenes/rig_mime.tscn") as PackedScene).instantiate() as CharacterRig
+	root.add_child(rig)
+	rig.face(Vector2.LEFT)
+	_check(rig.scale.x == -1.0 and (rig.get_node("Body") as Sprite2D).texture == rig.body_side, name, "facing left does not mirror the side view")
+	rig.face(Vector2.UP)
+	_check(rig.scale.x == 1.0 and (rig.get_node("Body") as Sprite2D).texture == rig.body_back, name, "facing up does not show the back")
+	rig.free()
+
+
+## A rig's walk cycle moves only with distance: a footfall every step_length, limbs swinging
+## while walking and settling to rest once it stops.
+func _test_rig_walk_cycle() -> void:
+	var name := "rig_walk_cycle"
+	var rig := (load("res://scenes/rig_mime.tscn") as PackedScene).instantiate() as CharacterRig
+	root.add_child(rig)
+	rig.face(Vector2.RIGHT)
+	var steps := [0]
+	rig.stepped.connect(func() -> void: steps[0] += 1)
+	var leg := rig.get_node("Leg1") as Sprite2D
+	var swung := 0.0
+	for i in 60:
+		rig.walk(rig.step_length / 10.0, 1.0 / 60.0)
+		swung = maxf(swung, absf(leg.rotation))
+	_check(steps[0] == 6, name, "walking 6 steps' length gave %d footfalls" % steps[0])
+	_check(swung > rig.leg_swing * 0.8, name, "the side view's leg swung only %.2f rad" % swung)
+	var phase := rig.phase
+	for i in 30:
+		rig.walk(0.0, 1.0 / 60.0)
+	_check(rig.phase == phase and rig.stride == 0.0 and leg.rotation == 0.0, name, "standing still the cycle moved or the limbs did not settle (stride %.2f, leg %.2f)" % [rig.stride, leg.rotation])
+	rig.free()
 
 
 ## The no-flash audit (jam rule 5, under 2 Hz): every repeating effect runs slower. The

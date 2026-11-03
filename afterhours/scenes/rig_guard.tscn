@@ -1,0 +1,26 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/character_rig.gd" id="1_rig"]
+[ext_resource type="Texture2D" path="res://art/svg/guard_body_front.svg" id="2_front"]
+[ext_resource type="Texture2D" path="res://art/svg/guard_body_back.svg" id="3_back"]
+[ext_resource type="Texture2D" path="res://art/svg/guard_body_side.svg" id="4_side"]
+[ext_resource type="Texture2D" path="res://art/svg/guard_arm.svg" id="5_arm"]
+[ext_resource type="Texture2D" path="res://art/svg/guard_leg.svg" id="6_leg"]
+
+[node name="Rig" type="Node2D"]
+script = ExtResource("1_rig")
+body_front = ExtResource("2_front")
+body_back = ExtResource("3_back")
+body_side = ExtResource("4_side")
+arm = ExtResource("5_arm")
+leg = ExtResource("6_leg")
+feet_at = Vector2(28, 96)
+hip = Vector2(6.5, -30)
+shoulder = Vector2(21.5, -54)
+side_spread = 4.0
+step_length = 40.0
+leg_swing = 0.42
+arm_swing = 0.3
+lift = 4.0
+bob = 1.5
+shadow_radius = 18.0
