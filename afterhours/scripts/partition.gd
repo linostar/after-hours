@@ -16,6 +16,15 @@ extends StaticBody2D
 
 enum Style { MUSEUM, DELFT, SHOJI, HEDGE, STROKES, GOTHIC, MARBLE }
 
+## How far a walker's feet keep off the footprint: half a guard across, arms out (the mime
+## is narrower), so no body overlaps the wall. The navmesh is carved this far round it (a
+## NavigationObstacle2D; the room's agent_radius still keeps them off the room's edges).
+const WALKER_CLEARANCE := 26.0
+## Walkers (guard.tscn, mime.tscn) turn a path's corner this early (their agents'
+## path_desired_distance), cutting it; the carve leaves this much more so a cut corner still
+## keeps WALKER_CLEARANCE.
+const CORNER_SLACK := 4.0
+
 const TOP := Color(0.85, 0.82, 0.74)
 const FACE := Color(0.7, 0.66, 0.58)
 const OUTLINE := Color(0.12, 0.1, 0.12, 0.9)
@@ -31,6 +40,13 @@ func _ready() -> void:
 	var footprint := CollisionPolygon2D.new()
 	footprint.polygon = PackedVector2Array([Vector2(-width / 2.0, -depth), Vector2(width / 2.0, -depth), Vector2(width / 2.0, 0.0), Vector2(-width / 2.0, 0.0)])
 	add_child(footprint)
+	var keep_off := NavigationObstacle2D.new()
+	var reach := WALKER_CLEARANCE + CORNER_SLACK
+	keep_off.vertices = PackedVector2Array([Vector2(-width / 2.0 - reach, -depth - reach), Vector2(width / 2.0 + reach, -depth - reach), Vector2(width / 2.0 + reach, reach), Vector2(-width / 2.0 - reach, reach)])
+	keep_off.affect_navigation_mesh = true
+	keep_off.carve_navigation_mesh = true
+	keep_off.avoidance_enabled = false
+	add_child(keep_off)
 
 
 func _draw() -> void:

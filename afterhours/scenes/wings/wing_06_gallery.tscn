@@ -65,7 +65,7 @@ depth = 50
 height = 80
 
 [node name="Guard" parent="Actors" instance=ExtResource("guard")]
-route = PackedVector2Array(480, 250, 700, 250, 700, 480, 260, 480, 260, 250)
+route = PackedVector2Array(480, 250, 730, 250, 730, 480, 260, 480, 260, 250)
 
 [node name="Guard2" parent="Actors" instance=ExtResource("guard")]
 route = PackedVector2Array(700, 490, 300, 490)

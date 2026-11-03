@@ -195,6 +195,7 @@ func _tests() -> Array[Callable]:
 		_test_wing_floors,
 		_test_puddles_clear_of_partitions,
 		_test_guards_patrol_round_partitions,
+		_test_patrol_paths_clear_walls,
 		_test_rig_walk_cycle,
 		_test_rig_joints_bend,
 		_test_mime_faces_its_way,
@@ -1809,43 +1810,107 @@ func _test_puddles_clear_of_partitions() -> void:
 			room.free()
 
 
-## Guards patrol round display walls, never through them: in wing 2's hall the guard's legs
-## down x 700 and up x 260 run straight across a partition; over two of its loops' legs no
-## guard ever stands inside a partition's footprint, and the guard still reaches the
-## waypoints past them.
+## Guards patrol round display walls, never through them, nor brushing them: in wing 2's
+## hall the guard's legs down x 700 and up x 260 run straight across a partition; over two
+## of its loops' legs no guard's feet ever come within Partition.WALKER_CLEARANCE of a
+## footprint (so no body overlaps a wall), and the guard still reaches the waypoints past
+## them.
 func _test_guards_patrol_round_partitions() -> void:
 	var name := "guards_patrol_round_partitions"
-	const HALL := "res://scenes/wings/wing_02_hall.tscn"
-	if change_scene_to_file(HALL) != OK:
-		_check(false, name, "cannot load %s" % HALL)
+	var room := await _load_wing_room(name, "res://scenes/wings/wing_02_hall.tscn")
+	if room == null:
 		return
+	var feet := _footprints(room)
+	# Walkers cut a path's corner by their agents' path_desired_distance; the carve allows
+	# Partition.CORNER_SLACK for it.
+	for walker: Node in [room.guard, room.mime]:
+		var agent := walker.get_node("Agent") as NavigationAgent2D
+		_check(agent.path_desired_distance <= Partition.CORNER_SLACK, name, "%s turns corners %.1f early, more than Partition.CORNER_SLACK" % [walker.name, agent.path_desired_distance])
+	for guard in room.guards:
+		guard.target = null
+	var brushed := []
+	var reached := {}
+	for frame in 1500:
+		await physics_frame
+		for guard in room.guards:
+			var gap := _clearance(guard.position, feet)
+			if gap < Partition.WALKER_CLEARANCE - 0.5:
+				brushed.append([guard.name, guard.position.round(), snappedf(gap, 0.1)])
+		for point: Vector2 in [Vector2(700, 480), Vector2(260, 250)]:
+			if room.guard.position.distance_to(point) < 1.0:
+				reached[point] = true
+	_check(brushed.is_empty(), name, "guards came within a body of a partition at [name, at, gap] %s" % [brushed.slice(0, 3)])
+	_check(reached.size() == 2, name, "the hall guard did not reach the waypoints past the partitions (reached %s)" % [reached.keys()])
+
+
+## Every guard's patrol keeps clear of every display wall, in every wing room and the slice
+## room: each waypoint, and the whole of each leg as the guard walks it (the navmesh's path
+## between waypoints, then the last straight stretch onto the waypoint), stays at least
+## Partition.WALKER_CLEARANCE off every footprint.
+func _test_patrol_paths_clear_walls() -> void:
+	var name := "patrol_paths_clear_walls"
+	var paths: Array[String] = [ROOM_PATH]
+	for wing: String in Content.WINGS:
+		paths.append_array((load(wing) as WingData).rooms)
+	for path in paths:
+		var room := await _load_wing_room(name, path)
+		if room == null:
+			continue
+		var feet := _footprints(room)
+		if feet.is_empty():
+			continue
+		var map := room.get_world_2d().navigation_map
+		for guard in room.guards:
+			for i in guard.route.size():
+				var from := guard.route[i]
+				var to := guard.route[(i + 1) % guard.route.size()]
+				_check(_clearance(to, feet) >= Partition.WALKER_CLEARANCE, name, "%s: %s's waypoint %s is %.1f off a partition" % [path.get_file(), guard.name, to, _clearance(to, feet)])
+				var walk := NavigationServer2D.map_get_path(map, from, to, true)
+				walk.append(to)
+				var nearest := INF
+				var at := from
+				for k in walk.size() - 1:
+					for s in 21:
+						var point := walk[k].lerp(walk[k + 1], s / 20.0)
+						var gap := _clearance(point, feet)
+						if gap < nearest:
+							nearest = gap
+							at = point
+				_check(nearest >= Partition.WALKER_CLEARANCE - 0.5, name, "%s: %s's leg %s -> %s passes %.1f off a partition at %s" % [path.get_file(), guard.name, from, to, nearest, at.round()])
+
+
+## Loads the room scene at `path` and waits until its navigation map has synced its navmesh
+## (failing `name` and returning null if it cannot).
+func _load_wing_room(name: String, path: String) -> Room:
+	if change_scene_to_file(path) != OK:
+		_check(false, name, "cannot load %s" % path)
+		return null
 	for i in 3:
 		await physics_frame
 	var room := current_scene as Room
 	var map := room.get_world_2d().navigation_map
 	if not await _wait_until(func() -> bool: return NavigationServer2D.map_get_closest_point_owner(map, room.mime.position).is_valid(), 60):
-		_check(false, name, "the hall's navigation map never synced")
-		return
+		_check(false, name, "%s's navigation map never synced" % path.get_file())
+		return null
+	return room
+
+
+## The floor footprints of `room`'s display walls (Partition).
+func _footprints(room: Room) -> Array[Rect2]:
 	var feet: Array[Rect2] = []
 	for each in room.get_node("Actors").get_children():
 		if each is Partition:
 			var wall := each as Partition
 			feet.append(Rect2(wall.position.x - wall.width / 2.0, wall.position.y - wall.depth, wall.width, wall.depth))
-	for guard in room.guards:
-		guard.target = null
-	var inside := []
-	var reached := {}
-	for frame in 1500:
-		await physics_frame
-		for guard in room.guards:
-			for foot in feet:
-				if foot.has_point(guard.position):
-					inside.append([guard.name, guard.position.round()])
-		for point: Vector2 in [Vector2(700, 480), Vector2(260, 250)]:
-			if room.guard.position.distance_to(point) < 1.0:
-				reached[point] = true
-	_check(inside.is_empty(), name, "guards walked through a partition at %s" % [inside.slice(0, 3)])
-	_check(reached.size() == 2, name, "the hall guard did not reach the waypoints past the partitions (reached %s)" % [reached.keys()])
+	return feet
+
+
+## How far `point` is from the nearest of `feet` (0 inside one).
+func _clearance(point: Vector2, feet: Array[Rect2]) -> float:
+	var nearest := INF
+	for foot in feet:
+		nearest = minf(nearest, point.distance_to(point.clamp(foot.position, foot.end)))
+	return nearest
 
 
 ## Whether the flat puddle ellipse round `centre` (`r` across, Puddles.FLATTEN of it deep)
