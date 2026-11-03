@@ -40,9 +40,10 @@ const SEARCH_TIME := 4.0
 ## How fast a searching guard turns to look around (radians per second).
 const SEARCH_TURN := 2.2
 ## How fast a guard turns toward a new heading (radians per second: a half turn in 0.3 s);
-## the cone turns with it. A turn sharper than TURN_IN_PLACE is made standing before it walks.
+## the cone turns with it. It walks on only once within TURN_IN_PLACE of its heading, so a
+## corner is turned standing and it never walks sideways to the way it faces.
 const TURN_RATE := PI / 0.3
-const TURN_IN_PLACE := PI / 2.0
+const TURN_IN_PLACE := PI / 6.0
 ## A chase re-plans its path only once the mime has moved this far from the path's goal.
 const CHASE_REPATH := 8.0
 ## Seconds the guard stands at each waypoint, still facing the leg it walked, before it
@@ -311,7 +312,7 @@ func _turn(delta: float) -> void:
 	_heading = heading
 
 
-## Whether it faces near enough the aimed heading to walk on (a sharper turn is made
+## Whether it faces near enough the aimed heading to walk on (the rest of the turn is made
 ## standing).
 func _can_step() -> bool:
 	return absf(facing.angle_to(_heading)) <= TURN_IN_PLACE

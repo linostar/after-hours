@@ -1014,7 +1014,8 @@ func _test_guard_partition_blocks_sight() -> void:
 	_check(room.guard.can_see(Vector2(566, 470)), name, "the guard cannot see the same distance across open floor (the control case)")
 
 
-## At a waypoint the guard pauses still facing the leg it walked, then turns to the next.
+## At a waypoint the guard pauses still facing the leg it walked, then turns to the next
+## standing before it walks on.
 func _test_guard_pauses_facing_its_leg() -> void:
 	var name := "guard_pauses_facing_its_leg"
 	var room := await _load_room()
@@ -1033,13 +1034,14 @@ func _test_guard_pauses_facing_its_leg() -> void:
 	var next_leg := (room.guard.route[2] - corner).normalized()
 	# It turns toward the next leg at TURN_RATE: not snapped, and there within the turn's time.
 	_check(not room.guard.facing.is_equal_approx(next_leg), name, "the guard snapped to its next leg instead of turning")
+	_check(room.guard.position == corner, name, "the guard walked off at %s mid-turn (sideways to the way it faces)" % room.guard.position)
 	for i in ceili(absf(first_leg.angle_to(next_leg)) / Guard.TURN_RATE * 60.0) + 2:
 		await physics_frame
 	_check(room.guard.facing.is_equal_approx(next_leg), name, "after the pause and its turn the guard faces %s, not its next leg %s" % [room.guard.facing, next_leg])
 
 
 ## A guard turns toward a new heading at TURN_RATE, never snapping: a noise behind it turns
-## it round on the spot first (a turn sharper than TURN_IN_PLACE), then it walks; its sight
+## it round on the spot (until within TURN_IN_PLACE), then it walks; its sight
 ## and its drawing turn with it.
 func _test_guard_turns_smoothly() -> void:
 	var name := "guard_turns_smoothly"
@@ -1736,13 +1738,12 @@ func _test_mime_faces_its_way() -> void:
 	for i in 10:
 		await physics_frame
 	_check(rig.view == CharacterRig.View.RIGHT, name, "standing still the mime turned to %s" % CharacterRig.View.keys()[rig.view])
-	var played := _game.audio.played.size()
 	Input.action_press("ui_left")
 	for i in 30:
 		await physics_frame
 	Input.action_release("ui_left")
 	_check(rig.view == CharacterRig.View.LEFT and rig.scale.x < 0.0, name, "walking left by keyboard the mime shows %s" % CharacterRig.View.keys()[rig.view])
-	_check(played > 0 and _game.audio.played.slice(-6).has(&"tiptoe"), name, "the keyboard walk's footfalls were not tiptoes")
+	_check(_game.audio.played.slice(-6).has(&"tiptoe"), name, "the keyboard walk's footfalls were not tiptoes")
 	room.mime.walk_to(Vector2(400, 200))
 	await _walk_trace(room.mime, 300)
 	_check(rig.view == CharacterRig.View.BACK, name, "walking up the mime shows %s" % CharacterRig.View.keys()[rig.view])
