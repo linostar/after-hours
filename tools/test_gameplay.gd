@@ -120,6 +120,7 @@ func _tests() -> Array[Callable]:
 		_test_paintings_registry,
 		_test_canvas_traces_and_grades,
 		_test_canvas_close_keeps_strokes,
+		_test_grade_badge_shows_each_wing,
 		_test_canvas_assist_paints_good,
 		_test_room_tap_walks_around_partition,
 		_test_room_tap_on_wall_stops_at_floor,
@@ -742,7 +743,8 @@ func _test_canvas_traces_and_grades() -> void:
 	_check(canvas.traced.size() == 1 and canvas.visible and result.is_empty(), name, "after the first stroke: %d traced, visible %s, painted %s" % [canvas.traced.size(), canvas.visible, result])
 	await _tap_at(_on_pad(canvas, canvas.ghosts[1])[0])
 	var grade := canvas.get_node("Grade") as TextureRect
-	_check(grade.visible and grade.texture == ForgeryCanvas.GRADE_ICONS[Forgery.Grade.PERFECT], name, "an exact fake does not show the Perfect icon")
+	_check(grade.visible and grade.texture == ForgeryCanvas.GRADE_ICONS[Forgery.Grade.PERFECT] and grade.rotation == 0.0, name, "an exact fake does not show the Perfect badge, upright")
+	_check((grade.get_node("Picture") as TextureRect).texture == Paintings.SCANS[StringName(canvas.painting)], name, "the badge does not show the traced painting")
 	_check(await _wait_until(func() -> bool: return not result.is_empty(), 120), name, "painted never came after the last stroke")
 	_check(not result.is_empty() and Forgery.grade(result[0]) == Forgery.Grade.PERFECT, name, "an exact fake painted %s, not Perfect" % [result])
 	_check(not canvas.visible, name, "the canvas stays open after painting")
@@ -750,6 +752,49 @@ func _test_canvas_traces_and_grades() -> void:
 	_check(canvas.traced.is_empty(), name, "reopening a finished canvas keeps the old strokes")
 	canvas.queue_free()
 	await process_frame
+
+
+## In every wing the grade badge shows the painting just traced (its scan, through its
+## style) in the grade's frame, tilted only for Sloppy; an unknown painting at grading is
+## reported (log and badge) and the frame still shows, empty.
+func _test_grade_badge_shows_each_wing() -> void:
+	var name := "grade_badge_shows_each_wing"
+	var qualities: Array[float] = [0.2, Forgery.ASSIST_QUALITY, 1.0]
+	for w in Content.WINGS.size():
+		var painting := (load(Content.WINGS[w]) as WingData).painting
+		var result: Array[float] = []
+		var canvas := _make_canvas(result)
+		canvas.painting = painting
+		canvas.open()
+		canvas.traced = canvas.ghosts.duplicate()
+		var fake_quality := qualities[w % qualities.size()]
+		canvas._finish(fake_quality)
+		var grade := canvas.get_node("Grade") as TextureRect
+		var picture := grade.get_node("Picture") as TextureRect
+		var fake_grade := Forgery.grade(fake_quality)
+		_check(grade.visible and grade.texture == ForgeryCanvas.GRADE_ICONS[fake_grade], name, "wing %d: the %s badge does not show its frame" % [w + 1, Forgery.Grade.keys()[fake_grade]])
+		_check(picture.visible and picture.texture == Paintings.SCANS[StringName(painting)], name, "wing %d: the badge shows %s, not the traced %s" % [w + 1, picture.texture.resource_path if picture.texture != null else "nothing", painting])
+		_check(picture.material is ShaderMaterial and (picture.material as ShaderMaterial).shader == Paintings.STYLES[StringName(painting)], name, "wing %d: the badge's %s is not drawn through its style" % [w + 1, painting])
+		_check(is_equal_approx(grade.rotation_degrees, ForgeryCanvas.GRADE_TILTS[fake_grade]) and (grade.rotation != 0.0) == (fake_grade == Forgery.Grade.SLOPPY), name, "wing %d: the %s badge is tilted %.1f degrees" % [w + 1, Forgery.Grade.keys()[fake_grade], grade.rotation_degrees])
+		canvas.close()
+		canvas.free()
+	var unknown_result: Array[float] = []
+	var unknown := _make_canvas(unknown_result)
+	unknown.open()
+	unknown.traced = unknown.ghosts.duplicate()
+	var errors_before := _game.errors.size()
+	_game.quiet_errors = true
+	unknown.painting = "no_such_painting"
+	unknown._finish(1.0)
+	_game.quiet_errors = false
+	_check(_game.errors.size() == errors_before + 2 and "grade badge" in _game.errors[-1] and "no_such_painting" in _game.errors[-1], name, "an unknown painting at grading was not reported (errors: %s)" % [_game.errors.slice(errors_before)])
+	_check((_game.get_node("ErrorLayer/ErrorBadge") as TextureRect).visible, name, "an unknown painting at grading shows no error badge")
+	var frame := unknown.get_node("Grade") as TextureRect
+	_check(frame.visible and frame.texture == ForgeryCanvas.GRADE_ICONS[Forgery.Grade.PERFECT] and (frame.get_node("Picture") as TextureRect).texture == null, name, "an unknown painting's badge does not show its empty frame")
+	_game.errors.resize(errors_before)
+	(_game.get_node("ErrorLayer/ErrorBadge") as TextureRect).visible = false
+	unknown.close()
+	unknown.free()
 
 
 ## Putting the brush down (by tap or by key) keeps the finished strokes; reopening
