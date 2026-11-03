@@ -48,3 +48,41 @@ func tick(_delta: float) -> void:
 
 func forget() -> void:
 	pass
+
+
+## Whether purely decorative motion is stilled (the Reduce Motion setting). Gameplay timing
+## (lights moving, pipes gushing) never is; only flourishes drawn on top of it.
+func reduce_motion() -> bool:
+	if not is_inside_tree():
+		return false
+	var game := get_node_or_null(GameState.AUTOLOAD_PATH) as GameState
+	return game != null and game.setting("reduce_motion")
+
+
+## The clock decoration is drawn at: `time`, or 0 (still) under Reduce Motion.
+func flourish(time: float) -> float:
+	return 0.0 if reduce_motion() else time
+
+
+## The points of a spiral around `centre` from radius `from` to `to`, starting at `angle`
+## and turning `turn` radians (negative turns the other way), flattened by `squash`: the
+## curl shared by the woodblock foam claws and the Van Gogh swirls.
+static func spiral(centre: Vector2, from: float, to: float, angle: float, turn: float, squash := 1.0, steps := 14) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	for k in steps + 1:
+		var t := float(k) / steps
+		var r := lerpf(from, to, t)
+		var a := angle + turn * t
+		points.append(centre + Vector2(cos(a) * r, sin(a) * r * squash))
+	return points
+
+
+## `points` stroked `width` wide in `color` over an `ink` outline (a print's or a brush's
+## line), with round ends.
+static func inked_line(canvas: CanvasItem, points: PackedVector2Array, color: Color, width: float, ink: Color, outline := 1.5) -> void:
+	canvas.draw_polyline(points, ink, width + outline * 2.0, true)
+	for end: Vector2 in [points[0], points[points.size() - 1]]:
+		canvas.draw_circle(end, width / 2.0 + outline, ink)
+	canvas.draw_polyline(points, color, width, true)
+	for end: Vector2 in [points[0], points[points.size() - 1]]:
+		canvas.draw_circle(end, width / 2.0, color)

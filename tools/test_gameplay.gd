@@ -1836,6 +1836,18 @@ func _test_no_flash_rates() -> void:
 			shaders += 1
 			_check(float(found.get_string(2)) < LIMIT_HZ, name, "%s's %s is %s" % [file, found.get_string(1), found.get_string(2)])
 	_check(shaders >= 7, name, "found only %d shader speeds (the regex no longer matches?)" % shaders)
+	# Every gimmick's decorative rate (a *_HZ constant: drips, splashes, foam, flow, motes,
+	# the glass's glint).
+	var rates := 0
+	for file in DirAccess.get_files_at("res://scripts/gimmicks"):
+		if not file.ends_with(".gd"):
+			continue
+		var constants := (load("res://scripts/gimmicks/" + file) as Script).get_script_constant_map()
+		for constant: String in constants:
+			if constant.ends_with("_HZ"):
+				rates += 1
+				_check(float(constants[constant]) < LIMIT_HZ, name, "%s's %s is %s Hz" % [file, constant, constants[constant]])
+	_check(rates >= 6, name, "found only %d gimmick decoration rates" % rates)
 	var gimmicks := 0
 	for wing_path in Content.WINGS:
 		for room_path: String in (load(wing_path) as WingData).rooms:
@@ -2966,6 +2978,12 @@ func _test_puddles_checked_and_wired() -> void:
 	_check(pipes.wet(Vector2(200, 300)) and not pipes.wet(Vector2(500, 300)) and not pipes.wet(Vector2(800, 300)), name, "the good pipe is not wet or a broken one is")
 	pipes.tick(0.1)
 	await process_frame
+	# The foam, streaks, crests and drops (and every gimmick's decoration) run on flourish:
+	# room time, still under Reduce Motion.
+	_check(pipes.flourish(1.5) == 1.5, name, "the decoration's clock is %.2f, not room time" % pipes.flourish(1.5))
+	_game.set_setting("reduce_motion", true)
+	_check(pipes.flourish(1.5) == 0.0, name, "Reduce Motion does not still the gimmick decoration")
+	_game.set_setting("reduce_motion", false)
 	pipes.free()
 	_game.errors.resize(errors_before)
 	(_game.get_node("ErrorLayer/ErrorBadge") as TextureRect).visible = false
