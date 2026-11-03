@@ -66,7 +66,7 @@ func flourish(time: float) -> float:
 
 ## The points of a spiral around `centre` from radius `from` to `to`, starting at `angle`
 ## and turning `turn` radians (negative turns the other way), flattened by `squash`: the
-## curl shared by the woodblock foam claws and the Van Gogh swirls.
+## curl shared by the woodblock foam lace and the Van Gogh swirls.
 static func spiral(centre: Vector2, from: float, to: float, angle: float, turn: float, squash := 1.0, steps := 14) -> PackedVector2Array:
 	var points := PackedVector2Array()
 	for k in steps + 1:
