@@ -6,13 +6,16 @@ extends Gimmick
 ## patch (DAMP of its full size) while it only drips, in a steady rhythm of its own. In a
 ## puddle the mime wades (SLOW of its speed) and every step splashes (LOUD: heard across
 ## the whole hearing range); guards wade at SLOW too (Guard asks slow_at for its own spot).
-## Drawn as a Hokusai woodblock print (flat fills, inked outlines, claw-fingered foam), in
-## three layers: the iron pipe on the wall (flanges, wall brackets, each burst a torn hole
-## with its metal peeled back; behind the paintings), the puddles on the floor (flat
-## Prussian blue rings with foam claws on the rim), and the falling water (in front of the
-## paintings, behind the actors: a stream with flowing streaks, foam claws at the mouth and
-## splash crests where it lands, or falling drips). The foam's sway, the streaks' flow, the
-## crests and the drops are decoration: each repeats under 2 Hz and stands still under
+## Drawn as a Hokusai woodblock print (flat Prussian tones, cream foam, indigo key-block
+## ink, claw-fingered foam), in three layers: the iron pipe on the wall (flanges, wall
+## brackets, each burst a torn hole with its metal peeled back; behind the paintings), the
+## puddles on the floor (a darker wet sheen, an inked rim, flat bands deepening to the middle,
+## a highlight crescent, foam lace and claws on the rim, ripples spreading from where the
+## water lands), and the falling water (in front of the paintings, behind the actors: a
+## ribboned stream with streaks speeding down it, thinning in and out with the gush, a crown
+## of foam crests and drops flung on ballistic arcs where it lands; between gushes drops that
+## swell, stretch, fall and burst). Every pipe moves on its own offsets. All of it is
+## decoration: each cycle repeats under 2 Hz and stands still under
 ## Reduce Motion. A pipe whose data is broken (no beat, a period or radius not above 0) is
 ## reported and left out.
 
@@ -25,17 +28,20 @@ const FLATTEN := 0.5
 const PIPE_Y := 112.0
 const PIPE_RADIUS := 6.0
 const FLANGE_RADIUS := 9.5
-## The print's palette: flat Prussian blue water in three tones, foam, ink and iron.
-const PRUSSIAN := Color(0.1, 0.23, 0.49)
-const PRUSSIAN_LIGHT := Color(0.32, 0.52, 0.75)
-const PRUSSIAN_DEEP := Color(0.04, 0.1, 0.27)
-const INK := Color(0.06, 0.07, 0.14)
-const FOAM := Color(0.97, 0.94, 0.85)
+## The print's palette (after the Great Wave): Prussian blue in three flat tones, cream foam
+## (the paper, never pure white), indigo key-block ink, and iron.
+const PRUSSIAN_DEEP := Color("1c3a6e")
+const PRUSSIAN := Color("2d5590")
+const PRUSSIAN_LIGHT := Color("4f7fae")
+const INK := Color("141a33")
+const FOAM := Color("f3ecd8")
+## The darker sheen of wet floor round a puddle.
+const WET := Color(0.08, 0.1, 0.2, 0.16)
 const IRON := Color(0.4, 0.45, 0.52)
 const IRON_LIGHT := Color(0.63, 0.68, 0.75)
 const IRON_DARK := Color(0.24, 0.27, 0.34)
 ## The falling stream lets the room show through a little: it is water in the air.
-const STREAM_ALPHA := 0.82
+const STREAM_ALPHA := 0.9
 ## Absolute z: the wall pipe just above the walls (under the paintings at -9), the falling
 ## water above the paintings and the fake's icon (-8), under the actors (0).
 const PIPE_Z := -10
@@ -43,13 +49,28 @@ const SPRAY_Z := -7
 const BRACKET_GAP := 160.0
 ## The stream's width where it lands, as a share of the puddle's radius.
 const STREAM_SPREAD := 0.3
-const SPLASH_DROPS := 5
-## Decorative cycles per second (all under the 2 Hz flash limit): drips falling, splash
-## crests and drops, the foam claws' sway and the streaks flowing down the stream.
-const DRIP_HZ := 1.2
-const SPLASH_HZ := 0.8
-const FOAM_HZ := 0.5
-const FLOW_HZ := 1.5
+const SPLASH_DROPS := 9
+const CROWN_SPIKES := 9
+const RIPPLES := 3
+## How fast a stream thins in and out at the start and end of its gush (a share of the gush).
+const GUSH_EASE := 0.06
+## A stream thinner than this (a share of full) is not drawn.
+const MIN_FLOW := 0.1
+## Where in its cycle (0..1) a drip lands.
+const DRIP_LAND := 0.82
+## Decorative cycles per second (all under the 2 Hz flash limit): drips forming, falling and
+## bursting; splash drops' flights (the slowest drop flies 0.8x as often, the fastest 1.25x);
+## the crown's crests rising and falling; the foam claws' sway; the streaks flowing down the
+## stream (each lane 0.7x to 1x of it); the ripples spreading; the stream's ribbons waving and
+## the puddle's bands shimmering.
+const DRIP_HZ := 0.8
+const SPLASH_HZ := 0.9
+const CROWN_HZ := 0.7
+const FOAM_HZ := 0.4
+const FLOW_HZ := 1.4
+const RIPPLE_HZ := 0.6
+const WAVE_HZ := 0.5
+const SHIMMER_HZ := 0.2
 
 ## Per burst: the puddle's centre (floor) and full radius (x, y, radius); the pipe bursts
 ## above it, on the back wall.
@@ -138,28 +159,118 @@ func tick(delta: float) -> void:
 		_spray.queue_redraw()
 
 
-## The puddles, on the floor: an inked rim, flat rings of Prussian blue, ripples, and foam
-## claws curling along the far rim.
+## A per-pipe offset so no two pipes or puddles move in step.
+func _seed(i: int) -> float:
+	return fposmod(puddles[i].x * 0.0131 + puddles[i].y * 0.0077 + i * 0.37, 1.0)
+
+
+## A steady pseudo-random 0..1 for pipe `i`'s `k`-th thing (a drop's arc, a crest's height).
+static func _hash(i: int, k: int) -> float:
+	return fposmod(sin(i * 12.9898 + k * 78.233) * 43758.5453, 1.0)
+
+
+## How far into its gush pipe `i` is (0..1), or -1 while it drips.
+func _gush(i: int) -> float:
+	var at := fposmod(_time / beats[i].x + beats[i].y, 1.0)
+	return at * 2.0 if at < 0.5 else -1.0
+
+
+## The stream's strength: thinning in at the start of a gush and out at its end.
+func _flow(i: int) -> float:
+	var g := _gush(i)
+	if g < 0.0:
+		return 0.0
+	return smoothstep(0.0, GUSH_EASE, g) * (1.0 - smoothstep(1.0 - GUSH_EASE, 1.0, g))
+
+
+## The puddles, on the floor: a darker wet sheen round each, an inked rim, flat Prussian
+## bands deepening toward the middle (the far shelves lit), a cream highlight crescent, a
+## foam lace and spray dots along the near rim, claw curls on the far rim, and ripples
+## spreading from where the water lands (the stream, or each drip).
 func _draw() -> void:
 	var t := flourish(_time)
 	for i in puddles.size():
 		if not usable(i):
 			continue
+		var offset := _seed(i)
 		var centre := Vector2(puddles[i].x, puddles[i].y)
 		var r := radius(i)
-		draw_colored_polygon(_ellipse(centre, r + 2.0), INK)
-		draw_colored_polygon(_ellipse(centre, r), PRUSSIAN)
-		var inner := centre + Vector2(r * 0.08, -r * FLATTEN * 0.14)
-		draw_colored_polygon(_ellipse(inner, r * 0.64), PRUSSIAN_LIGHT)
-		draw_colored_polygon(_ellipse(inner + Vector2(r * 0.04, -r * FLATTEN * 0.08), r * 0.32), PRUSSIAN)
-		draw_polyline(spiral(centre, r * 0.82, r * 0.82, PI * 0.2, PI * 0.55, FLATTEN), FOAM, 1.5, true)
-		draw_polyline(spiral(inner, r * 0.48, r * 0.48, PI * 1.15, PI * 0.5, FLATTEN), FOAM, 1.2, true)
-		var claws := maxi(2, int(r / 18.0))
+		var shimmer := t * SHIMMER_HZ + offset
+		draw_colored_polygon(_ellipse(centre + Vector2(0.0, 2.0), r * 1.22 + 6.0, 0.05, shimmer, offset), WET)
+		draw_colored_polygon(_ellipse(centre + Vector2(0.0, 1.0), r * 1.08 + 3.0, 0.05, shimmer, offset + 1.0), WET)
+		draw_colored_polygon(_ellipse(centre, r + 2.0, 0.025, shimmer, offset), INK)
+		draw_colored_polygon(_ellipse(centre, r, 0.025, shimmer, offset), PRUSSIAN)
+		# Bands: the far (upper) shelf light, the middle deep, each a key-block line round it.
+		var shelf := centre + Vector2(-r * 0.05, -r * FLATTEN * 0.1)
+		var light := _ellipse(shelf, r * 0.8, 0.05, shimmer + 0.3, offset + 2.0)
+		draw_colored_polygon(light, PRUSSIAN_LIGHT)
+		var middle := _ellipse(centre + Vector2(r * 0.04, r * FLATTEN * 0.06), r * 0.52, 0.07, shimmer + 0.6, offset + 3.0)
+		draw_colored_polygon(middle, PRUSSIAN)
+		var deep := _ellipse(centre + Vector2(r * 0.07, r * FLATTEN * 0.12), r * 0.28, 0.08, shimmer + 0.9, offset + 4.0)
+		draw_colored_polygon(deep, PRUSSIAN_DEEP)
+		for band: PackedVector2Array in [light, middle]:
+			band.append(band[0])
+			draw_polyline(band, Color(INK, 0.45), 1.0, true)
+		_crescent(centre, r, offset)
+		_ripples(i, centre, r, t)
+		_lace(centre, r, t, offset)
+		var claws := maxi(2, int(r / 22.0))
 		for k in claws:
-			var angle := PI + PI * (k + 0.5) / claws
+			var angle := PI + PI * (k + 0.5 + (_hash(i, k) - 0.5) * 0.4) / claws
 			var at := centre + Vector2(cos(angle) * r, sin(angle) * r * FLATTEN)
 			var dir := signf(cos(angle)) if absf(cos(angle)) > 0.1 else 1.0
-			_claw(self, at, 5.0 + r * 0.06, dir, sin(TAU * (t * FOAM_HZ + k * 0.3)) * 0.2)
+			_claw(self, at, 4.0 + r * 0.055, dir, sin(TAU * (t * FOAM_HZ + offset + k * 0.29)) * 0.22)
+
+
+## The highlight: a cream crescent on the far-left shelf, tapered at both ends.
+func _crescent(centre: Vector2, r: float, offset: float) -> void:
+	var outer := PackedVector2Array()
+	var inner := PackedVector2Array()
+	var from := PI * (1.08 + offset * 0.05)
+	var to := PI * 1.52
+	for k in 13:
+		var u := float(k) / 12.0
+		var angle := lerpf(from, to, u)
+		var dir := Vector2(cos(angle), sin(angle) * FLATTEN)
+		outer.append(centre + dir * r * 0.86)
+		inner.append(centre + Vector2(r * 0.03, r * FLATTEN * 0.06) + dir * r * lerpf(0.86, 0.74, sin(PI * u)))
+	inner.reverse()
+	draw_colored_polygon(outer + inner, Color(FOAM, 0.85))
+
+
+## Rings spreading over puddle `i` from where its water lands, eased out and fading: a few
+## at a time while it gushes, one per drip while it drips.
+func _ripples(i: int, centre: Vector2, r: float, t: float) -> void:
+	var rings: Array[float] = []
+	var flow := _flow(i)
+	if flow > 0.0:
+		for k in RIPPLES:
+			rings.append(fposmod(t * RIPPLE_HZ + float(k) / RIPPLES + _seed(i), 1.0))
+	else:
+		# A drip lands at DRIP_LAND of its cycle; its ring spreads over the next 70 %.
+		# and a fainter one follows it out.
+		var age := fposmod(t * DRIP_HZ + _seed(i) - DRIP_LAND, 1.0) / 0.7
+		for lag: float in [0.0, 0.22]:
+			if age - lag >= 0.0 and age - lag < 1.0:
+				rings.append(age - lag)
+	for age in rings:
+		var spread := 1.0 - (1.0 - age) * (1.0 - age)
+		var ring := _ellipse(centre, lerpf(3.0, r * 0.85, spread))
+		ring.append(ring[0])
+		var fade := (1.0 - age) * (1.0 - age) * (flow if flow > 0.0 else 1.0)
+		draw_polyline(ring, Color(FOAM, 0.75 * fade), lerpf(1.8, 0.8, age), true)
+
+
+## Foam along the near rim: broken cream dashes drifting slowly round, and spray dots.
+func _lace(centre: Vector2, r: float, t: float, offset: float) -> void:
+	var dashes := maxi(3, int(r / 12.0))
+	for k in dashes:
+		var from := PI * (0.08 + 0.84 * (k + 0.15 * sin(TAU * (t * FOAM_HZ * 0.5 + offset + k * 0.21))) / dashes)
+		draw_polyline(spiral(centre, r * 0.9, r * 0.9, from, PI * 0.45 / dashes, FLATTEN, 5), FOAM, 1.4, true)
+	for k in dashes + 2:
+		var angle := PI * (0.05 + 0.9 * (k + 0.5) / (dashes + 2))
+		var at := centre + Vector2(cos(angle), sin(angle) * FLATTEN) * r * (1.02 + 0.06 * sin(k * 2.3 + offset * 9.0))
+		draw_circle(at, 1.1 + 0.5 * fposmod(k * 0.618 + offset, 1.0), FOAM)
 
 
 ## The iron pipe along the wall: inked, lit along its top; flanges at its joints, brackets
@@ -230,9 +341,12 @@ func _burst(at: Vector2) -> void:
 		_pipe.draw_line(base, tip, IRON_LIGHT, 1.0, true)
 
 
-## The water falling from each burst. Gushing: an inked stream, lighter down its middle,
-## streaks flowing down it, foam claws flaring from the mouth and splash crests and drops
-## where it lands. Dripping: drops falling from the burst.
+## The water falling from each burst. Gushing: a ribboned stream (deep, mid and light bands
+## waving down it, inked edges) thinning in and out with the gush, cream streaks speeding
+## down it, foam claws and spray at the mouth, and where it lands a crown of foam crests
+## (the far ones behind the stream, the near ones in front) and drops flying out on
+## ballistic arcs, each on its own timing. Dripping: a drop swells under the burst,
+## stretches, falls faster and faster and bursts into a small crown where it lands.
 func _draw_spray() -> void:
 	var t := flourish(_time)
 	for i in puddles.size():
@@ -240,34 +354,147 @@ func _draw_spray() -> void:
 			continue
 		var centre := Vector2(puddles[i].x, puddles[i].y)
 		var burst := Vector2(centre.x, PIPE_Y + 3.0)
-		if not gushing(i):
-			for d in 2:
-				var u := fposmod(t * DRIP_HZ + d * 0.5, 1.0)
-				_drop(burst.lerp(centre, u * u), 2.6)
+		var flow := _flow(i)
+		if flow <= 0.0:
+			_drip(i, burst, centre, t)
+		# The first and last instants of a gush are too thin to draw (and to triangulate).
+		if flow < MIN_FLOW:
 			continue
-		var spread := puddles[i].z * STREAM_SPREAD
-		var stream := PackedVector2Array([burst + Vector2(-5, 0), burst + Vector2(5, 0), centre + Vector2(spread, 0), centre + Vector2(-spread, 0)])
-		_spray.draw_colored_polygon(stream, Color(PRUSSIAN, STREAM_ALPHA))
-		_spray.draw_colored_polygon(PackedVector2Array([burst + Vector2(-1.5, 0), burst + Vector2(2, 0), centre + Vector2(spread * 0.35, 0), centre + Vector2(-spread * 0.15, 0)]), Color(PRUSSIAN_LIGHT, STREAM_ALPHA))
-		var flow := fposmod(t * FLOW_HZ, 1.0)
-		for lane: float in [-0.6, 0.1, 0.55]:
-			for dash in 4:
-				var from := (dash + flow) / 4.0
-				var to := minf(from + 0.1, 1.0)
-				_spray.draw_line(burst.lerp(centre, from) + Vector2(lane * lerpf(5.0, spread, from), 0), burst.lerp(centre, to) + Vector2(lane * lerpf(5.0, spread, to), 0), FOAM, 1.4, true)
-		_spray.draw_line(stream[0], stream[3], INK, 2.0, true)
-		_spray.draw_line(stream[1], stream[2], INK, 2.0, true)
+		var spread := puddles[i].z * STREAM_SPREAD * lerpf(0.5, 1.0, flow)
+		_crown(i, centre, spread, t, flow, true)
+		_stream(i, burst, centre, spread, t, flow)
+		_crown(i, centre, spread, t, flow, false)
 		for side: float in [-1.0, 1.0]:
-			_claw(_spray, burst + Vector2(side * 5.0, 1.0), 9.0, side, sin(TAU * t * FOAM_HZ) * 0.25 * side)
+			_claw(_spray, burst + Vector2(side * 4.5, 1.0), 8.0 * flow, side, sin(TAU * (t * FOAM_HZ + _seed(i))) * 0.25 * side)
 		for k in 4:
+			var u := fposmod(t * SPLASH_HZ * 0.9 + k * 0.25 + _seed(i), 1.0)
 			var side := -1.0 if k % 2 == 0 else 1.0
-			var reach := spread * (1.1 if k < 2 else 0.45)
-			var bob := sin(TAU * (t * SPLASH_HZ + k * 0.25))
-			_claw(_spray, centre + Vector2(side * reach, -2.0 - bob * 2.0), 14.0 if k < 2 else 10.0, side, bob * 0.2)
+			# Spray off the mouth: a short hop out and down the wall.
+			_bead(burst + Vector2(side * (5.0 + 12.0 * u), 2.0 - 20.0 * u * (1.0 - u) + 8.0 * u), 1.6 * (1.0 - u) + 0.4, 1.0 - u)
 		for d in SPLASH_DROPS:
-			var u := fposmod(t * SPLASH_HZ + float(d) / SPLASH_DROPS, 1.0)
-			var side := -1.0 if d % 2 == 0 else 1.0
-			_drop(centre + Vector2(side * (spread + u * 22.0), -sin(u * PI) * 18.0), 2.6 * (1.0 - u) + 1.0)
+			_flying_drop(i, d, centre, spread, t, flow)
+
+
+## The stream from `burst` to `centre`: three bands, each a ribbon whose middle waves down it.
+func _stream(i: int, burst: Vector2, centre: Vector2, spread: float, t: float, flow: float) -> void:
+	var offset := _seed(i)
+	var mouth := 4.5 * flow
+	# Each band: its width share, its shift toward the lit (left) side, colour.
+	var bands: Array[Array] = [[1.0, 0.0, Color(PRUSSIAN_DEEP, STREAM_ALPHA)], [0.62, -0.22, Color(PRUSSIAN, STREAM_ALPHA)], [0.26, -0.42, Color(PRUSSIAN_LIGHT, STREAM_ALPHA)]]
+	var steps := 24
+	for band: Array in bands:
+		var left := PackedVector2Array()
+		var right := PackedVector2Array()
+		for k in steps + 1:
+			var v := float(k) / steps
+			var half := lerpf(mouth, spread, pow(v, 1.3)) * float(band[0])
+			var wave := sin(TAU * (v * 1.4 - t * WAVE_HZ + offset + float(band[0]))) * (0.6 + 2.2 * v) * flow
+			var mid := burst.lerp(centre, v) + Vector2(wave + float(band[1]) * lerpf(mouth, spread, pow(v, 1.3)), 0.0)
+			left.append(mid - Vector2(half, 0.0))
+			right.append(mid + Vector2(half, 0.0))
+		var edge := right.duplicate()
+		edge.reverse()
+		_spray.draw_colored_polygon(left + edge, band[2])
+		if band[0] == 1.0:
+			_spray.draw_polyline(left, INK, 1.6, true)
+			_spray.draw_polyline(right, INK, 1.6, true)
+	# Streaks: cream lines speeding down (falling, so each accelerates and stretches), each
+	# lane at its own pace so they never march in step.
+	for lane in 5:
+		var across := lerpf(-0.62, 0.55, lane / 4.0)
+		var pace := lerpf(0.7, 1.0, _hash(i, lane + 20))
+		for k in 3:
+			var f := fposmod(t * FLOW_HZ * pace + k / 3.0 + _hash(i, lane), 1.0)
+			var from := f * f
+			var to := minf(from + 0.04 + 0.14 * f, 1.0)
+			var line := PackedVector2Array()
+			for m in 4:
+				var v := lerpf(from, to, m / 3.0)
+				var half := lerpf(mouth, spread, pow(v, 1.3))
+				var wave := sin(TAU * (v * 1.4 - t * WAVE_HZ + offset + 1.0)) * (0.6 + 2.2 * v) * flow
+				line.append(burst.lerp(centre, v) + Vector2(wave + across * half, 0.0))
+			_spray.draw_polyline(line, Color(FOAM, sin(PI * f) * 0.95), 1.3, true)
+
+
+## The crown where the stream lands: on the far side a churning cream ring of white water
+## (drawn first), then cream crests round the landing ring, each rising and falling on its
+## own beat and curling outward at the tip, a bead flung off each; `far` draws the far half
+## (behind the stream), else the near half (in front of it).
+func _crown(i: int, centre: Vector2, spread: float, t: float, flow: float, far: bool) -> void:
+	var ring := spread * 1.1
+	if far:
+		var churn := _ellipse(centre, ring * 1.05, 0.12, t * WAVE_HZ + _seed(i), _seed(i))
+		_spray.draw_colored_polygon(churn, Color(FOAM, 0.9 * flow))
+		churn.append(churn[0])
+		_spray.draw_polyline(churn, Color(INK, flow), 1.2, true)
+		_spray.draw_colored_polygon(_ellipse(centre, ring * 0.7, 0.1, t * WAVE_HZ * 0.8, _seed(i) + 2.0), Color(PRUSSIAN_LIGHT, flow))
+	for k in CROWN_SPIKES:
+		var angle := TAU * (k + 0.5 * _hash(i, k + 40)) / CROWN_SPIKES
+		if (sin(angle) < 0.0) != far:
+			continue
+		var out := Vector2(cos(angle), sin(angle) * FLATTEN)
+		var base := centre + out * ring
+		var rise := 0.5 + 0.5 * sin(TAU * (t * CROWN_HZ + _hash(i, k + 60)))
+		var height := (10.0 + 12.0 * _hash(i, k + 80)) * (0.45 + 0.55 * rise) * flow
+		var lean := out.x * height * 0.5
+		var tip := base + Vector2(lean, -height)
+		var width := 3.0 + 2.0 * _hash(i, k + 100)
+		# The crest's tip curls back over toward the outside, like the print's wave fingers.
+		var curl := tip + Vector2(signf(out.x + 0.01) * width * 0.9, height * 0.18)
+		var crest := PackedVector2Array([base - Vector2(width, 0.0), base.lerp(tip, 0.55) + Vector2(-width * 0.45 + lean * 0.1, 0.0), tip, curl, base.lerp(tip, 0.5) + Vector2(width * 0.45 + lean * 0.1, 0.0), base + Vector2(width, 0.0)])
+		if out.x < 0.0:
+			crest = PackedVector2Array([base - Vector2(width, 0.0), base.lerp(tip, 0.5) + Vector2(-width * 0.45 + lean * 0.1, 0.0), curl, tip, base.lerp(tip, 0.55) + Vector2(width * 0.45 + lean * 0.1, 0.0), base + Vector2(width, 0.0)])
+		# A crest too low to have a shape (a thin stream's) is left out.
+		if height < 3.0 or Geometry2D.triangulate_polygon(crest).is_empty():
+			continue
+		_spray.draw_colored_polygon(crest, FOAM)
+		crest.append(crest[0])
+		_spray.draw_polyline(crest, INK, 1.1, true)
+		_bead(tip + Vector2(lean * 0.3, -3.0 - 5.0 * rise), 1.0 + 0.8 * rise, flow)
+
+
+## Splash drop `d` of pipe `i`: flung from the landing ring on a parabola (constant speed
+## across, rising and falling under gravity), its own pace and launch so none move together.
+func _flying_drop(i: int, d: int, centre: Vector2, spread: float, t: float, flow: float) -> void:
+	var pace := lerpf(0.8, 1.25, _hash(i, d + 120))
+	var u := fposmod(t * SPLASH_HZ * pace + _hash(i, d + 140), 1.0)
+	var side := -1.0 if d % 2 == 0 else 1.0
+	var start := centre + Vector2(side * spread * lerpf(0.4, 1.0, _hash(i, d + 160)), lerpf(-2.0, 3.0, _hash(i, d + 180)))
+	var across := side * lerpf(10.0, 34.0, _hash(i, d + 200)) * flow
+	var apex := lerpf(10.0, 30.0, _hash(i, d + 220)) * flow
+	var at := start + Vector2(across * u, -4.0 * apex * u * (1.0 - u) + 5.0 * u)
+	var size := lerpf(2.6, 1.2, u) * lerpf(0.7, 1.15, _hash(i, d + 240))
+	_bead(at, size, 1.0 - smoothstep(0.8, 1.0, u))
+
+
+## A drip's cycle under the burst: it swells (0 to 0.35), stretches and falls, faster and
+## faster, to the puddle (to DRIP_LAND) and bursts into a small crown and two flecks.
+func _drip(i: int, burst: Vector2, centre: Vector2, t: float) -> void:
+	var q := fposmod(t * DRIP_HZ + _seed(i), 1.0)
+	if q < 0.35:
+		var swell := q / 0.35
+		var size := lerpf(1.0, 3.2, swell)
+		var hang := burst + Vector2(0.0, 2.0 + size * (0.6 + swell))
+		_spray.draw_colored_polygon(PackedVector2Array([burst + Vector2(-1.4, 0.0), burst + Vector2(1.4, 0.0), hang + Vector2(size * 0.8, 0.0), hang + Vector2(-size * 0.8, 0.0)]), INK)
+		_water_bead(hang, size)
+	elif q < DRIP_LAND:
+		var f := (q - 0.35) / (DRIP_LAND - 0.35)
+		var at := burst.lerp(centre, f * f)
+		var tail := 2.0 + 10.0 * f
+		var size := 3.0
+		_spray.draw_colored_polygon(PackedVector2Array([at + Vector2(-size - 0.8, 0.0), at + Vector2(0.0, -size - tail), at + Vector2(size + 0.8, 0.0)]), INK)
+		_spray.draw_colored_polygon(PackedVector2Array([at + Vector2(-size, 0.0), at + Vector2(0.0, -size - tail + 1.5), at + Vector2(size, 0.0)]), PRUSSIAN_LIGHT)
+		_water_bead(at, size)
+	else:
+		var b := (q - DRIP_LAND) / (1.0 - DRIP_LAND)
+		var rise := sin(PI * b)
+		for k in 4:
+			var side := -1.0 if k < 2 else 1.0
+			var base := centre + Vector2(side * (2.0 + 2.5 * (k % 2)), 0.0)
+			var tip := base + Vector2(side * (1.5 + 2.0 * (k % 2)), -(3.0 + 3.0 * ((k + 1) % 2)) * rise)
+			_spray.draw_colored_polygon(PackedVector2Array([base - Vector2(1.4, 0.0), tip, base + Vector2(1.4, 0.0)]), FOAM)
+		for side: float in [-1.0, 1.0]:
+			_bead(centre + Vector2(side * 10.0 * b, -4.0 * 7.0 * b * (1.0 - b)), 1.3, 1.0 - b)
 
 
 ## A foam claw at `base` about `size` big: a stalk rising and curling over toward `dir`
@@ -293,17 +520,29 @@ func _claw(canvas: CanvasItem, base: Vector2, size: float, dir: float, sway: flo
 	canvas.draw_polyline(band, INK, 1.2, true)
 
 
-## A falling drop: an inked bead of blue with a glint of foam.
-func _drop(at: Vector2, r: float) -> void:
-	_spray.draw_circle(at, r + 1.0, INK)
+## A drop of spray: a cream bead ringed in ink, `alpha` see-through.
+func _bead(at: Vector2, r: float, alpha: float) -> void:
+	if alpha <= 0.0:
+		return
+	_spray.draw_circle(at, r + 0.9, Color(INK, alpha))
+	_spray.draw_circle(at, r, Color(FOAM, alpha))
+
+
+## A falling drop of water: a blue bead ringed in ink with a cream glint.
+func _water_bead(at: Vector2, r: float) -> void:
+	_spray.draw_circle(at, r + 0.9, INK)
 	_spray.draw_circle(at, r, PRUSSIAN_LIGHT)
-	_spray.draw_circle(at - Vector2(r, r) * 0.3, r * 0.35, FOAM)
+	_spray.draw_circle(at - Vector2(r, r) * 0.3, r * 0.4, FOAM)
 
 
-## A flat ellipse's outline points around `centre`, `r` across.
-func _ellipse(centre: Vector2, r: float) -> PackedVector2Array:
+## A flat ellipse's outline points around `centre`, `r` across; `wobble` (a share of r)
+## ripples its edge in slow waves at `phase` (cycles), offset by `offset`.
+func _ellipse(centre: Vector2, r: float, wobble := 0.0, phase := 0.0, offset := 0.0) -> PackedVector2Array:
 	var points := PackedVector2Array()
-	for k in 32:
-		var angle := TAU * k / 32.0
-		points.append(centre + Vector2(cos(angle) * r, sin(angle) * r * FLATTEN))
+	for k in 40:
+		var angle := TAU * k / 40.0
+		var rr := r
+		if wobble > 0.0:
+			rr *= 1.0 + wobble * (sin(3.0 * angle + TAU * phase + offset * 5.0) * 0.6 + sin(5.0 * angle - TAU * phase * 0.7 + offset * 9.0) * 0.4)
+		points.append(centre + Vector2(cos(angle) * rr, sin(angle) * rr * FLATTEN))
 	return points
