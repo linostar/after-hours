@@ -6,10 +6,10 @@ extends Gimmick
 ## patch (DAMP of its full size) while it only drips, in a steady rhythm of its own. In a
 ## puddle the mime wades (SLOW of its speed) and every step splashes (LOUD: heard across
 ## the whole hearing range); guards wade at SLOW too (Guard asks slow_at for its own spot).
-## Drawn as a Hokusai woodblock print (flat Prussian tones, cream foam, indigo key-block
+## Drawn as a Hokusai woodblock print (muted Prussian tones, cream foam, indigo key-block
 ## ink and spray), in three layers: the iron pipe on the wall (flanges, wall
 ## brackets, each burst a torn hole with its metal peeled back; behind the paintings), the
-## puddles on the floor (a darker wet sheen, an inked rim, flat bands deepening to the middle,
+## puddles on the floor (a darker wet sheen, a soft inked rim, the water shading from deep in the middle,
 ## a highlight crescent, foam lace and lapping splashes on the rim, ripples spreading from where the
 ## water lands), and the falling water (in front of the paintings, behind the actors: a
 ## ribboned stream with streaks speeding down it, thinning in and out with the gush, a crown
@@ -28,11 +28,14 @@ const FLATTEN := 0.5
 const PIPE_Y := 112.0
 const PIPE_RADIUS := 6.0
 const FLANGE_RADIUS := 9.5
-## The print's palette (after the Great Wave): Prussian blue in three flat tones, cream foam
-## (the paper, never pure white), indigo key-block ink, and iron.
-const PRUSSIAN_DEEP := Color("1c3a6e")
-const PRUSSIAN := Color("2d5590")
-const PRUSSIAN_LIGHT := Color("4f7fae")
+## The print's palette (after the Great Wave): Prussian blue in three muted, faded tones
+## (the puddles shade smoothly between them), cream foam (the paper, never pure white),
+## indigo key-block ink, and iron.
+const PRUSSIAN_DEEP := Color("2e4259")
+const PRUSSIAN := Color("4a6280")
+const PRUSSIAN_LIGHT := Color("8099b0")
+## The puddle's gradient: rings from the deep middle out to the rim.
+const SHADE_RINGS := 7
 const INK := Color("141a33")
 const FOAM := Color("f3ecd8")
 ## The darker sheen of wet floor round a puddle.
@@ -183,10 +186,11 @@ func _flow(i: int) -> float:
 	return smoothstep(0.0, GUSH_EASE, g) * (1.0 - smoothstep(1.0 - GUSH_EASE, 1.0, g))
 
 
-## The puddles, on the floor: a darker wet sheen round each, an inked rim, flat Prussian
-## bands deepening toward the middle (the far shelves lit), a cream highlight crescent, a
-## foam lace and spray dots along the near rim, splashes lapping up round the rim, and ripples
-## spreading from where the water lands (the stream, or each drip).
+## The puddles, on the floor: a darker wet sheen round each, a soft inked rim, the water
+## shading smoothly from deep in the middle to light at the rim (the far-left shelf lit), a
+## cream highlight crescent, a foam lace and spray dots along the near rim, splashes lapping
+## up round the rim, and ripples spreading from where the water lands (the stream, or each
+## drip).
 func _draw() -> void:
 	var t := flourish(_time)
 	for i in puddles.size():
@@ -198,25 +202,41 @@ func _draw() -> void:
 		var shimmer := t * SHIMMER_HZ + offset
 		draw_colored_polygon(_ellipse(centre + Vector2(0.0, 2.0), r * 1.22 + 6.0, 0.05, shimmer, offset), WET)
 		draw_colored_polygon(_ellipse(centre + Vector2(0.0, 1.0), r * 1.08 + 3.0, 0.05, shimmer, offset + 1.0), WET)
-		draw_colored_polygon(_ellipse(centre, r + 2.0, 0.025, shimmer, offset), INK)
-		draw_colored_polygon(_ellipse(centre, r, 0.025, shimmer, offset), PRUSSIAN)
-		# Bands: the far (upper) shelf light, the middle deep, each a key-block line round it.
-		var shelf := centre + Vector2(-r * 0.05, -r * FLATTEN * 0.1)
-		var light := _ellipse(shelf, r * 0.8, 0.05, shimmer + 0.3, offset + 2.0)
-		draw_colored_polygon(light, PRUSSIAN_LIGHT)
-		var middle := _ellipse(centre + Vector2(r * 0.04, r * FLATTEN * 0.06), r * 0.52, 0.07, shimmer + 0.6, offset + 3.0)
-		draw_colored_polygon(middle, PRUSSIAN)
-		var deep := _ellipse(centre + Vector2(r * 0.07, r * FLATTEN * 0.12), r * 0.28, 0.08, shimmer + 0.9, offset + 4.0)
-		draw_colored_polygon(deep, PRUSSIAN_DEEP)
-		for band: PackedVector2Array in [light, middle]:
-			band.append(band[0])
-			draw_polyline(band, Color(INK, 0.45), 1.0, true)
+		draw_colored_polygon(_ellipse(centre, r + 1.5, 0.025, shimmer, offset), Color(INK, 0.55))
+		_shade(centre, r, shimmer, offset)
 		_crescent(centre, r, offset)
 		_ripples(i, centre, r, t)
 		_lace(centre, r, t, offset)
 		var splashes := maxi(3, int(r / 16.0))
 		for k in splashes:
 			_rim_splash(i, k, centre, r, TAU * (k + 0.5 + (_hash(i, k) - 0.5) * 0.5) / splashes, t)
+
+
+## The water's body: SHADE_RINGS rings from the deep middle (a little toward the near side)
+## out to the rim, drawn as quads with a colour at each corner so the tones blend: deep in
+## the middle, mid across, lighter at the rim, and lighter still on the far-left shelf where
+## the room's light falls.
+func _shade(centre: Vector2, r: float, shimmer: float, offset: float) -> void:
+	var middle := centre + Vector2(r * 0.07, r * FLATTEN * 0.12)
+	var rings: Array[PackedVector2Array] = []
+	var tones: Array[PackedColorArray] = []
+	for k in SHADE_RINGS + 1:
+		var f := float(k) / SHADE_RINGS
+		var ring := _ellipse(middle.lerp(centre, f), r * f, 0.025 * f, shimmer, offset)
+		var depth := PRUSSIAN_DEEP.lerp(PRUSSIAN, smoothstep(0.0, 0.7, f)).lerp(PRUSSIAN_LIGHT, smoothstep(0.6, 1.0, f) * 0.35)
+		var tone := PackedColorArray()
+		for m in ring.size():
+			var angle := TAU * m / ring.size()
+			var lit := pow(0.5 + 0.5 * cos(angle - PI * 1.25), 2.0) * smoothstep(0.25, 0.9, f) * 0.55
+			tone.append(depth.lerp(PRUSSIAN_LIGHT, lit))
+		rings.append(ring)
+		tones.append(tone)
+	for k in SHADE_RINGS:
+		var inner := rings[k]
+		var outer := rings[k + 1]
+		for m in inner.size():
+			var n := (m + 1) % inner.size()
+			draw_primitive(PackedVector2Array([inner[m], inner[n], outer[n], outer[m]]), PackedColorArray([tones[k][m], tones[k][n], tones[k + 1][n], tones[k + 1][m]]), PackedVector2Array())
 
 
 ## The highlight: a cream crescent on the far-left shelf, tapered at both ends.
@@ -232,7 +252,7 @@ func _crescent(centre: Vector2, r: float, offset: float) -> void:
 		outer.append(centre + dir * r * 0.86)
 		inner.append(centre + Vector2(r * 0.03, r * FLATTEN * 0.06) + dir * r * lerpf(0.86, 0.74, sin(PI * u)))
 	inner.reverse()
-	draw_colored_polygon(outer + inner, Color(FOAM, 0.85))
+	draw_colored_polygon(outer + inner, Color(FOAM, 0.55))
 
 
 ## Rings spreading over puddle `i` from where its water lands, eased out and fading: a few
