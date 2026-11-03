@@ -36,8 +36,13 @@ Lengthening pass (more guards; the wing already had three rooms):
 3. Even so, the straight line from Eden's right door to the exit crossed both Eden guards'
    beats. The route now goes along the top of the room first (a waypoint at (300, 215)), as
    a player would.
+4. The Garden's third guard paced north up x 840 with the door from Hell's arrival point in
+   its cone (the layout rule above): the old run escaped only on timing, and when the walls'
+   clearance changed the timing (art pass) no wait got the mime in unseen. It now paces east
+   and west along y 420 (x 760 to 880), the arrival point never within 41 degrees of its view.
 
 ## Bot result
 `tools/bot.gd --record`: 42 plays; the doors in wait 4.25 and 4 s; the run takes 39 s, par 90 s (the bot threads the extra guards; a person will be slower).
 Re-recorded without the creatures (step 9): 8 plays; the run takes 30.55 s, par 80 s.
 Re-recorded at a person's painting pace (step 10): 8 plays; the run takes 50.6 s, par 80 s.
+Re-recorded with every walker keeping a body's width off the display walls (art pass), the Garden's third guard pacing sideways: 36 plays; the run takes 57.8 s, par 90 s.

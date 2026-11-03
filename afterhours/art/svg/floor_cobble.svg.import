@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bn8qicvt8r8or"
-path="res://.godot/imported/guard_leg.svg-694152778cc079b8d04ea4789d4284c1.ctex"
+uid="uid://c2qoomhd7ihqw"
+path="res://.godot/imported/floor_cobble.svg-3186366d4a10f8cf87677fa0f7587d6b.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/svg/guard_leg.svg"
-dest_files=["res://.godot/imported/guard_leg.svg-694152778cc079b8d04ea4789d4284c1.ctex"]
+source_file="res://art/svg/floor_cobble.svg"
+dest_files=["res://.godot/imported/floor_cobble.svg-3186366d4a10f8cf87677fa0f7587d6b.ctex"]
 
 [params]
 
@@ -38,6 +38,6 @@ process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
 detect_3d/compress_to=1
-svg/scale=1.0
+svg/scale=2.0
 editor/scale_with_editor_scale=false
 editor/convert_colors_with_editor_theme=false

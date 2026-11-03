@@ -1,10 +1,11 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/room_base.tscn" id="base"]
 [ext_resource type="PackedScene" path="res://scenes/tilt_frame.tscn" id="frame"]
 [ext_resource type="PackedScene" path="res://scenes/hiding_portrait.tscn" id="portrait"]
 [ext_resource type="PackedScene" path="res://scenes/easel.tscn" id="easel"]
 [ext_resource type="PackedScene" path="res://scenes/door.tscn" id="door"]
+[ext_resource type="Texture2D" path="res://art/svg/floor_checker.svg" id="floor_tile"]
 
 [node name="Room" instance=ExtResource("base")]
 
@@ -18,12 +19,9 @@ color = Color(0.22, 0.25, 0.3, 1)
 color = Color(0.15, 0.17, 0.21, 1)
 
 [node name="Floor" parent="."]
-color = Color(0.42, 0.36, 0.28, 1)
-
-[node name="DoorArt0" type="Polygon2D" parent="."]
-z_index = -10
-color = Color(0.12, 0.09, 0.1, 1)
-polygon = PackedVector2Array(0, 290, 24, 290, 24, 370, 0, 370)
+color = Color(1, 1, 1, 1)
+texture_repeat = 2
+texture = ExtResource("floor_tile")
 
 [node name="FrameA" parent="Frames" instance=ExtResource("frame")]
 position = Vector2(450, 75)

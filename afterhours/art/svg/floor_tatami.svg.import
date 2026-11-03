@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://fmfq6jnbtbg5"
-path="res://.godot/imported/mime_leg.svg-1035c7c43acefa95182c68feaf71249f.ctex"
+uid="uid://bneqdlg2hl5aq"
+path="res://.godot/imported/floor_tatami.svg-3506232a4f304b64864c41df00f0255e.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/svg/mime_leg.svg"
-dest_files=["res://.godot/imported/mime_leg.svg-1035c7c43acefa95182c68feaf71249f.ctex"]
+source_file="res://art/svg/floor_tatami.svg"
+dest_files=["res://.godot/imported/floor_tatami.svg-3506232a4f304b64864c41df00f0255e.ctex"]
 
 [params]
 
@@ -38,6 +38,6 @@ process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
 detect_3d/compress_to=1
-svg/scale=1.0
+svg/scale=2.0
 editor/scale_with_editor_scale=false
 editor/convert_colors_with_editor_theme=false

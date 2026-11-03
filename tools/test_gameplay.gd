@@ -120,6 +120,7 @@ func _tests() -> Array[Callable]:
 		_test_paintings_registry,
 		_test_canvas_traces_and_grades,
 		_test_canvas_close_keeps_strokes,
+		_test_grade_badge_shows_each_wing,
 		_test_canvas_assist_paints_good,
 		_test_room_tap_walks_around_partition,
 		_test_room_tap_on_wall_stops_at_floor,
@@ -190,7 +191,13 @@ func _tests() -> Array[Callable]:
 		_test_rotate_overlay_pauses,
 		_test_juice_on_actions,
 		_test_rig_views,
+		_test_room_at_night,
+		_test_wing_floors,
+		_test_puddles_clear_of_partitions,
+		_test_guards_patrol_round_partitions,
+		_test_patrol_paths_clear_walls,
 		_test_rig_walk_cycle,
+		_test_rig_joints_bend,
 		_test_mime_faces_its_way,
 		_test_ghost_faces_travel,
 		_test_no_flash_rates,
@@ -741,7 +748,8 @@ func _test_canvas_traces_and_grades() -> void:
 	_check(canvas.traced.size() == 1 and canvas.visible and result.is_empty(), name, "after the first stroke: %d traced, visible %s, painted %s" % [canvas.traced.size(), canvas.visible, result])
 	await _tap_at(_on_pad(canvas, canvas.ghosts[1])[0])
 	var grade := canvas.get_node("Grade") as TextureRect
-	_check(grade.visible and grade.texture == ForgeryCanvas.GRADE_ICONS[Forgery.Grade.PERFECT], name, "an exact fake does not show the Perfect icon")
+	_check(grade.visible and grade.texture == ForgeryCanvas.GRADE_ICONS[Forgery.Grade.PERFECT] and grade.rotation == 0.0, name, "an exact fake does not show the Perfect badge, upright")
+	_check((grade.get_node("Picture") as TextureRect).texture == Paintings.SCANS[StringName(canvas.painting)], name, "the badge does not show the traced painting")
 	_check(await _wait_until(func() -> bool: return not result.is_empty(), 120), name, "painted never came after the last stroke")
 	_check(not result.is_empty() and Forgery.grade(result[0]) == Forgery.Grade.PERFECT, name, "an exact fake painted %s, not Perfect" % [result])
 	_check(not canvas.visible, name, "the canvas stays open after painting")
@@ -749,6 +757,49 @@ func _test_canvas_traces_and_grades() -> void:
 	_check(canvas.traced.is_empty(), name, "reopening a finished canvas keeps the old strokes")
 	canvas.queue_free()
 	await process_frame
+
+
+## In every wing the grade badge shows the painting just traced (its scan, through its
+## style) in the grade's frame, tilted only for Sloppy; an unknown painting at grading is
+## reported (log and badge) and the frame still shows, empty.
+func _test_grade_badge_shows_each_wing() -> void:
+	var name := "grade_badge_shows_each_wing"
+	var qualities: Array[float] = [0.2, Forgery.ASSIST_QUALITY, 1.0]
+	for w in Content.WINGS.size():
+		var painting := (load(Content.WINGS[w]) as WingData).painting
+		var result: Array[float] = []
+		var canvas := _make_canvas(result)
+		canvas.painting = painting
+		canvas.open()
+		canvas.traced = canvas.ghosts.duplicate()
+		var fake_quality := qualities[w % qualities.size()]
+		canvas._finish(fake_quality)
+		var grade := canvas.get_node("Grade") as TextureRect
+		var picture := grade.get_node("Picture") as TextureRect
+		var fake_grade := Forgery.grade(fake_quality)
+		_check(grade.visible and grade.texture == ForgeryCanvas.GRADE_ICONS[fake_grade], name, "wing %d: the %s badge does not show its frame" % [w + 1, Forgery.Grade.keys()[fake_grade]])
+		_check(picture.visible and picture.texture == Paintings.SCANS[StringName(painting)], name, "wing %d: the badge shows %s, not the traced %s" % [w + 1, picture.texture.resource_path if picture.texture != null else "nothing", painting])
+		_check(picture.material is ShaderMaterial and (picture.material as ShaderMaterial).shader == Paintings.STYLES[StringName(painting)], name, "wing %d: the badge's %s is not drawn through its style" % [w + 1, painting])
+		_check(is_equal_approx(grade.rotation_degrees, ForgeryCanvas.GRADE_TILTS[fake_grade]) and (grade.rotation != 0.0) == (fake_grade == Forgery.Grade.SLOPPY), name, "wing %d: the %s badge is tilted %.1f degrees" % [w + 1, Forgery.Grade.keys()[fake_grade], grade.rotation_degrees])
+		canvas.close()
+		canvas.free()
+	var unknown_result: Array[float] = []
+	var unknown := _make_canvas(unknown_result)
+	unknown.open()
+	unknown.traced = unknown.ghosts.duplicate()
+	var errors_before := _game.errors.size()
+	_game.quiet_errors = true
+	unknown.painting = "no_such_painting"
+	unknown._finish(1.0)
+	_game.quiet_errors = false
+	_check(_game.errors.size() == errors_before + 2 and "grade badge" in _game.errors[-1] and "no_such_painting" in _game.errors[-1], name, "an unknown painting at grading was not reported (errors: %s)" % [_game.errors.slice(errors_before)])
+	_check((_game.get_node("ErrorLayer/ErrorBadge") as TextureRect).visible, name, "an unknown painting at grading shows no error badge")
+	var frame := unknown.get_node("Grade") as TextureRect
+	_check(frame.visible and frame.texture == ForgeryCanvas.GRADE_ICONS[Forgery.Grade.PERFECT] and (frame.get_node("Picture") as TextureRect).texture == null, name, "an unknown painting's badge does not show its empty frame")
+	_game.errors.resize(errors_before)
+	(_game.get_node("ErrorLayer/ErrorBadge") as TextureRect).visible = false
+	unknown.close()
+	unknown.free()
 
 
 ## Putting the brush down (by tap or by key) keeps the finished strokes; reopening
@@ -1015,9 +1066,11 @@ func _test_guard_partition_blocks_sight() -> void:
 
 
 ## At a waypoint the guard pauses still facing the leg it walked, then turns to the next
-## standing before it walks on.
+## standing before it walks on. Facing is compared within FACING_TOLERANCE radians: the leg
+## follows the navmesh's path, whose points carry float noise far below a visible angle.
 func _test_guard_pauses_facing_its_leg() -> void:
 	var name := "guard_pauses_facing_its_leg"
+	const FACING_TOLERANCE := 0.001
 	var room := await _load_room()
 	if room == null:
 		return
@@ -1028,16 +1081,16 @@ func _test_guard_pauses_facing_its_leg() -> void:
 	var first_leg := (corner - room.guard.route[0]).normalized()
 	for i in roundi(Guard.WAYPOINT_PAUSE * 60.0) - 4:
 		await physics_frame
-	_check(room.guard.position == corner and room.guard.facing.is_equal_approx(first_leg), name, "during the pause the guard faces %s, not its finished leg %s" % [room.guard.facing, first_leg])
+	_check(room.guard.position == corner and absf(room.guard.facing.angle_to(first_leg)) < FACING_TOLERANCE, name, "during the pause the guard faces %s, not its finished leg %s" % [room.guard.facing, first_leg])
 	for i in 6:
 		await physics_frame
 	var next_leg := (room.guard.route[2] - corner).normalized()
 	# It turns toward the next leg at TURN_RATE: not snapped, and there within the turn's time.
-	_check(not room.guard.facing.is_equal_approx(next_leg), name, "the guard snapped to its next leg instead of turning")
+	_check(absf(room.guard.facing.angle_to(next_leg)) > FACING_TOLERANCE, name, "the guard snapped to its next leg instead of turning")
 	_check(room.guard.position == corner, name, "the guard walked off at %s mid-turn (sideways to the way it faces)" % room.guard.position)
 	for i in ceili(absf(first_leg.angle_to(next_leg)) / Guard.TURN_RATE * 60.0) + 2:
 		await physics_frame
-	_check(room.guard.facing.is_equal_approx(next_leg), name, "after the pause and its turn the guard faces %s, not its next leg %s" % [room.guard.facing, next_leg])
+	_check(absf(room.guard.facing.angle_to(next_leg)) < FACING_TOLERANCE, name, "after the pause and its turn the guard faces %s, not its next leg %s" % [room.guard.facing, next_leg])
 
 
 ## A guard turns toward a new heading at TURN_RATE, never snapping: a noise behind it turns
@@ -1620,7 +1673,7 @@ func _test_juice_on_actions() -> void:
 	for i in 20:
 		await physics_frame
 		await process_frame
-		bobbed = bobbed or room.get_node("Actors/Mime/Rig/Body").position.y < 0.0
+		bobbed = bobbed or room.get_node("Actors/Mime/Rig/Body").position.y != 0.0
 	_check(bobbed, name, "the walking mime does not bob")
 	await _walk_trace(room.mime, 300)
 	for i in 6:
@@ -1675,16 +1728,210 @@ func _test_juice_on_actions() -> void:
 	_check(await _wait_until(func() -> bool: return hub.mime.rig.squash.y < 1.0, 10), name, "E in the hub with no door in reach did not shrug")
 
 
+## Every room is at night (a CanvasModulate of Room.NIGHT) and what gives light or is
+## read (the guard's cone and eyes, the pause button, the fake's icon) is unshaded; a wing's
+## first room has no entry doorway, only its exit door on the left.
+func _test_room_at_night() -> void:
+	var name := "room_at_night"
+	var room := await _load_room()
+	if room == null:
+		return
+	var night := room.get_node_or_null("Night") as CanvasModulate
+	_check(night != null and night.color == Room.NIGHT, name, "the room has no night tint")
+	for path: String in ["PauseButton", "FakeIcon", "Actors/Guard", "Actors/Guard/Cone"]:
+		var item := room.get_node(path) as CanvasItem
+		_check(item.material == Room.GLOW, name, "%s is not lit against the night" % path)
+	for wing: String in Content.WINGS:
+		var first := (load((load(wing) as WingData).rooms[0]) as PackedScene).instantiate()
+		var lefts := 0
+		for door in first.get_node("Doors").get_children():
+			lefts += 1 if (door as Node2D).position.x < 480.0 else 0
+		_check(first.get_children().all(func(each: Node) -> bool: return not each.name.begins_with("DoorArt")) and lefts == 1, name, "%s's first room shows an entry doorway or has %d doors on the left" % [wing.get_file(), lefts])
+		first.free()
+
+
+## Each wing's rooms are floored in that wing's own tile (tools/floors.py), repeating across
+## the floor, and their display walls (Partition) are built in the wing's own style, never
+## the plain museum one; no two wings share a tile or a style.
+func _test_wing_floors() -> void:
+	var name := "wing_floors"
+	var tiles: Array[Texture2D] = []
+	var styles: Array[Partition.Style] = []
+	for wing: String in Content.WINGS:
+		var tile: Texture2D = null
+		var style := Partition.Style.MUSEUM
+		for path: String in (load(wing) as WingData).rooms:
+			var room := (load(path) as PackedScene).instantiate()
+			var ground := room.get_node("Floor") as Polygon2D
+			_check(ground.texture != null and ground.texture_repeat == CanvasItem.TEXTURE_REPEAT_ENABLED, name, "%s's floor is not tiled" % path.get_file())
+			if tile == null:
+				tile = ground.texture
+			_check(ground.texture == tile, name, "%s's floor is not its wing's tile" % path.get_file())
+			for each in room.get_node("Actors").get_children():
+				if each is Partition:
+					if style == Partition.Style.MUSEUM:
+						style = (each as Partition).style
+					_check((each as Partition).style == style and style != Partition.Style.MUSEUM, name, "%s's %s is not built in its wing's style" % [path.get_file(), each.name])
+			room.free()
+		_check(not tile in tiles, name, "%s shares its floor tile with another wing" % wing.get_file())
+		tiles.append(tile)
+		_check(not style in styles, name, "%s shares its display walls' style with another wing" % wing.get_file())
+		styles.append(style)
+
+
+## No display wall stands in water: in every wing room, each burst pipe's puddle at full
+## size keeps PUDDLE_CLEARANCE off every Partition's footprint, and no wall's face (drawn
+## above its footprint) hides a puddle behind it.
+func _test_puddles_clear_of_partitions() -> void:
+	var name := "puddles_clear_of_partitions"
+	const PUDDLE_CLEARANCE := 12.0
+	for wing: String in Content.WINGS:
+		for path: String in (load(wing) as WingData).rooms:
+			var room := (load(path) as PackedScene).instantiate()
+			var waters: Array[Puddles] = []
+			var walls: Array[Partition] = []
+			var pending: Array[Node] = [room]
+			while not pending.is_empty():
+				var node: Node = pending.pop_back()
+				if node is Puddles:
+					waters.append(node as Puddles)
+				elif node is Partition:
+					walls.append(node as Partition)
+				pending.append_array(node.get_children())
+			for water in waters:
+				for puddle in water.puddles:
+					var centre := Vector2(puddle.x, puddle.y)
+					for wall in walls:
+						var foot := Rect2(wall.position.x - wall.width / 2.0, wall.position.y - wall.depth, wall.width, wall.depth)
+						var face := Rect2(foot.position.x, wall.position.y - wall.height - wall.depth, wall.width, wall.height + wall.depth)
+						var standing := _ellipse_meets(centre, puddle.z + PUDDLE_CLEARANCE, foot)
+						var hidden := centre.y < wall.position.y and _ellipse_meets(centre, puddle.z, face)
+						_check(not standing and not hidden, name, "%s: %s %s the puddle at %s" % [path.get_file(), wall.name, "stands in" if standing else "hides", puddle])
+			room.free()
+
+
+## Guards patrol round display walls, never through them, nor brushing them: in wing 2's
+## hall the guard's legs down x 700 and up x 260 run straight across a partition; over two
+## of its loops' legs no guard's feet ever come within Partition.WALKER_CLEARANCE of a
+## footprint (so no body overlaps a wall), and the guard still reaches the waypoints past
+## them.
+func _test_guards_patrol_round_partitions() -> void:
+	var name := "guards_patrol_round_partitions"
+	var room := await _load_wing_room(name, "res://scenes/wings/wing_02_hall.tscn")
+	if room == null:
+		return
+	var feet := _footprints(room)
+	# Walkers cut a path's corner by their agents' path_desired_distance; the carve allows
+	# Partition.CORNER_SLACK for it.
+	for walker: Node in [room.guard, room.mime]:
+		var agent := walker.get_node("Agent") as NavigationAgent2D
+		_check(agent.path_desired_distance <= Partition.CORNER_SLACK, name, "%s turns corners %.1f early, more than Partition.CORNER_SLACK" % [walker.name, agent.path_desired_distance])
+	for guard in room.guards:
+		guard.target = null
+	var brushed := []
+	var reached := {}
+	for frame in 1500:
+		await physics_frame
+		for guard in room.guards:
+			var gap := _clearance(guard.position, feet)
+			if gap < Partition.WALKER_CLEARANCE - 0.5:
+				brushed.append([guard.name, guard.position.round(), snappedf(gap, 0.1)])
+		for point: Vector2 in [Vector2(700, 480), Vector2(260, 250)]:
+			if room.guard.position.distance_to(point) < 1.0:
+				reached[point] = true
+	_check(brushed.is_empty(), name, "guards came within a body of a partition at [name, at, gap] %s" % [brushed.slice(0, 3)])
+	_check(reached.size() == 2, name, "the hall guard did not reach the waypoints past the partitions (reached %s)" % [reached.keys()])
+
+
+## Every guard's patrol keeps clear of every display wall, in every wing room and the slice
+## room: each waypoint, and the whole of each leg as the guard walks it (the navmesh's path
+## between waypoints, then the last straight stretch onto the waypoint), stays at least
+## Partition.WALKER_CLEARANCE off every footprint.
+func _test_patrol_paths_clear_walls() -> void:
+	var name := "patrol_paths_clear_walls"
+	var paths: Array[String] = [ROOM_PATH]
+	for wing: String in Content.WINGS:
+		paths.append_array((load(wing) as WingData).rooms)
+	for path in paths:
+		var room := await _load_wing_room(name, path)
+		if room == null:
+			continue
+		var feet := _footprints(room)
+		if feet.is_empty():
+			continue
+		var map := room.get_world_2d().navigation_map
+		for guard in room.guards:
+			for i in guard.route.size():
+				var from := guard.route[i]
+				var to := guard.route[(i + 1) % guard.route.size()]
+				_check(_clearance(to, feet) >= Partition.WALKER_CLEARANCE, name, "%s: %s's waypoint %s is %.1f off a partition" % [path.get_file(), guard.name, to, _clearance(to, feet)])
+				var walk := NavigationServer2D.map_get_path(map, from, to, true)
+				walk.append(to)
+				var nearest := INF
+				var at := from
+				for k in walk.size() - 1:
+					for s in 21:
+						var point := walk[k].lerp(walk[k + 1], s / 20.0)
+						var gap := _clearance(point, feet)
+						if gap < nearest:
+							nearest = gap
+							at = point
+				_check(nearest >= Partition.WALKER_CLEARANCE - 0.5, name, "%s: %s's leg %s -> %s passes %.1f off a partition at %s" % [path.get_file(), guard.name, from, to, nearest, at.round()])
+
+
+## Loads the room scene at `path` and waits until its navigation map has synced its navmesh
+## (failing `name` and returning null if it cannot).
+func _load_wing_room(name: String, path: String) -> Room:
+	if change_scene_to_file(path) != OK:
+		_check(false, name, "cannot load %s" % path)
+		return null
+	for i in 3:
+		await physics_frame
+	var room := current_scene as Room
+	var map := room.get_world_2d().navigation_map
+	if not await _wait_until(func() -> bool: return NavigationServer2D.map_get_closest_point_owner(map, room.mime.position).is_valid(), 60):
+		_check(false, name, "%s's navigation map never synced" % path.get_file())
+		return null
+	return room
+
+
+## The floor footprints of `room`'s display walls (Partition).
+func _footprints(room: Room) -> Array[Rect2]:
+	var feet: Array[Rect2] = []
+	for each in room.get_node("Actors").get_children():
+		if each is Partition:
+			var wall := each as Partition
+			feet.append(Rect2(wall.position.x - wall.width / 2.0, wall.position.y - wall.depth, wall.width, wall.depth))
+	return feet
+
+
+## How far `point` is from the nearest of `feet` (0 inside one).
+func _clearance(point: Vector2, feet: Array[Rect2]) -> float:
+	var nearest := INF
+	for foot in feet:
+		nearest = minf(nearest, point.distance_to(point.clamp(foot.position, foot.end)))
+	return nearest
+
+
+## Whether the flat puddle ellipse round `centre` (`r` across, Puddles.FLATTEN of it deep)
+## meets `rect`: the rect's point nearest the centre lies inside it.
+func _ellipse_meets(centre: Vector2, r: float, rect: Rect2) -> bool:
+	var near := centre.clamp(rect.position, rect.end)
+	var off := near - centre
+	return (off.x / r) ** 2 + (off.y / (r * Puddles.FLATTEN)) ** 2 <= 1.0
+
+
 ## A rig's view follows the heading: down front, up back, right and left the side view
-## (mirrored for left); a diagonal near the boundary keeps the current view (hysteresis); a
-## zero heading keeps it too.
+## (mirrored for left); a diagonal is side on from any view; a heading between SIDE_LEAVE
+## and SIDE_ENTER keeps the current view (hysteresis); a zero heading keeps it too.
 func _test_rig_views() -> void:
 	var name := "rig_views"
 	const V := CharacterRig.View
 	var cases: Array[Array] = [
 		[Vector2.DOWN, V.FRONT, V.FRONT], [Vector2.UP, V.FRONT, V.BACK], [Vector2.RIGHT, V.FRONT, V.RIGHT],
-		[Vector2.LEFT, V.FRONT, V.LEFT], [Vector2.ZERO, V.LEFT, V.LEFT], [Vector2(1, 0.9), V.RIGHT, V.RIGHT],
-		[Vector2(1, 0.9), V.FRONT, V.FRONT], [Vector2(1, 1.4), V.RIGHT, V.FRONT], [Vector2(1.4, -1), V.BACK, V.RIGHT],
+		[Vector2.LEFT, V.FRONT, V.LEFT], [Vector2.ZERO, V.LEFT, V.LEFT], [Vector2(1, 1), V.FRONT, V.RIGHT],
+		[Vector2(-1, -1), V.BACK, V.LEFT], [Vector2(1, 0.9), V.RIGHT, V.RIGHT], [Vector2(0.6, 1), V.FRONT, V.FRONT],
+		[Vector2(0.6, 1), V.RIGHT, V.RIGHT], [Vector2(0.3, 1), V.RIGHT, V.FRONT], [Vector2(1.4, -1), V.BACK, V.RIGHT],
 		[Vector2(-1, 0.2), V.RIGHT, V.LEFT],
 	]
 	for each in cases:
@@ -1694,8 +1941,15 @@ func _test_rig_views() -> void:
 	root.add_child(rig)
 	rig.face(Vector2.LEFT)
 	_check(rig.scale.x == -1.0 and (rig.get_node("Body") as Sprite2D).texture == rig.body_side, name, "facing left does not mirror the side view")
+	_check((rig.get_node("Leg1/Shin") as Sprite2D).texture == rig.leg_lower_side, name, "the side view's shin is not the side shoe")
+	# Each shin's knee sits on the joint, whichever (and however wide) its texture.
+	var side_shin := rig.get_node("Leg1/Shin") as Sprite2D
+	_check(side_shin.offset.x == -side_shin.texture.get_width() / 2.0, name, "the side view's shin hangs %s off its knee" % (side_shin.offset.x + side_shin.texture.get_width() / 2.0))
 	rig.face(Vector2.UP)
 	_check(rig.scale.x == 1.0 and (rig.get_node("Body") as Sprite2D).texture == rig.body_back, name, "facing up does not show the back")
+	_check((rig.get_node("Leg1/Shin") as Sprite2D).texture == rig.leg_lower, name, "the back view's shin is not the front-and-back shoe")
+	var back_shin := rig.get_node("Leg1/Shin") as Sprite2D
+	_check(back_shin.offset.x == -back_shin.texture.get_width() / 2.0, name, "the back view's shin hangs %s off its knee" % (back_shin.offset.x + back_shin.texture.get_width() / 2.0))
 	rig.free()
 
 
@@ -1720,6 +1974,58 @@ func _test_rig_walk_cycle() -> void:
 		rig.walk(0.0, 1.0 / 60.0)
 	_check(rig.phase == phase and rig.stride == 0.0 and leg.rotation == 0.0, name, "standing still the cycle moved or the limbs did not settle (stride %.2f, leg %.2f)" % [rig.stride, leg.rotation])
 	rig.free()
+
+
+## Every limb of both rigs is two parts at a joint (upper arm and forearm, thigh and shin),
+## drawn from SVGs imported at ART_SCALE; walking bends (or, front and back, foreshortens)
+## every knee and elbow in every view (front, back, side, mirrored left), and standing still
+## straightens them all; the body sinks lowest at a footfall (contact, legs spread) and rises
+## as the legs pass; the bend leaves the footfalls' timing as it was.
+func _test_rig_joints_bend() -> void:
+	var name := "rig_joints_bend"
+	const V := CharacterRig.View
+	for path: String in ["res://scenes/rig_mime.tscn", "res://scenes/rig_guard.tscn"]:
+		var rig := (load(path) as PackedScene).instantiate() as CharacterRig
+		root.add_child(rig)
+		var joints: Array[Sprite2D] = []
+		for limb: String in ["Arm0/Forearm", "Arm1/Forearm", "Leg0/Shin", "Leg1/Shin"]:
+			var lower := rig.get_node_or_null(limb) as Sprite2D
+			_check(lower != null and lower.get_parent() is Sprite2D, name, "%s has no %s on an upper part" % [path, limb])
+			if lower != null:
+				joints.append(lower)
+		if joints.size() < 4:
+			rig.free()
+			continue
+		var body := rig.get_node("Body") as Sprite2D
+		# Imported at 1x the body would be no taller than its feet anchor in base units.
+		_check(body.scale == Vector2.ONE / CharacterRig.ART_SCALE and rig.body_front.get_height() > rig.feet_at.y * CharacterRig.ART_SCALE * 0.9, name, "%s's body is not imported at ART_SCALE and drawn back at its inverse (%s, scale %s)" % [path, rig.body_front.get_size(), body.scale])
+		# A joint's bend: its turn plus how far its upper and lower parts are foreshortened.
+		var bend := func(lower: Sprite2D) -> float:
+			var upper := lower.get_parent() as Sprite2D
+			return absf(lower.rotation) + absf(1.0 - lower.scale.y * upper.scale.y * CharacterRig.ART_SCALE) + absf(1.0 - upper.scale.y * CharacterRig.ART_SCALE)
+		for view: V in [V.FRONT, V.BACK, V.RIGHT, V.LEFT]:
+			rig.face(([Vector2.DOWN, Vector2.UP, Vector2.RIGHT, Vector2.LEFT] as Array[Vector2])[view])
+			_check(rig.view == view, name, "%s did not turn to %s" % [path, V.keys()[view]])
+			var bent: Array[float] = [0.0, 0.0, 0.0, 0.0]
+			for i in 120:
+				rig.walk(rig.step_length / 15.0, 1.0 / 60.0)
+				for j in 4:
+					bent[j] = maxf(bent[j], bend.call(joints[j]))
+			for j in 4:
+				_check(bent[j] > 0.15, name, "%s walking %s: %s bent only %.2f" % [path, V.keys()[view], joints[j].get_parent().name + "/" + joints[j].name, bent[j]])
+			# Just past a footfall (contact) the body is lower than as the legs pass.
+			var heights: Array[float] = []
+			for at: float in [0.0, 0.25]:
+				rig.phase = at
+				rig.walk(0.001, 0.0)
+				heights.append(body.position.y)
+			_check(heights[0] > heights[1] + rig.bob * 0.8, name, "%s walking %s: the body is not lowest at contact (%.2f there, %.2f passing)" % [path, V.keys()[view], heights[0], heights[1]])
+			for i in 30:
+				rig.walk(0.0, 1.0 / 60.0)
+			for j in 4:
+				var upper := joints[j].get_parent() as Sprite2D
+				_check(joints[j].rotation == 0.0 and upper.rotation == 0.0 and bend.call(joints[j]) == 0.0, name, "%s standing %s: %s is not straight (%.2f)" % [path, V.keys()[view], upper.name, joints[j].rotation])
+		rig.free()
 
 
 ## The mime faces the way it walks (a path walk and a keyboard nudge), keeps its facing when
@@ -1794,6 +2100,18 @@ func _test_no_flash_rates() -> void:
 			shaders += 1
 			_check(float(found.get_string(2)) < LIMIT_HZ, name, "%s's %s is %s" % [file, found.get_string(1), found.get_string(2)])
 	_check(shaders >= 7, name, "found only %d shader speeds (the regex no longer matches?)" % shaders)
+	# Every gimmick's decorative rate (a *_HZ constant: drips, splashes, foam, flow, motes,
+	# the glass's glint).
+	var rates := 0
+	for file in DirAccess.get_files_at("res://scripts/gimmicks"):
+		if not file.ends_with(".gd"):
+			continue
+		var constants := (load("res://scripts/gimmicks/" + file) as Script).get_script_constant_map()
+		for constant: String in constants:
+			if constant.ends_with("_HZ"):
+				rates += 1
+				_check(float(constants[constant]) < LIMIT_HZ, name, "%s's %s is %s Hz" % [file, constant, constants[constant]])
+	_check(rates >= 6, name, "found only %d gimmick decoration rates" % rates)
 	var gimmicks := 0
 	for wing_path in Content.WINGS:
 		for room_path: String in (load(wing_path) as WingData).rooms:
@@ -2924,6 +3242,12 @@ func _test_puddles_checked_and_wired() -> void:
 	_check(pipes.wet(Vector2(200, 300)) and not pipes.wet(Vector2(500, 300)) and not pipes.wet(Vector2(800, 300)), name, "the good pipe is not wet or a broken one is")
 	pipes.tick(0.1)
 	await process_frame
+	# The foam, streaks, crests and drops (and every gimmick's decoration) run on flourish:
+	# room time, still under Reduce Motion.
+	_check(pipes.flourish(1.5) == 1.5, name, "the decoration's clock is %.2f, not room time" % pipes.flourish(1.5))
+	_game.set_setting("reduce_motion", true)
+	_check(pipes.flourish(1.5) == 0.0, name, "Reduce Motion does not still the gimmick decoration")
+	_game.set_setting("reduce_motion", false)
 	pipes.free()
 	_game.errors.resize(errors_before)
 	(_game.get_node("ErrorLayer/ErrorBadge") as TextureRect).visible = false

@@ -3,8 +3,9 @@ extends Control
 ## The easel overlay where the mime paints the fake, wordless: the painting shows faintly
 ## on the canvas, and its ghost strokes (Forgery) come one at a time, a glowing path with a
 ## pulsing start dot to drag along, or a ring to tap for a dab. The paint stays as it is
-## traced. After the last stroke the grade icon pops in, holds, and the canvas closes
-## with painted(quality). The museum keeps running meanwhile: the watching guard's
+## traced. After the last stroke the grade badge pops in, holds, and the canvas closes
+## with painted(quality): the painting just traced (its scan, through its style) in the
+## grade's frame (GRADE_ICONS, overlays with a window for the picture), tilted for Sloppy. The museum keeps running meanwhile: the watching guard's
 ## suspicion eye shows beside the canvas, and the put-down-brush button (or a catch,
 ## through close) leaves with the finished strokes kept; open resumes them, or starts a
 ## fresh canvas once a fake is done. With Assist mode on (Game.assist) the assist button
@@ -34,6 +35,12 @@ const GRADE_ICONS: Dictionary[Forgery.Grade, Texture2D] = {
 	Forgery.Grade.SLOPPY: preload("res://art/svg/grade_sloppy.svg"),
 	Forgery.Grade.GOOD: preload("res://art/svg/grade_good.svg"),
 	Forgery.Grade.PERFECT: preload("res://art/svg/grade_perfect.svg"),
+}
+## The badge's tilt per grade (degrees): a Sloppy fake hangs crooked.
+const GRADE_TILTS: Dictionary[Forgery.Grade, float] = {
+	Forgery.Grade.SLOPPY: -9.0,
+	Forgery.Grade.GOOD: 0.0,
+	Forgery.Grade.PERFECT: 0.0,
 }
 const GRADE_SOUNDS: Dictionary[Forgery.Grade, StringName] = {
 	Forgery.Grade.SLOPPY: &"grade_sloppy",
@@ -66,6 +73,7 @@ var _pop_quality := 0.0
 @onready var _ink: Node2D = $Ink
 @onready var _eye: Node2D = $Eye
 @onready var _grade: TextureRect = $Grade
+@onready var _picture: TextureRect = $Grade/Picture
 @onready var _close: Button = $CloseButton
 @onready var _assist: Button = $AssistButton
 @onready var _game := get_node(GameState.AUTOLOAD_PATH) as GameState
@@ -194,11 +202,18 @@ func _paint_assisted() -> void:
 	_finish(Forgery.ASSIST_QUALITY)
 
 
-## Grades `fake_quality`, pops its icon in, holds it, then closes with painted.
+## Grades `fake_quality`, pops its badge in (the traced painting in the grade's frame),
+## holds it, then closes with painted. An unknown painting is reported and the frame shows
+## empty.
 func _finish(fake_quality: float) -> void:
 	var fake_grade := Forgery.grade(fake_quality)
 	print("[Forgery] Fake painted: quality %.2f, %s" % [fake_quality, Forgery.Grade.keys()[fake_grade]])
 	_grade.texture = GRADE_ICONS[fake_grade]
+	_grade.rotation_degrees = GRADE_TILTS[fake_grade]
+	_picture.texture = Paintings.SCANS.get(StringName(painting))
+	_picture.material = Paintings.style(StringName(painting))
+	if _picture.texture == null:
+		_game.report_error("Forgery canvas '%s': the grade badge has no picture of unknown painting '%s'" % [get_path(), painting])
 	_game.audio.play(GRADE_SOUNDS[fake_grade])
 	_grade.scale = Vector2.ZERO
 	_grade.show()

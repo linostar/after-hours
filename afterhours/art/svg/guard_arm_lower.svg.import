@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c8o4st5muc3nc"
-path="res://.godot/imported/guard_arm.svg-4bdb1a4cde4c5c7c3ff4b08c8d0f5434.ctex"
+uid="uid://c7m6oal7w2538"
+path="res://.godot/imported/guard_arm_lower.svg-6a71350ca7472a1207a78115bb75be92.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/svg/guard_arm.svg"
-dest_files=["res://.godot/imported/guard_arm.svg-4bdb1a4cde4c5c7c3ff4b08c8d0f5434.ctex"]
+source_file="res://art/svg/guard_arm_lower.svg"
+dest_files=["res://.godot/imported/guard_arm_lower.svg-6a71350ca7472a1207a78115bb75be92.ctex"]
 
 [params]
 
@@ -23,7 +23,7 @@ compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=false
+mipmaps/generate=true
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""
@@ -38,6 +38,6 @@ process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
 detect_3d/compress_to=1
-svg/scale=1.0
+svg/scale=2.0
 editor/scale_with_editor_scale=false
 editor/convert_colors_with_editor_theme=false

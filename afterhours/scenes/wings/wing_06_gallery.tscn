@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/room_base.tscn" id="base"]
 [ext_resource type="Script" path="res://scripts/gimmicks/gimmick_mix.gd" id="gimmick"]
@@ -8,6 +8,7 @@
 [ext_resource type="Script" path="res://scripts/partition.gd" id="partition"]
 [ext_resource type="PackedScene" path="res://scenes/guard.tscn" id="guard"]
 [ext_resource type="PackedScene" path="res://scenes/door.tscn" id="door"]
+[ext_resource type="Texture2D" path="res://art/svg/floor_parquet.svg" id="floor_tile"]
 
 [node name="Room" instance=ExtResource("base")]
 
@@ -21,7 +22,9 @@ color = Color(0.36, 0.3, 0.22, 1)
 color = Color(0.24, 0.18, 0.12, 1)
 
 [node name="Floor" parent="."]
-color = Color(0.45, 0.34, 0.24, 1)
+color = Color(1, 1, 1, 1)
+texture_repeat = 2
+texture = ExtResource("floor_tile")
 
 [node name="Gimmick" type="Node2D" parent="."]
 z_index = -9
@@ -29,7 +32,7 @@ script = ExtResource("gimmick")
 
 [node name="Part0" type="Node2D" parent="Gimmick"]
 script = ExtResource("part0")
-puddles = PackedVector3Array(420, 330, 75)
+puddles = PackedVector3Array(560, 345, 65)
 beats = PackedVector2Array(10, 0.5)
 
 [node name="FrameA" parent="Frames" instance=ExtResource("frame")]
@@ -48,6 +51,7 @@ face = Vector2(0, -24)
 [node name="Partition0" type="StaticBody2D" parent="Actors"]
 position = Vector2(330, 420)
 script = ExtResource("partition")
+style = 6
 width = 120
 depth = 50
 height = 80
@@ -55,12 +59,13 @@ height = 80
 [node name="Partition1" type="StaticBody2D" parent="Actors"]
 position = Vector2(640, 300)
 script = ExtResource("partition")
+style = 6
 width = 120
 depth = 50
 height = 80
 
 [node name="Guard" parent="Actors" instance=ExtResource("guard")]
-route = PackedVector2Array(480, 250, 700, 250, 700, 480, 260, 480, 260, 250)
+route = PackedVector2Array(480, 250, 730, 250, 730, 480, 260, 480, 260, 250)
 
 [node name="Guard2" parent="Actors" instance=ExtResource("guard")]
 route = PackedVector2Array(700, 490, 300, 490)

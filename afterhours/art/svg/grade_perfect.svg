@@ -1,11 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">
+  <defs>
+    <linearGradient id="gilt" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff0a8"/>
+      <stop offset="0.5" stop-color="#f2c94c"/>
+      <stop offset="1" stop-color="#a87e2a"/>
+    </linearGradient>
+  </defs>
   <g stroke="#f2c94c" stroke-width="4" stroke-linecap="round">
-    <path d="M60 4 V14 M60 106 V116 M4 60 H14 M106 60 H116 M20 20 L27 27 M100 20 L93 27 M20 100 L27 93 M100 100 L93 93"/>
+    <path d="M60 3 V15 M60 105 V117 M3 60 H11 M109 60 H117 M15 13 L22 20 M105 13 L98 20 M15 107 L22 100 M105 107 L98 100"/>
   </g>
-  <rect x="18" y="26" width="84" height="68" rx="3" fill="#8a6a2a"/>
-  <rect x="23" y="31" width="74" height="58" fill="#f2c94c"/>
-  <rect x="28" y="36" width="64" height="48" fill="#1f2f5c"/>
-  <path d="M28 72 Q42 64 56 70 T92 66 L92 84 L28 84 Z" fill="#2d5a3c"/>
-  <path d="M60 42 L64 54 L76 56 L66 63 L69 75 L60 68 L51 75 L54 63 L44 56 L56 54 Z" fill="#fff3c4" stroke="#f2c94c" stroke-width="2" stroke-linejoin="round"/>
-  <path d="M38 44 L40 49 L45 50 L40 51 L38 56 L36 51 L31 50 L36 49 Z M82 42 L84 47 L89 48 L84 49 L82 54 L80 49 L75 48 L80 47 Z" fill="#fff3c4"/>
+  <path fill-rule="evenodd" d="M15 23 H105 V97 H15 Z M28 36 V84 H92 V36 Z" fill="url(#gilt)" stroke="#5a4214" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M19.5 27.5 H100.5 V92.5 H19.5 Z" fill="none" stroke="#fffbe0" stroke-width="1.2" opacity="0.8"/>
+  <path d="M24 32 H96 V88 H24 Z" fill="none" stroke="#8a6a2a" stroke-width="1.2"/>
+  <path d="M28 36 H92 V84 H28 Z" fill="none" stroke="#3a2a0e" stroke-width="1.5"/>
+  <g fill="#fffbe0">
+    <path d="M21 25 L22.2 28.8 L26 30 L22.2 31.2 L21 35 L19.8 31.2 L16 30 L19.8 28.8 Z"/>
+    <path d="M21 85 L22.2 88.8 L26 90 L22.2 91.2 L21 95 L19.8 91.2 L16 90 L19.8 88.8 Z"/>
+    <path d="M99 85 L100.2 88.8 L104 90 L100.2 91.2 L99 95 L97.8 91.2 L94 90 L97.8 88.8 Z"/>
+  </g>
+  <path d="M100 14 L104.5 26 L117 27 L107.4 35 L110.6 47 L100 40.4 L89.4 47 L92.6 35 L83 27 L95.5 26 Z" fill="#fff3c4" stroke="#c9952a" stroke-width="2" stroke-linejoin="round"/>
 </svg>
