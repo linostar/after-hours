@@ -193,6 +193,7 @@ func _tests() -> Array[Callable]:
 		_test_rig_views,
 		_test_room_at_night,
 		_test_wing_floors,
+		_test_puddles_clear_of_partitions,
 		_test_rig_walk_cycle,
 		_test_rig_joints_bend,
 		_test_mime_faces_its_way,
@@ -1772,6 +1773,45 @@ func _test_wing_floors() -> void:
 		tiles.append(tile)
 		_check(not style in styles, name, "%s shares its display walls' style with another wing" % wing.get_file())
 		styles.append(style)
+
+
+## No display wall stands in water: in every wing room, each burst pipe's puddle at full
+## size keeps PUDDLE_CLEARANCE off every Partition's footprint, and no wall's face (drawn
+## above its footprint) hides a puddle behind it.
+func _test_puddles_clear_of_partitions() -> void:
+	var name := "puddles_clear_of_partitions"
+	const PUDDLE_CLEARANCE := 12.0
+	for wing: String in Content.WINGS:
+		for path: String in (load(wing) as WingData).rooms:
+			var room := (load(path) as PackedScene).instantiate()
+			var waters: Array[Puddles] = []
+			var walls: Array[Partition] = []
+			var pending: Array[Node] = [room]
+			while not pending.is_empty():
+				var node: Node = pending.pop_back()
+				if node is Puddles:
+					waters.append(node as Puddles)
+				elif node is Partition:
+					walls.append(node as Partition)
+				pending.append_array(node.get_children())
+			for water in waters:
+				for puddle in water.puddles:
+					var centre := Vector2(puddle.x, puddle.y)
+					for wall in walls:
+						var foot := Rect2(wall.position.x - wall.width / 2.0, wall.position.y - wall.depth, wall.width, wall.depth)
+						var face := Rect2(foot.position.x, wall.position.y - wall.height - wall.depth, wall.width, wall.height + wall.depth)
+						var standing := _ellipse_meets(centre, puddle.z + PUDDLE_CLEARANCE, foot)
+						var hidden := centre.y < wall.position.y and _ellipse_meets(centre, puddle.z, face)
+						_check(not standing and not hidden, name, "%s: %s %s the puddle at %s" % [path.get_file(), wall.name, "stands in" if standing else "hides", puddle])
+			room.free()
+
+
+## Whether the flat puddle ellipse round `centre` (`r` across, Puddles.FLATTEN of it deep)
+## meets `rect`: the rect's point nearest the centre lies inside it.
+func _ellipse_meets(centre: Vector2, r: float, rect: Rect2) -> bool:
+	var near := centre.clamp(rect.position, rect.end)
+	var off := near - centre
+	return (off.x / r) ** 2 + (off.y / (r * Puddles.FLATTEN)) ** 2 <= 1.0
 
 
 ## A rig's view follows the heading: down front, up back, right and left the side view

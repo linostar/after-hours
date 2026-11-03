@@ -32,7 +32,7 @@ script = ExtResource("gimmick")
 
 [node name="Part0" type="Node2D" parent="Gimmick"]
 script = ExtResource("part0")
-puddles = PackedVector3Array(420, 330, 75)
+puddles = PackedVector3Array(560, 345, 65)
 beats = PackedVector2Array(10, 0.5)
 
 [node name="FrameA" parent="Frames" instance=ExtResource("frame")]

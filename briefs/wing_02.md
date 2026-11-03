@@ -45,7 +45,14 @@ were placed over the old route's wet crossings and the bot passed on its first r
 1. Bursts straight behind a painting (the hall's Mona Lisa, the Great Wave) made the water
    seem to pour out of the painting, the reading the pipes replaced. They moved to clear
    wall at x 560 (the gallery's puddle grew to radius 90 so it still floods the swap spot).
+1. No display wall may stand in water (art pass; `puddles_clear_of_partitions`: every
+   puddle at full size 12 off every partition's footprint, and never hidden behind a wall's
+   face). The gallery's swap-spot puddle moved to (545, 228) at radius 74, still flooding
+   the swap spot (480, 235) but clear of the right wall's top; its west puddle to (175, 340)
+   at radius 70; the hall's right wall moved from x 650 to 725, out of the middle puddle
+   (whose pipe cannot move left: the portrait hangs there).
 
 ## Bot result
 `tools/bot.gd --record`: 41 plays; the hall crossing back waits 0.75 s and the exit 7.75 s for its pipe; the run takes 37.7 s, par 85 s.
 Re-recorded at a person's painting pace (step 10): 38 plays; the run takes 54.5 s, par 85 s.
+Re-recorded with the walls out of the water (art pass): 50 plays; the run takes 57.8 s, par 90 s.

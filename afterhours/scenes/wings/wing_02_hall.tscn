@@ -53,7 +53,7 @@ depth = 50
 height = 80
 
 [node name="Partition1" type="StaticBody2D" parent="Actors"]
-position = Vector2(650, 330)
+position = Vector2(725, 330)
 script = ExtResource("partition")
 style = 2
 width = 130
