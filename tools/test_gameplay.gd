@@ -284,6 +284,15 @@ func _test_title_arrives() -> void:
 	_check(_game.scene_paths[GameState.Flow.TITLE] == TITLE_PATH, name, "Game.scene_paths[TITLE] is not %s" % TITLE_PATH)
 	var frame := current_scene.get_node_or_null("Frame") as TextureRect
 	_check(frame != null and frame.texture != null and frame.is_visible_in_tree(), name, "the title's Frame art is missing or hidden")
+	# The museum at night behind it, the mime sneaking across; the play button's focus ring the
+	# theme's gilt glow (a round border, not the engine's white box).
+	var night := current_scene.get_node_or_null("Night") as TitleScene
+	var walked_from := night.mime.phase if night != null else 0.0
+	for i in 30:
+		await process_frame
+	_check(night != null and night.mime.phase != walked_from, name, "the title has no night scene with the mime sneaking across")
+	var focus := (current_scene.get_node("PlayButton") as Button).get_theme_stylebox("focus") as StyleBoxFlat
+	_check(focus != null and not focus.draw_center and focus.border_width_top > 0 and focus.border_color.r > 0.9 and focus.border_color.b < 0.5 and focus.corner_radius_top_left >= 64, name, "the play button's focus ring is not the round gilt glow (%s)" % focus)
 	_check(not _game.error_badge_visible(), name, "the error badge shows on a clean start (errors: %s)" % [_game.errors])
 
 

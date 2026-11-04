@@ -28,6 +28,7 @@ const TOOL_SAVE_PATH := "user://tool_save.json"
 
 ## A pressed button dips to this scale and springs back over PRESS_TIME.
 const PRESS_SCALE := 0.9
+const FOCUS_RING := preload("res://art/focus_ring.tres")
 const PRESS_TIME := 0.14
 
 ## Emitted when a goto's fade-in has finished.
@@ -325,11 +326,14 @@ func _process(delta: float) -> void:
 	_place_world()
 
 
-## Every button dips when pressed (touch, click or key), whatever screen it is on.
+## Every button dips when pressed (touch, click or key), whatever screen it is on, and
+## shows keyboard focus as FOCUS_RING, a round gilt glow round its gilt-ringed icon (not
+## the engine's white box).
 func _on_node_added(node: Node) -> void:
 	var button := node as BaseButton
 	if button != null:
 		button.button_down.connect(_press.bind(button))
+		button.add_theme_stylebox_override(&"focus", FOCUS_RING)
 
 
 func _press(button: BaseButton) -> void:
