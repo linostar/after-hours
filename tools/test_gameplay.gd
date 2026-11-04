@@ -2611,7 +2611,7 @@ func _test_room_swap_and_escape() -> void:
 	await physics_frame
 	_check(room.escaping and not results.visible and room.mime.rig.fidget == CharacterRig.Fidget.TIP, name, "the escape went straight to the results without its beat (escaping %s, fidget %s)" % [room.escaping, room.mime.rig.fidget])
 	var shown := await _wait_until(func() -> bool: return results.visible, ceili(Room.escape_beat_time() * 60.0) + 10)
-	_check(shown and not room.escaping and room.exit_door.shut == 1.0 and room.mime.rig.modulate.a == 0.0, name, "after the beat the results are not shown over a shut door with the mime gone (shown %s, shut %.2f, mime alpha %.2f)" % [shown, room.exit_door.shut, room.mime.rig.modulate.a])
+	_check(shown and not room.escaping and room.exit_door.shut == 1.0 and not room.exit_door.glowing and room.mime.rig.modulate.a == 0.0, name, "after the beat the results are not shown over a shut door with the mime gone (shown %s, shut %.2f, mime alpha %.2f)" % [shown, room.exit_door.shut, room.mime.rig.modulate.a])
 	# Every star has popped in by 3 x (STAR_GAP + POP_TIME), each gold as earned.
 	for i in ceili(3.0 * (Results.STAR_GAP + Results.POP_TIME) * 60.0) + 6:
 		await physics_frame
@@ -2624,8 +2624,9 @@ func _test_room_swap_and_escape() -> void:
 	_check(room.elapsed == finished_at, name, "the timer kept running after the escape")
 
 
-## A tap (or E) during the escape beat skips it: the results show at once, the door shut and
-## the mime gone; the stars were already recorded.
+## A tap (or E) during the escape beat skips it: the results show at once, the door shut (its
+## glow out) and the mime gone; the stars were already recorded. Skipped mid-swing, the door's
+## thud sounds once and nothing of the beat plays late.
 func _test_escape_beat_skips() -> void:
 	var name := "escape_beat_skips"
 	for by_key: bool in [false, true]:
@@ -2644,6 +2645,18 @@ func _test_escape_beat_skips() -> void:
 			await _tap_at(Vector2(480, 400))
 		_check(not room.escaping and results.visible and room.exit_door.shut == 1.0 and room.mime.rig.modulate.a == 0.0, name, "a %s did not skip the escape beat to the results" % ("key" if by_key else "tap"))
 		_check(room.stars.size() == 3, name, "the skipped escape has no stars")
+	# Skipped mid-swing: the door's thud sounds once, then nothing of the beat plays late.
+	var swinging := await _load_room()
+	if swinging == null:
+		return
+	swinging.guard.active = false
+	swinging.mime.carrying = true
+	swinging._escape()
+	await _wait_until(func() -> bool: return swinging.exit_door.shut > 0.2, ceili(Room.escape_beat_time() * 60.0))
+	_game.audio.played.clear()
+	await _tap_at(Vector2(480, 400))
+	await create_timer(Door.SHUT_TIME + 0.1).timeout
+	_check(_game.audio.played.count(&"door") == 1 and swinging.exit_door.shut == 1.0 and not swinging.exit_door.glowing, name, "a skip mid-swing did not shut the door with one thud and its glow out (sounds %s)" % [_game.audio.played])
 
 
 ## Tapping away mid-swap cancels it; the exit does nothing without the original.

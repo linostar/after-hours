@@ -175,7 +175,8 @@ func splat() -> void:
 	_squash_tween()
 	rig.squash = SPLAT_SCALE
 	_squash.tween_interval(SPLAT_HOLD)
-	_squash.tween_property(rig, "squash", Vector2.ONE, SPLAT_TIME).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+	# Under Reduce Motion it eases back without the wobble.
+	_squash.tween_property(rig, "squash", Vector2.ONE, SPLAT_TIME).set_trans(Tween.TRANS_QUAD if rig.reduce_motion() else Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 	dizzy_left = DIZZY_TIME
 	_dizzy_clock = 0.0
 	queue_redraw()

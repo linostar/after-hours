@@ -76,11 +76,13 @@ func arrival_point() -> Vector2:
 	return position + arrival
 
 
-## Swings the leaf shut over SHUT_TIME, a thud as it closes; returns its tween.
+## Swings the leaf shut over SHUT_TIME, a thud as it closes and its glow out; returns its
+## tween.
 func swing_shut() -> Tween:
 	var tween := create_tween()
 	tween.tween_property(self, "shut", 1.0, SHUT_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tween.tween_callback(Audio.play_for.bind(self, &"door"))
+	tween.tween_property(self, "glowing", false, 0.0)
 	return tween
 
 

@@ -129,7 +129,7 @@ func _draw_chain() -> void:
 
 
 ## The unlock under way: the chains slide down and fade as one, the padlock falls ahead of
-## them to the floor and bounces once.
+## them to the floor and bounces once (not under Reduce Motion).
 func _draw_falling() -> void:
 	var chains := 1.0 - _fall
 	if chains > 0.0:
@@ -139,7 +139,7 @@ func _draw_falling() -> void:
 	# The lock lands at 0.6 of the fall and bounces back to the floor by the end.
 	var t := clampf(_fall / 0.6, 0.0, 1.0)
 	var y := lerpf(middle.y, LOCK_FLOOR, t * t)
-	if _fall > 0.6:
+	if _fall > 0.6 and not GameState.reduce_motion_for(self):
 		y = LOCK_FLOOR - sin((_fall - 0.6) / 0.4 * PI) * 10.0
 	draw_set_transform(Vector2(0, y - 6.0), _fall * 0.6)
 	draw_rect(Rect2(-10, -2, 20, 16), LOCK)

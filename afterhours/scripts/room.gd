@@ -130,6 +130,8 @@ var ghost: GhostMime
 ## In a replay (WingRun.replaying), the room the bot went to after this stay (-1: the end).
 var _replay_next := -1
 var _escape_beat: Tween
+## The tweens the escape beat started (the slip, the fade, the door's swing).
+var _escape_parts: Array[Tween] = []
 ## Seconds until the mime's next footstep on noisy floor can make a noise.
 var _step_noise_wait := 0.0
 
@@ -697,10 +699,9 @@ func _play_escape_beat() -> void:
 	var doorway := exit_door.position + exit_door.opening.get_center()
 	_escape_beat = create_tween()
 	_escape_beat.tween_interval(ESCAPE_TIP)
-	_escape_beat.tween_callback(mime.glide.bind(doorway, ESCAPE_SLIP))
-	_escape_beat.tween_callback(mime.fade_out.bind(ESCAPE_SLIP))
+	_escape_beat.tween_callback(func() -> void: _escape_parts.append_array([mime.glide(doorway, ESCAPE_SLIP), mime.fade_out(ESCAPE_SLIP)]))
 	_escape_beat.tween_interval(ESCAPE_SLIP)
-	_escape_beat.tween_callback(exit_door.swing_shut)
+	_escape_beat.tween_callback(func() -> void: _escape_parts.append(exit_door.swing_shut()))
 	_escape_beat.tween_interval(Door.SHUT_TIME + ESCAPE_HOLD)
 	_escape_beat.tween_callback(_end_escape)
 	print("[Room] Escape beat")
@@ -711,11 +712,17 @@ static func escape_beat_time() -> float:
 	return ESCAPE_TIP + ESCAPE_SLIP + Door.SHUT_TIME + ESCAPE_HOLD
 
 
-## Skips the rest of the escape beat: the mime gone, the door shut, the results now.
+## Skips the rest of the escape beat (its slip, fade and swing too): the mime gone, the door
+## shut (its thud, unless it already sounded), the results now.
 func _skip_escape() -> void:
 	_escape_beat.kill()
+	for part in _escape_parts:
+		part.kill()
 	mime.rig.modulate.a = 0.0
+	if exit_door.shut < 1.0:
+		_game.audio.play(&"door")
 	exit_door.shut = 1.0
+	exit_door.glowing = false
 	print("[Room] Escape beat skipped")
 	_end_escape()
 
