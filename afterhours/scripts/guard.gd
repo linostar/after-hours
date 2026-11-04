@@ -21,8 +21,8 @@ extends Node2D
 ##   (saw_hiding): then it chases to the hiding place and pulls it out, until the target
 ##   steps out again.
 ## The room's gimmick (Gimmick.light_at) scales how fast suspicion fills; in its shade the
-## guard cannot see the mime. It walks the room's navmesh (Agent). The cone is drawn on the floor (red while it
-## chases or searches), the suspicion as an eye above its head that fills and reddens, and
+## guard cannot see the mime. It walks the room's navmesh (Agent). The cone is drawn on the floor (warming with
+## suspicion, red while it chases or searches; cone_color), the suspicion as an eye above its head that fills and reddens, and
 ## the intent as an icon above that (INTENT_ICONS; none while patrolling) that pops in
 ## when the intent changes.
 
@@ -493,8 +493,14 @@ func _update_cone() -> void:
 		var hit := space.intersect_ray(PhysicsRayQueryParameters2D.create(global_position, end, SIGHT_MASK))
 		points.append(to_local(hit["position"] if not hit.is_empty() else end))
 	_cone.polygon = points
-	var alert := intent == GuardBrain.Intent.CHASE or intent == GuardBrain.Intent.SEARCH
-	_cone.color = CONE_ALERT_COLOR if alert else CONE_COLOR.lerp(CONE_ALERT_COLOR, suspicion)
+	_cone.color = cone_color(suspicion, intent == GuardBrain.Intent.CHASE or intent == GuardBrain.Intent.SEARCH)
+
+
+## The cone's colour: calm at no suspicion, warming smoothly toward the alert red as
+## `cone_suspicion` rises (no step, so it never flashes), and red while `alert` (chasing or
+## searching).
+static func cone_color(cone_suspicion: float, alert: bool) -> Color:
+	return CONE_ALERT_COLOR if alert else CONE_COLOR.lerp(CONE_ALERT_COLOR, clampf(cone_suspicion, 0.0, 1.0))
 
 
 func _draw() -> void:

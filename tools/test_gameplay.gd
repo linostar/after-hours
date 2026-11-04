@@ -110,6 +110,7 @@ func _tests() -> Array[Callable]:
 		_test_detection_cone,
 		_test_detection_suspicion,
 		_test_detection_light,
+		_test_cone_warms_with_suspicion,
 		_test_stars,
 		_test_save_shape,
 		_test_save_load_write_and_corrupt,
@@ -2991,6 +2992,25 @@ func _test_detection_light() -> void:
 	var bright := Detection.suspicion_after(0.0, true, 0.0, 180.0, 0.1, 2.0)
 	_check(is_equal_approx(bright, lit * 2.0), name, "light 2 filled %.3f, not twice %.3f" % [bright, lit])
 	_check(is_equal_approx(Detection.suspicion_after(0.5, true, 0.0, 180.0, 0.1, 0.0), 0.5 - Detection.DRAIN * 0.1), name, "a seen mime in shade did not drain like an unseen one")
+
+
+## The cone warms from calm toward the alert red with suspicion, step by small step (no
+## flash), and is red while alert; a guard's drawn cone follows its suspicion.
+func _test_cone_warms_with_suspicion() -> void:
+	var name := "cone_warms_with_suspicion"
+	_check(Guard.cone_color(0.0, false).is_equal_approx(Guard.CONE_COLOR), name, "a calm cone is not CONE_COLOR")
+	_check(Guard.cone_color(1.0, false).is_equal_approx(Guard.CONE_ALERT_COLOR) and Guard.cone_color(0.0, true) == Guard.CONE_ALERT_COLOR, name, "a full or alert cone is not CONE_ALERT_COLOR")
+	var before := Guard.cone_color(0.0, false)
+	for i in range(1, 21):
+		var color := Guard.cone_color(i / 20.0, false)
+		_check(color.g < before.g and absf(color.get_luminance() - before.get_luminance()) < 0.05, name, "the cone at suspicion %.2f did not warm a small step (%s after %s)" % [i / 20.0, color, before])
+		before = color
+	var room := await _load_room()
+	room.guard.suspicion = 0.5
+	await physics_frame
+	await physics_frame
+	var cone := room.guard.get_node("Cone") as Polygon2D
+	_check(cone.color.is_equal_approx(Guard.cone_color(room.guard.suspicion, false)), name, "the drawn cone %s does not follow suspicion %.2f" % [cone.color, room.guard.suspicion])
 
 
 ## The slice room with a TestGimmick (named Gimmick) added before it enters the tree.
