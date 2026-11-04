@@ -1,6 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
-  <rect x="2" y="8" width="14" height="18" fill="#1f2f5c" stroke="#c9a24a" stroke-width="2.5"/>
-  <rect x="24" y="14" width="14" height="18" fill="#7a6a8a" stroke="#c9a24a" stroke-width="2.5"/>
-  <path d="M10 32 Q20 40 30 34 M27 31 L30 34 L26 37" fill="none" stroke="#f2efe6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M30 8 Q20 0 10 6 M13 3 L10 6 L14 9" fill="none" stroke="#f2efe6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="3" y="12" width="13" height="17" fill="#1f2f5c" stroke="#c9a24a" stroke-width="2.5"/>
+  <rect x="24" y="12" width="13" height="17" fill="#7a6a8a" stroke="#c9a24a" stroke-width="2.5"/>
+  <path d="M9.5 9 Q19 1.5 27.6 7.6" fill="none" stroke="#f2efe6" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="M32 10.5 L25.2 9.9 L29.3 4.6 Z" fill="#f2efe6" stroke="#f2efe6" stroke-width="1" stroke-linejoin="round"/>
+  <path d="M30.5 32 Q21 38.5 12.4 32.4" fill="none" stroke="#f2efe6" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="M8 29.5 L14.8 30.1 L10.7 35.4 Z" fill="#f2efe6" stroke="#f2efe6" stroke-width="1" stroke-linejoin="round"/>
 </svg>
