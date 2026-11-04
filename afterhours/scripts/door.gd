@@ -96,10 +96,9 @@ func _draw() -> void:
 	var inward := _inward()
 	# The room-side edge of the opening, and the strip just inside the room for the mat.
 	var inner_x := opening.end.x if inward > 0.0 else opening.position.x
-	if glowing:
-		draw_rect(opening.grow(GLOW_GROW), GLOW)
 	if secret:
 		_draw_secret(inner_x, inward)
+		_draw_glow()
 		return
 	var mat := Rect2(inner_x if inward > 0.0 else inner_x - MAT, opening.position.y + 6.0, MAT, opening.size.y - 12.0)
 	draw_rect(mat, accent.darkened(0.15))
@@ -117,6 +116,13 @@ func _draw() -> void:
 		draw_rect(jamb, INK, false, 1.2)
 	_draw_dressing(top, bottom, inner_x, inward, trim, accent)
 	_draw_leaf(inner_x, inward)
+	_draw_glow()
+
+
+## The open way out (or the hideout door once there are originals): a glow over the doorway.
+func _draw_glow() -> void:
+	if glowing:
+		draw_rect(opening.grow(GLOW_GROW), GLOW)
 
 
 ## The wing's own touch on the doorway.
