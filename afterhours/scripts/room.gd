@@ -143,6 +143,8 @@ var guard: Guard
 @onready var _keys: KeyboardInput = $KeyboardInput
 @onready var _canvas: ForgeryCanvas = $EaselLayer/ForgeryCanvas
 @onready var _fake_icon: Sprite2D = $FakeIcon
+## The par clock and the objective strip (RoomHud).
+@onready var hud: RoomHud = $Hud
 ## The view from inside a portrait: the room through that painting's style, in its frame.
 @onready var _style_view: Control = $StyleLayer/StyleView
 var _frames: Array[TiltFrame] = []
@@ -162,6 +164,7 @@ func _ready() -> void:
 	add_child(night)
 	($PauseButton as CanvasItem).material = GLOW
 	_fake_icon.material = GLOW
+	hud.material = GLOW
 	entrance = ($Entrance as Node2D).position
 	easel = get_node_or_null("Actors/Easel") as Easel
 	gimmick = get_node_or_null("Gimmick") as Gimmick
@@ -194,6 +197,7 @@ func _ready() -> void:
 		else:
 			_game.report_error("Room '%s': no door leads back to room %d, where the mime came from" % [scene_file_path, run.came_from])
 	_take_run()
+	hud.room = self
 	mime.place_at(entrance)
 	if masterpiece != null:
 		masterpiece.painting = run.wing.painting

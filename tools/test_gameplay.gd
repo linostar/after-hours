@@ -164,6 +164,7 @@ func _tests() -> Array[Callable]:
 		_test_goto_missing_scene_reports,
 		_test_room_swap_and_escape,
 		_test_escape_beat_skips,
+		_test_room_hud,
 		_test_room_swap_cancel_and_locked_exit,
 		_test_room_easel_paints_fake,
 		_test_room_catch_while_painting,
@@ -2665,6 +2666,74 @@ func _test_escape_beat_skips() -> void:
 	await _tap_at(Vector2(480, 400))
 	await create_timer(Door.SHUT_TIME + 0.1).timeout
 	_check(_game.audio.played.count(&"door") == 1 and swinging.exit_door.shut == 1.0 and not swinging.exit_door.glowing, name, "a skip mid-swing did not shut the door with one thud and its glow out (sounds %s)" % [_game.audio.played])
+
+
+## The HUD: the par clock follows the wing timer over par (and stops with it), warms only
+## past par; the objective strip ticks off painting, swapping and escaping as they happen,
+## keeps them through a catch, and the HUD hides in a hideout replay.
+func _test_room_hud() -> void:
+	var name := "room_hud"
+	_check(RoomHud.clock_fill(0.0, 80.0) == 0.0 and is_equal_approx(RoomHud.clock_fill(20.0, 80.0), 0.25) and RoomHud.clock_fill(120.0, 80.0) == 1.0, name, "the clock does not fill with elapsed over par")
+	_check(RoomHud.warmth(79.0, 80.0) == 0.0 and RoomHud.warmth(80.0 + RoomHud.WARM_TIME * 0.5, 80.0) == 0.5 and RoomHud.warmth(200.0, 80.0) == 1.0, name, "the face does not warm only past par")
+	_check(RoomHud.goals(false, false, false) == [false, false, false] and RoomHud.goals(true, false, false) == [true, false, false]
+			and RoomHud.goals(false, true, false) == [true, true, false] and RoomHud.goals(false, true, true) == [true, true, true], name, "the goals do not follow the mime's state")
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.active = false
+	var hud := room.hud
+	var areas: Array[Rect2] = [RoomHud.clock_rect(), RoomHud.plate_rect()]
+	var canvas := room.get_node("EaselLayer/ForgeryCanvas/Easel") as Control
+	for area in areas:
+		_check(hud.visible and Rect2(Vector2.ZERO, Vector2(960, 540)).encloses(area) and not area.intersects(room.get_node("PauseButton").get_rect()) and not area.intersects(canvas.get_global_rect()), name, "the HUD (%s) is off the world, over the pause button or the canvas board" % area)
+	# No wing room hangs a painting under it.
+	for wing_path in Content.WINGS:
+		for room_path: String in (load(wing_path) as WingData).rooms:
+			var scene := (load(room_path) as PackedScene).instantiate()
+			var hung: Dictionary[String, Rect2] = {}
+			for frame in scene.get_node("Frames").get_children():
+				hung["frame " + frame.name] = Rect2(frame.position - TiltFrame.SIZE / 2.0, TiltFrame.SIZE)
+			for portrait in scene.get_node("Portraits").get_children():
+				hung["portrait " + portrait.name] = Rect2(portrait.position - HidingPortrait.SIZE / 2.0, HidingPortrait.SIZE)
+			var picture := scene.get_node_or_null("Masterpiece") as FramedPainting
+			if picture != null:
+				hung["the masterpiece"] = Rect2(picture.position - picture.size / 2.0, picture.size)
+			for what in hung:
+				_check(not areas.any(func(area: Rect2) -> bool: return area.intersects(hung[what])), name, "%s: %s is under the HUD" % [room_path, what])
+			scene.free()
+	await physics_frame
+	_check(hud.done == [false, false, false], name, "goals are done before anything was: %s" % [hud.done])
+	var before := room.elapsed
+	for i in 30:
+		await physics_frame
+	_check(room.elapsed > before and is_equal_approx(RoomHud.clock_fill(room.elapsed, room.par_time), room.elapsed / room.par_time), name, "the clock does not follow the running timer")
+	room._on_painted(Forgery.ASSIST_QUALITY)
+	await process_frame
+	await process_frame
+	_check(hud.done == [true, false, false], name, "painting did not tick the brush: %s" % [hud.done])
+	room._swap()
+	await process_frame
+	await process_frame
+	_check(hud.done == [true, true, false], name, "swapping did not tick the swap: %s" % [hud.done])
+	room._on_caught()
+	await create_timer(Room.TOSS_SHAKE + Room.TOSS_FLIGHT + 0.1).timeout
+	_check(hud.done == [true, true, false], name, "a catch lost the goals: %s" % [hud.done])
+	room._escape()
+	var stopped := room.elapsed
+	await process_frame
+	await process_frame
+	await physics_frame
+	_check(hud.done == [true, true, true] and room.elapsed == stopped, name, "escaping did not tick the exit and stop the clock: %s" % [hud.done])
+	var replay := await _load_room()
+	if replay == null:
+		return
+	# Stopped first (leaving), so the replay's empty stay does not end it and leave the room.
+	replay.leaving = true
+	replay.run.replaying = true
+	await process_frame
+	await process_frame
+	_check(not replay.hud.visible, name, "the HUD shows in a hideout replay")
+	replay.run.replaying = false
 
 
 ## Tapping away mid-swap cancels it; the exit does nothing without the original.
