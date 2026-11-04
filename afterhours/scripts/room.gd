@@ -89,6 +89,8 @@ const RIG_NIGHT := preload("res://shaders/rig_night.gdshader")
 ## The lights' washes sit over the wall and floor, under the paintings and everything on
 ## the floor (their lamps draw over the frames).
 const LIGHTS_Z := -5
+## The back wall's dressing (RoomDecor) sits on the wall polygons, under the gimmick.
+const DECOR_Z := -9
 
 ## The par time for the third star, in seconds.
 @export var par_time := 45.0
@@ -300,6 +302,18 @@ func _light_the_room() -> void:
 		paintings.append(painting_rect())
 		masterpiece.modulate = boost
 	lights.paintings = paintings
+	# The back wall dressed in the wing's style, its lamps clear of the paintings and of what
+	# the gimmick draws on the wall; over the wall polygons, under the gimmick.
+	var decor := RoomDecor.new()
+	decor.name = "Decor"
+	decor.style = StringName(run.wing.painting)
+	decor.avoid = paintings.duplicate()
+	if gimmick != null:
+		decor.avoid.append_array(gimmick.wall_rects())
+	decor.lights = lights
+	decor.z_index = DECOR_Z
+	add_child(decor)
+	move_child(decor, $Floor.get_index() + 1)
 	for door in doors:
 		door.modulate = boost
 	if easel != null:

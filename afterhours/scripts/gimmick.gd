@@ -50,6 +50,12 @@ func forget() -> void:
 	pass
 
 
+## What the gimmick draws on the back wall (a window, a pipe), room units: the room's
+## dressing (RoomDecor) hangs nothing over it.
+func wall_rects() -> Array[Rect2]:
+	return []
+
+
 ## Whether purely decorative motion is stilled (the Reduce Motion setting). Gameplay timing
 ## (lights moving, pipes gushing) never is; only flourishes drawn on top of it.
 func reduce_motion() -> bool:

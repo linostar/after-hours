@@ -35,6 +35,9 @@ const FLOOR_TOP := 172.0
 @export var orbits: PackedVector3Array = PackedVector3Array()
 ## Seconds for one turn of every orbit.
 @export var period := 9.0
+## Whether it paints its starry sky on the back wall and its night strokes on the floor
+## (off in the finale, whose Louvre dressing keeps its own walls).
+@export var sky := true
 
 var _time := 0.0
 ## The sky on the wall behind the paintings, and the night over the floor (drawn once).
@@ -52,10 +55,12 @@ func _ready() -> void:
 	_sky.z_as_relative = false
 	_sky.z_index = -10
 	_sky.draw.connect(_draw_sky)
+	_sky.visible = sky
 	add_child(_sky)
 	_night = Node2D.new()
 	_night.show_behind_parent = true
 	_night.draw.connect(_draw_night)
+	_night.visible = sky
 	add_child(_night)
 
 

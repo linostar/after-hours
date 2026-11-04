@@ -67,6 +67,11 @@ func light_at(point: Vector2) -> float:
 	return LIT if absf(point.x - band_x(point.y)) <= width / 2.0 else DIM
 
 
+## The window, its frame and sill.
+func wall_rects() -> Array[Rect2]:
+	return [Rect2(window_x + WINDOW_RECT.position.x - SASH_WIDTH * 2.0, WINDOW_RECT.position.y - SASH_WIDTH * 2.0, WINDOW_RECT.size.x + SASH_WIDTH * 4.0, WINDOW_RECT.size.y + SASH_WIDTH * 4.0)]
+
+
 func tick(delta: float) -> void:
 	_time += delta
 	queue_redraw()

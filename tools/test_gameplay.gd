@@ -165,6 +165,7 @@ func _tests() -> Array[Callable]:
 		_test_room_swap_and_escape,
 		_test_escape_beat_skips,
 		_test_room_hud,
+		_test_room_decor,
 		_test_room_swap_cancel_and_locked_exit,
 		_test_room_easel_paints_fake,
 		_test_room_catch_while_painting,
@@ -2752,6 +2753,54 @@ func _test_room_hud() -> void:
 	await process_frame
 	_check(not replay.hud.visible, name, "the HUD shows in a hideout replay")
 	replay.run.replaying = false
+
+
+## Every wing room's back wall is dressed in its wing's style (RoomDecor), its lamps hung only
+## in clear wall (off every painting, the gimmick's window or pipe and the HUD), each lighting
+## the wall and the floor (two pools); the finale never paints wing 4's starry sky; an
+## unknown style is reported.
+func _test_room_decor() -> void:
+	var name := "room_decor"
+	var paintings: Array[Rect2] = [Rect2(300, 40, 70, 130), Rect2(600, 50, 60, 50)]
+	for x in RoomDecor.lamp_xs(paintings, 88.0, RoomDecor.LAMP_BOX):
+		var lamp := Rect2(Vector2(x, 88.0) + RoomDecor.LAMP_BOX.position, RoomDecor.LAMP_BOX.size)
+		_check(x >= RoomDecor.HUD_CLEAR and not paintings.any(func(each: Rect2) -> bool: return each.grow(RoomDecor.LAMP_CLEARANCE - 1.0).intersects(lamp)), name, "a lamp at x %.0f hangs over a painting or the HUD" % x)
+	_check(RoomDecor.lamp_xs([Rect2(0, 96, 960, 32)] as Array[Rect2], 88.0, RoomDecor.LAMP_BOX).is_empty(), name, "a lamp hangs across a wall-wide pipe")
+	for wing_path in Content.WINGS:
+		var wing := load(wing_path) as WingData
+		for index in wing.rooms.size():
+			# The room as one of its wing's (its style is the wing's painting), come in at its Entrance.
+			_game.run = WingRun.new(wing)
+			_game.run.room = index
+			change_scene_to_file(wing.rooms[index])
+			var room := await _wait_for_room(wing.rooms[index], 120)
+			if room == null:
+				_check(false, name, "%s did not load" % wing.rooms[index])
+				continue
+			var decor := room.get_node_or_null("Decor") as RoomDecor
+			_check(decor != null and decor.style == StringName(wing.painting) and decor.z_index == Room.DECOR_Z, name, "%s is not dressed in %s" % [wing.rooms[index], wing.painting])
+			if decor == null:
+				continue
+			var lights := room.get_node("Lights") as RoomLights
+			_check(lights.pools.size() == decor.lamps.size() * 2, name, "%s: its %d lamps do not each light the wall and floor" % [wing.rooms[index], decor.lamps.size()])
+			for lamp in decor.lamps:
+				var box := Rect2(lamp + RoomDecor.LAMP_BOX.position, RoomDecor.LAMP_BOX.size)
+				var blocked := decor.avoid.any(func(each: Rect2) -> bool: return each.intersects(box))
+				_check(not blocked and lamp.x >= RoomDecor.HUD_CLEAR, name, "%s: the lamp at %s hangs over a painting, the gimmick's wall or the HUD" % [wing.rooms[index], lamp])
+			if wing.painting == "mona_lisa" and room.gimmick != null:
+				var parts: Array[Gimmick] = room.gimmick.parts() if room.gimmick is GimmickMix else [room.gimmick]
+				for part in parts:
+					_check(not part is Searchlights or not (part as Searchlights).sky, name, "%s paints wing 4's starry sky" % wing.rooms[index])
+	_game.run = null
+	var stray := RoomDecor.new()
+	stray.style = &"no_such_style"
+	_game.quiet_errors = true
+	var errors_before := _game.errors.size()
+	root.add_child(stray)
+	_check(_game.errors.size() == errors_before + 1 and stray.lamps.is_empty(), name, "an unknown style is not reported")
+	_game.quiet_errors = false
+	stray.queue_free()
+	await process_frame
 
 
 ## Tapping away mid-swap cancels it; the exit does nothing without the original.

@@ -40,6 +40,7 @@ script = ExtResource("part0")
 script = ExtResource("part1")
 orbits = PackedVector3Array(280, 360, 80, 700, 380, 80)
 period = 11.0
+sky = false
 
 [node name="Masterpiece" type="Node2D" parent="."]
 z_index = -9
