@@ -511,7 +511,4 @@ func _draw_lids() -> void:
 ## Whether Reduce Motion is on (no Game outside the tree: a test's loose rig moves); the
 ## mime's dizzy stars ask it too.
 func reduce_motion() -> bool:
-	if not is_inside_tree():
-		return false
-	var game := get_node_or_null(GameState.AUTOLOAD_PATH) as GameState
-	return game != null and game.setting("reduce_motion")
+	return GameState.reduce_motion_for(self)

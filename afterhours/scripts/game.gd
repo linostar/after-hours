@@ -303,6 +303,15 @@ func punch(zoom: float, seconds: float) -> void:
 	_punch_left = seconds
 
 
+## Whether Reduce Motion is on, for a node that has no Game handle (a rig, a gimmick, a
+## decoration); a node outside the tree (a test's loose one) moves.
+static func reduce_motion_for(node: Node) -> bool:
+	if not node.is_inside_tree():
+		return false
+	var game := node.get_node_or_null(AUTOLOAD_PATH) as GameState
+	return game != null and game.setting("reduce_motion")
+
+
 ## Whether a shake or a punch is moving the world.
 func jolting() -> bool:
 	return _shake_left > 0.0 or _punch_left > 0.0

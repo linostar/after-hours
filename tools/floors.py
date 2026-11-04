@@ -109,3 +109,31 @@ for bx, by, across in [(0, 0, True), (24, 0, False), (0, 12, False), (24, 12, Tr
             planks.append(f'<rect x="{bx + k * 8}" y="{by}" width="8" height="12" fill="{colour}" stroke="#4a2e1a" stroke-width="0.5"/>')
             planks.append(f'<path d="M{bx + k * 8 + 4} {by + 1} V{by + 11}" stroke="#a87545" stroke-width="0.3" opacity="0.7"/>')
 svg("parquet", 48, 24, "  " + "".join(planks) + "\n")
+
+# The lobby: big slabs of honey marble laid in a grid, soft veins, a brass star inlaid where
+# four slabs meet (drawn at every corner so it wraps).
+star = lambda cx, cy: (f'<polygon points="{cx},{cy - 6} {cx + 2},{cy - 1.5} {cx + 8},{cy} {cx + 2},{cy + 1.5} {cx},{cy + 6} '
+                       f'{cx - 2},{cy + 1.5} {cx - 8},{cy} {cx - 2},{cy - 1.5}" fill="#c9a24a" stroke="#6e5420" stroke-width="0.7"/>')
+svg("lobby", 192, 96, f"""  <rect width="192" height="96" fill="#c4ad87"/>
+  <rect x="0.5" y="0.5" width="95" height="47" fill="#cfbb97" stroke="#8f7b5a" stroke-width="1"/>
+  <rect x="96.5" y="48.5" width="95" height="47" fill="#cfbb97" stroke="#8f7b5a" stroke-width="1"/>
+  <rect x="96.5" y="0.5" width="95" height="47" fill="none" stroke="#8f7b5a" stroke-width="1"/>
+  <rect x="0.5" y="48.5" width="95" height="47" fill="none" stroke="#8f7b5a" stroke-width="1"/>
+  <path d="M10 10 Q34 18 50 14 Q68 10 86 26 M108 58 Q132 66 148 62 Q168 58 182 78 M116 6 Q140 16 170 10 M14 60 Q40 70 62 66 M30 84 Q50 80 70 90" stroke="#ae9a76" stroke-width="0.8" fill="none"/>
+  {"".join(star(x, y) for x in (0, 96, 192) for y in (0, 48, 96))}
+""")
+
+# The hideout: worn wide floorboards in staggered lengths, nail heads at the joists.
+rnd = random.Random(1911)
+boards = []
+for row in range(4):
+    y = row * 8
+    offset = (row * 29) % 64
+    for k in range(-1, 2):
+        x = offset + k * 64
+        colour = rnd.choice(["#5b3f28", "#664630", "#523822", "#6b4a31"])
+        boards.append(f'<rect x="{x}" y="{y}" width="64" height="8" fill="{colour}" stroke="#2e1f13" stroke-width="0.6"/>')
+        boards.append(f'<path d="M{x + 4} {y + 3} Q{x + 30} {y + 5} {x + 60} {y + 3}" stroke="#7a573a" stroke-width="0.3" fill="none"/>')
+        for nx in (x + 3, x + 61):
+            boards.append(f'<circle cx="{nx}" cy="{y + 2}" r="0.6" fill="#1f160e"/><circle cx="{nx}" cy="{y + 6}" r="0.6" fill="#1f160e"/>')
+svg("planks", 64, 32, "  " + "".join(boards) + "\n")

@@ -31,6 +31,10 @@ var _target: Node2D
 
 func _ready() -> void:
 	($Navigation as NavigationRegion2D).bake_navigation_polygon(false)
+	var decor := $Decor as HubDecor
+	decor.doors = Content.WINGS.size()
+	decor.first_x = FIRST_DOOR_X
+	decor.gap = DOOR_GAP
 	var ids := Content.wing_ids()
 	var came_from := -1
 	for i in Content.WINGS.size():
