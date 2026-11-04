@@ -77,3 +77,12 @@ arrival = Vector2(60, 0)
 [node name="ToLast" parent="Doors" instance=ExtResource("door")]
 position = Vector2(925, 330)
 to_room = 2
+
+[node name="Plinth" type="StaticBody2D" parent="Actors"]
+position = Vector2(110, 500)
+script = ExtResource("partition")
+style = 1
+prop = 2
+width = 34.0
+depth = 28.0
+height = 56.0

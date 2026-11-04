@@ -13,8 +13,13 @@ extends StaticBody2D
 ## with pointed-arch niches; MARBLE (the Louvre) veined marble with pilasters, a dark plinth
 ## and a cornice. Its detail (dabs, strokes, veins) is seeded from its position, so it never
 ## changes between visits.
+## A `prop` other than WALL is museum furniture on the same footprint (blocking walking and
+## sight alike), trimmed in its wing's style colour (STYLE_TRIMS): a BENCH (a padded seat on
+## legs), a PLINTH carrying a marble bust, or a ROPE (velvet slung between two brass
+## stanchions).
 
 enum Style { MUSEUM, DELFT, SHOJI, HEDGE, STROKES, GOTHIC, MARBLE }
+enum Prop { WALL, BENCH, PLINTH, ROPE }
 
 ## How far a walker's feet keep off the footprint: half a guard across, arms out (the mime
 ## is narrower), so no body overlaps the wall. The navmesh is carved this far round it (a
@@ -28,11 +33,22 @@ const CORNER_SLACK := 4.0
 const TOP := Color(0.85, 0.82, 0.74)
 const FACE := Color(0.7, 0.66, 0.58)
 const OUTLINE := Color(0.12, 0.1, 0.12, 0.9)
+## Each style's trim for the furniture: the bench's cushion, the plinth's band, the rope.
+const STYLE_TRIMS: Dictionary[Style, Color] = {
+	Style.MUSEUM: Color(0.55, 0.12, 0.16), Style.DELFT: Color(0.2, 0.32, 0.6), Style.SHOJI: Color(0.62, 0.14, 0.12),
+	Style.HEDGE: Color(0.3, 0.52, 0.28), Style.STROKES: Color(0.95, 0.78, 0.28), Style.GOTHIC: Color(0.42, 0.24, 0.42),
+	Style.MARBLE: Color(0.56, 0.12, 0.14),
+}
+const WOOD := Color(0.4, 0.26, 0.15)
+const BRASS := Color(0.82, 0.66, 0.3)
+const PLINTH_STONE := Color(0.78, 0.76, 0.72)
+const BUST := Color(0.93, 0.92, 0.88)
 
 @export var width := 160.0
 @export var depth := 60.0
 @export var height := 90.0
 @export var style := Style.MUSEUM
+@export var prop := Prop.WALL
 
 
 func _ready() -> void:
@@ -54,6 +70,9 @@ func _draw() -> void:
 	var face := Rect2(-width / 2.0, -height, width, height)
 	var brush := RandomNumberGenerator.new()
 	brush.seed = int(position.x * 7.0 + position.y * 13.0)
+	if prop != Prop.WALL:
+		_draw_prop(STYLE_TRIMS[style])
+		return
 	match style:
 		Style.DELFT:
 			_draw_delft(top, face)
@@ -247,3 +266,77 @@ func _draw_marble(top: Rect2, face: Rect2, brush: RandomNumberGenerator) -> void
 	draw_line(face.position + Vector2(0.0, 6.0), Vector2(face.end.x, face.position.y + 6.0), PLINTH, 0.8)
 	draw_rect(Rect2(face.position.x, face.end.y - 10.0, face.size.x, 10.0), PLINTH)
 	draw_line(Vector2(face.position.x, face.end.y - 10.0), Vector2(face.end.x, face.end.y - 10.0), MARBLE.darkened(0.3), 1.0)
+
+
+
+## The furniture on the footprint (front edge at y 0, `depth` deep, `height` tall).
+func _draw_prop(trim: Color) -> void:
+	match prop:
+		Prop.BENCH:
+			_draw_bench(trim)
+		Prop.PLINTH:
+			_draw_plinth(trim)
+		Prop.ROPE:
+			_draw_rope(trim)
+
+
+## A gallery bench: four legs, a wooden frame and a padded seat, buttoned.
+func _draw_bench(trim: Color) -> void:
+	var seat := Rect2(-width / 2.0, -height - depth, width, depth)
+	for x: float in [-width / 2.0 + 6.0, width / 2.0 - 10.0]:
+		draw_rect(Rect2(x, -height, 4.0, height), WOOD.darkened(0.2))
+		draw_rect(Rect2(x + 2.0, -height - depth * 0.6, 3.0, height + depth * 0.6 - 4.0), WOOD.darkened(0.35))
+	draw_rect(Rect2(-width / 2.0, -height, width, 6.0), WOOD)
+	draw_rect(seat, trim)
+	draw_rect(Rect2(seat.position.x, seat.end.y - 4.0, seat.size.x, 4.0), trim.darkened(0.3))
+	for k in 5:
+		draw_circle(Vector2(seat.position.x + seat.size.x * (k + 0.5) / 5.0, seat.get_center().y - 1.0), 1.2, trim.darkened(0.45))
+	draw_rect(seat, OUTLINE, false, 1.2)
+	draw_rect(Rect2(-width / 2.0, -height, width, 6.0), OUTLINE, false, 1.0)
+
+
+## A stone plinth, banded in the trim, carrying a marble bust on a little socle.
+func _draw_plinth(trim: Color) -> void:
+	var top := Rect2(-width / 2.0, -height - depth, width, depth)
+	var face := Rect2(-width / 2.0, -height, width, height)
+	draw_rect(face, PLINTH_STONE.darkened(0.12))
+	draw_rect(top, PLINTH_STONE)
+	draw_rect(Rect2(face.position.x, face.position.y + 6.0, face.size.x, 4.0), trim)
+	draw_rect(Rect2(face.position.x - 2.0, face.end.y - 6.0, face.size.x + 4.0, 6.0), PLINTH_STONE.darkened(0.25))
+	draw_rect(face, OUTLINE, false, 1.2)
+	draw_rect(top, OUTLINE, false, 1.0)
+	# The bust, standing on the top's middle: socle, shoulders, neck, head with a curl of hair.
+	var base := top.get_center() + Vector2(0.0, 4.0)
+	draw_rect(Rect2(base.x - 7.0, base.y - 6.0, 14.0, 6.0), BUST.darkened(0.1))
+	var shoulders := PackedVector2Array([base + Vector2(-13, -6), base + Vector2(13, -6), base + Vector2(9, -20), base + Vector2(-9, -20)])
+	draw_colored_polygon(shoulders, BUST)
+	draw_rect(Rect2(base.x - 3.5, base.y - 26.0, 7.0, 7.0), BUST.darkened(0.06))
+	draw_circle(base + Vector2(0, -33), 8.0, BUST)
+	draw_arc(base + Vector2(0, -35), 8.0, PI * 1.05, PI * 1.95, 8, BUST.darkened(0.18), 2.0, true)
+	draw_circle(base + Vector2(-3, -33), 0.9, BUST.darkened(0.35))
+	draw_circle(base + Vector2(3, -33), 0.9, BUST.darkened(0.35))
+	draw_polyline(_closed(shoulders), OUTLINE, 1.0, true)
+	draw_arc(base + Vector2(0, -33), 8.0, 0.0, TAU, 20, OUTLINE, 1.0, true)
+
+
+## Two brass stanchions at the footprint's ends with a velvet rope slung between them.
+func _draw_rope(trim: Color) -> void:
+	var y := -depth / 2.0
+	for x: float in [-width / 2.0 + 4.0, width / 2.0 - 4.0]:
+		draw_set_transform(Vector2(x, y), 0.0, Vector2(1.0, 0.45))
+		draw_circle(Vector2.ZERO, 7.0, BRASS.darkened(0.3))
+		draw_set_transform(Vector2.ZERO)
+		draw_rect(Rect2(x - 2.0, y - height, 4.0, height), BRASS)
+		draw_line(Vector2(x - 1.0, y - height), Vector2(x - 1.0, y), BRASS.lightened(0.3), 1.0)
+		draw_circle(Vector2(x, y - height - 3.0), 4.0, BRASS)
+	var sag := PackedVector2Array()
+	for k in 13:
+		var t := k / 12.0
+		sag.append(Vector2(lerpf(-width / 2.0 + 4.0, width / 2.0 - 4.0, t), y - height + 4.0 + sin(t * PI) * height * 0.35))
+	draw_polyline(sag, trim.darkened(0.3), 5.0, true)
+	draw_polyline(sag, trim, 3.0, true)
+
+
+func _closed(points: PackedVector2Array) -> PackedVector2Array:
+	points.append(points[0])
+	return points

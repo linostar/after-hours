@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/room_base.tscn" id="base"]
 [ext_resource type="PackedScene" path="res://scenes/tilt_frame.tscn" id="frame"]
@@ -6,6 +6,7 @@
 [ext_resource type="PackedScene" path="res://scenes/easel.tscn" id="easel"]
 [ext_resource type="PackedScene" path="res://scenes/door.tscn" id="door"]
 [ext_resource type="Texture2D" path="res://art/svg/floor_checker.svg" id="floor_tile"]
+[ext_resource type="Script" path="res://scripts/partition.gd" id="partition"]
 
 [node name="Room" instance=ExtResource("base")]
 
@@ -44,3 +45,21 @@ position = Vector2(45, 470)
 to_room = -1
 opening = Rect2(-45, -40, 24, 80)
 arrival = Vector2(60, 0)
+
+[node name="Bench" type="StaticBody2D" parent="Actors"]
+position = Vector2(480, 500)
+script = ExtResource("partition")
+style = 1
+prop = 1
+width = 96.0
+depth = 22.0
+height = 24.0
+
+[node name="Plinth" type="StaticBody2D" parent="Actors"]
+position = Vector2(850, 500)
+script = ExtResource("partition")
+style = 1
+prop = 2
+width = 34.0
+depth = 28.0
+height = 56.0

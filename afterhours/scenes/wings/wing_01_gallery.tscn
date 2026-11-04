@@ -68,3 +68,21 @@ position = Vector2(45, 330)
 to_room = 1
 opening = Rect2(-45, -40, 24, 80)
 arrival = Vector2(60, 0)
+
+[node name="Rope" type="StaticBody2D" parent="Actors"]
+position = Vector2(150, 500)
+script = ExtResource("partition")
+style = 1
+prop = 3
+width = 110.0
+depth = 10.0
+height = 34.0
+
+[node name="Plinth" type="StaticBody2D" parent="Actors"]
+position = Vector2(650, 410)
+script = ExtResource("partition")
+style = 1
+prop = 2
+width = 34.0
+depth = 28.0
+height = 56.0

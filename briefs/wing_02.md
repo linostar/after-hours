@@ -58,3 +58,4 @@ Re-recorded at a person's painting pace (step 10): 38 plays; the run takes 54.5 
 Re-recorded with the walls out of the water (art pass): 50 plays; the run takes 57.8 s, par 90 s.
 Re-recorded with guards patrolling round the display walls (art pass): 96 plays; the run takes 69.2 s, par 100 s.
 Re-recorded with every walker keeping a body's width off the display walls (art pass): 42 plays; the run takes 55.8 s, par 85 s.
+Re-recorded with the floor props (polish pass): 55 plays; the run takes 59.15 s, par 90 s.
