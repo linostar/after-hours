@@ -302,6 +302,18 @@ def fx_chain_rattle(rng):
     return buf
 
 
+def fx_chains_fall(rng):
+    """A wing unlocking: the chains slithering off in a falling jangle, the padlock's clunk on
+    the floor and its little bounce, then a bright note: open."""
+    buf = []
+    for k in range(10):
+        place(buf, ping(rng.uniform(2600, 1500) - k * 60.0, 0.12, 30.0, STEEL), k * 0.04 + rng.uniform(0, 0.012), rng.uniform(0.5, 1.0) * (1.0 - k * 0.05))
+    place(buf, knock(rng, 150.0, 0.1), 0.5, 1.2)
+    place(buf, knock(rng, 170.0, 0.08), 0.68, 0.6)
+    place(buf, ping(note_hz(F6), 0.6, 6.0, VIBES), 0.8, 0.5)
+    return buf
+
+
 def fx_caught(rng):
     """A guard grabbing the mime: a cartoon bonk with a springy boing."""
     n = int(0.45 * RATE)
@@ -460,6 +472,7 @@ EFFECTS = {
     "swap": (fx_swap, 0.51, "event"),
     "door": (fx_door, 0.44, "event"),
     "chain_rattle": (fx_chain_rattle, 0.39, "event"),
+    "chains_fall": (fx_chains_fall, 0.45, "event"),
     "caught": (fx_caught, 0.44, "stinger"),
     "toss": (fx_toss, 0.15, "event"),
     "splat": (fx_splat, 0.41, "event"),

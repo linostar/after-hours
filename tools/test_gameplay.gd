@@ -2344,8 +2344,20 @@ func _test_hub_doors_unlock_and_enter() -> void:
 	hub = current_scene as Hub
 	_check(hub.wing_doors[0].finished and hub.wing_doors[0].stars == 2 and hub.wing_doors[1].open and not hub.wing_doors[2].open, name, "after wing 1 its door does not show 2 stars and open wing 2 only")
 	_check(hub.mime.position.distance_to(hub.wing_doors[0].position + Hub.BACK_FROM_WING) <= 1.0, name, "back from wing 1 the mime is at %s, not in front of its door" % hub.mime.position)
+	# Wing 2 just opened: its door plays the unlock once (chains off, painting bright), then
+	# a later visit shows it plain open.
+	_check(hub.wing_doors[1].unlocking and _game.just_unlocked == -1, name, "wing 2's door did not start its unlock beat (or the flag was kept)")
+	var unlocked := await _wait_until(func() -> bool: return not hub.wing_doors[1].unlocking, ceili((WingDoor.UNLOCK_DELAY + WingDoor.UNLOCK_TIME) * 60.0) + 20)
+	_check(unlocked and _game.audio.played.has(&"chains_fall"), name, "wing 2's unlock beat did not finish with its sound")
+	_game.goto(GameState.Flow.HIDEOUT)
+	await _wait_until(func() -> bool: return current_scene is Hideout and not _game.is_transitioning(), 120)
+	_game.goto(GameState.Flow.HUB)
+	await _wait_until(func() -> bool: return current_scene is Hub and not _game.is_transitioning(), 120)
+	hub = current_scene as Hub
+	_check(hub.wing_doors[1].open and not hub.wing_doors.any(func(door: WingDoor) -> bool: return door.unlocking), name, "a later visit played an unlock again")
 	_game.run = null
 	_game.save = Save.defaults()
+	_game.just_unlocked = -1
 	DirAccess.remove_absolute(_game.save_path)
 	_game.scene_paths[GameState.Flow.ROOM] = ROOM_PATH
 

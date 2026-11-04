@@ -45,6 +45,9 @@ var scene_paths: Dictionary[Flow, String] = {
 var state := Flow.TITLE
 ## The wing being played (null before any; a room loaded on its own makes a one-room run).
 var run: WingRun
+## The wing (index in Content.WINGS) a first escape just unlocked, until the hub plays its
+## unlock beat (-1: none).
+var just_unlocked := -1
 ## Every error reported this run, oldest first.
 var errors: Array[String] = []
 ## While true, report_error logs with print instead of push_error, so a test that
@@ -177,7 +180,8 @@ func setting(key: String) -> bool:
 
 
 ## Records the run's escape (its stars and time) for its wing and writes the save when it
-## is a best; returns what it beat (Save.improvement). A run of a room loaded on its own (no
+## is a best; returns what it beat (Save.improvement). A first escape from a wing unlocks
+## the next one (just_unlocked, for the hub's unlock beat). A run of a room loaded on its own (no
 ## wing file) is not recorded and beats nothing.
 func record_escape(stars: Array[bool], time: float) -> Dictionary:
 	if run == null or run.wing.resource_path.is_empty():
@@ -185,9 +189,14 @@ func record_escape(stars: Array[bool], time: float) -> Dictionary:
 		return {"stars": false, "time": false}
 	var id := Content.wing_id(run.wing.resource_path)
 	var beaten := Save.improvement(save, id, stars, time)
+	var first := not Save.finished(save, id)
 	if Save.record(save, id, stars, time):
 		print("[Game] New best for %s: %d star(s), %.2f s" % [id, Save.stars_of(save, id), save["wings"][id]["time"]])
 		write_save()
+	var index := Content.WINGS.find(run.wing.resource_path)
+	if first and index >= 0 and index + 1 < Content.WINGS.size():
+		just_unlocked = index + 1
+		print("[Game] Wing %d unlocked" % (just_unlocked + 1))
 	return beaten
 
 
