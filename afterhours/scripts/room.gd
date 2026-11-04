@@ -34,6 +34,8 @@ extends Node2D
 ## then TOSS_FLIGHT along an arc TOSS_HEIGHT high), closing the canvas if it was painting
 ## (its finished strokes are kept); taps are ignored meanwhile, then every guard starts its
 ## route again (a mime carrying the fake or the original keeps it: only the guards reset).
+## Caught HINT_AFTER times in a room on one play, the room shows where its trick is for the
+## mime's way through (hint_in, hint_out: a RoomHint) until it leaves.
 ## The timer (elapsed) keeps running through it all, but not while a screen change fades
 ## (the player cannot act then); ever_seen records whether any guard ever spotted the mime.
 ## A room is one of its wing's rooms (Game.run, a WingRun; a room loaded on its own makes a
@@ -97,12 +99,24 @@ const SKETCH_Z := -4
 ## how close the mime must come to pick it up.
 const SKETCH_REST := Vector2(30, 24)
 const SKETCH_REACH := 12.0
+## After this many catches in a room on one play (WingRun.room_catches), the room shows where
+## its trick is (RoomHint) until the mime leaves; drawn over the wall and its paintings (only
+## round their edges) and under everything that walks.
+const HINT_AFTER := 3
+const HINT_Z := -4
 
 ## The par time for the third star, in seconds.
 @export var par_time := 45.0
 ## Where the wing's hidden sketch is tucked (a TiltFrame under Frames or a HidingPortrait under
 ## Portraits) in the one room of the wing that hides it; empty elsewhere.
 @export_node_path("TiltFrame", "HidingPortrait") var sketch_in: NodePath
+## Where the room's trick is, for the hint after HINT_AFTER catches here: on the way in (before
+## the swap) and on the way out (carrying the original). Each entry is a NodePath to a
+## TiltFrame under Frames or a HidingPortrait under Portraits (to tilt or hide in), or a Vector2
+## floor spot (a puddle to splash, a searchlight pool, parasol shade to stand in); empty where
+## the room needs no trick that way.
+@export var hint_in: Array = []
+@export var hint_out: Array = []
 
 ## Seconds since the room started (the wing timer: a toss does not stop it).
 var elapsed := 0.0
@@ -122,6 +136,9 @@ var hide_target: HidingPortrait
 var sketch: Sketch
 var sketch_source: Node2D
 var sketch_intent := false
+## The trick's hint for each way through the room ([in, out]; null where the room has none
+## that way): the one for the mime's way shows once it has been caught HINT_AFTER times here.
+var hints: Array[RoomHint] = [null, null]
 var hidden_in: HidingPortrait
 ## The quality (Forgery) of the fake the mime carries, or of the one hung by the swap.
 var fake_quality := 0.0
@@ -264,6 +281,7 @@ func _ready() -> void:
 			_game.report_error("Room '%s': Portraits child '%s' is a %s, not a HidingPortrait" % [scene_file_path, child.name, child.get_class()])
 	_light_the_room()
 	_place_sketch()
+	_place_hints()
 	_canvas.watchers = guards
 	_canvas.painted.connect(_on_painted)
 	if fake_hung:
@@ -771,6 +789,48 @@ func _take_sketch() -> void:
 	print("[Room] Picked up the sketch at t %.2f" % elapsed)
 
 
+## The trick's hints (hint_in, hint_out), hidden until due (_show_hint). An entry that is not
+## one of the room's frames or portraits, nor a floor spot, is reported and left out.
+func _place_hints() -> void:
+	for way in 2:
+		var field := "hint_out" if way == 1 else "hint_in"
+		var entries := hint_out if way == 1 else hint_in
+		if entries.is_empty():
+			continue
+		var hint := RoomHint.new()
+		hint.name = "HintOut" if way == 1 else "HintIn"
+		for entry: Variant in entries:
+			var target: Node = get_node_or_null(entry) if entry is NodePath and not (entry as NodePath).is_empty() else null
+			if entry is Vector2:
+				hint.spots.append(entry)
+			elif target is TiltFrame and target in _frames:
+				hint.rects.append((target as TiltFrame).rect())
+			elif target is HidingPortrait and target in _portraits:
+				hint.rects.append((target as HidingPortrait).rect())
+			else:
+				_game.report_error("Room '%s': %s entry %s is not one of the room's frames or portraits, nor a floor spot" % [scene_file_path, field, entry])
+		hint.material = GLOW
+		hint.z_index = HINT_Z
+		hint.hide()
+		add_child(hint)
+		hints[way] = hint
+	_show_hint()
+
+
+## Shows the hint for the mime's way (out while it carries the original) once it has been
+## caught HINT_AFTER times in this room on this play; never in a replay.
+func _show_hint() -> void:
+	var due: bool = run.room_catches.get(run.room, 0) >= HINT_AFTER and not run.replaying
+	for way in 2:
+		var hint := hints[way]
+		if hint == null:
+			continue
+		var shown := due and (way == 1) == mime.carrying
+		if shown and not hint.visible:
+			print("[Room] Hint shows the way %s (%d catches here)" % ["out" if way == 1 else "in", run.room_catches[run.room]])
+		hint.visible = shown
+
+
 ## The active guard nearest `point` within `reach` (GuardBrain.HEARING_RANGE unless a quieter
 ## noise carries less), or null: a noise pulls only that one.
 func nearest_in_earshot(point: Vector2, reach := GuardBrain.HEARING_RANGE) -> Guard:
@@ -807,6 +867,7 @@ func _swap() -> void:
 	print("[Room] Swapped the forgery for the original at t %.2f (fake %s)" % [elapsed, Forgery.Grade.keys()[Forgery.grade(fake_quality)]])
 	_game.audio.play(&"swap")
 	_game.punch(SWAP_PUNCH, PUNCH_TIME)
+	_show_hint()
 
 
 func _on_inspected(by: Guard) -> void:
@@ -890,6 +951,8 @@ func _on_spotted() -> void:
 
 func _on_caught() -> void:
 	catches += 1
+	run.room_catches[run.room] = run.room_catches.get(run.room, 0) + 1
+	_show_hint()
 	tossing = true
 	_cancel_swap()
 	paint_intent = false

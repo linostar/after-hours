@@ -9,6 +9,8 @@
 [ext_resource type="Texture2D" path="res://art/svg/floor_gothic.svg" id="floor_tile"]
 
 [node name="Room" instance=ExtResource("base")]
+hint_in = [NodePath("Frames/FrameB")]
+hint_out = [NodePath("Frames/FrameC")]
 sketch_in = NodePath("Portraits/PortraitA")
 
 [node name="Entrance" parent="."]

@@ -11,6 +11,7 @@
 [ext_resource type="Texture2D" path="res://art/svg/floor_checker.svg" id="floor_tile"]
 
 [node name="Room" instance=ExtResource("base")]
+hint_in = [NodePath("Frames/FrameA")]
 
 [node name="Entrance" parent="."]
 position = Vector2(105, 330)

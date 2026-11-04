@@ -11,6 +11,7 @@
 [ext_resource type="Texture2D" path="res://art/svg/floor_terrazzo.svg" id="floor_tile"]
 
 [node name="Room" instance=ExtResource("base")]
+hint_in = [NodePath("Frames/FrameA")]
 sketch_in = NodePath("Portraits/PortraitA")
 
 [node name="Entrance" parent="."]

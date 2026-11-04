@@ -167,6 +167,8 @@ func _tests() -> Array[Callable]:
 		_test_room_hud,
 		_test_room_decor,
 		_test_sketch_found,
+		_test_hint_after_catches,
+		_test_wings_have_hints,
 		_test_room_swap_cancel_and_locked_exit,
 		_test_room_easel_paints_fake,
 		_test_room_catch_while_painting,
@@ -1067,6 +1069,111 @@ func _test_sketch_found() -> void:
 	_check(_game.errors.size() == errors_before + 1 and stray.sketch == null, name, "a bad sketch_in is not reported")
 	_game.quiet_errors = false
 	_game.save = Save.defaults()
+
+
+## A play of a one-room wing of the slice room (so a room loaded into it is that wing's room 0,
+## not a room on its own with a run of its own).
+func _hint_run() -> WingRun:
+	var run := WingRun.new((load(Content.WINGS[0]) as WingData))
+	run.wing = run.wing.duplicate()
+	run.wing.rooms = [ROOM_PATH]
+	return run
+
+
+## The slice room hinting at `way_in` and `way_out`, loaded into `run` and made current.
+func _load_hint_room(run: WingRun, way_in: Array, way_out: Array) -> Room:
+	var room := (load(ROOM_PATH) as PackedScene).instantiate() as Room
+	room.hint_in = way_in
+	room.hint_out = way_out
+	_game.run = run
+	var old := current_scene
+	root.add_child(room)
+	current_scene = room
+	if old != null:
+		old.queue_free()
+	for i in 3:
+		await physics_frame
+	room.guard.active = false
+	return room
+
+
+## The trick's hint: none before HINT_AFTER catches in the room; from the third (a toss's) it
+## shows the way in before the swap and the way out while carrying; it stays across leaving
+## and coming back on the same play; a new play starts at none; Reduce Motion holds it
+## steady; a room without hint data has none; a bad hint entry is reported.
+func _test_hint_after_catches() -> void:
+	var name := "hint_after_catches"
+	var run := _hint_run()
+	var room := await _load_hint_room(run, [^"Frames/FrameA"], [Vector2(300, 400), ^"Portraits/PortraitB"])
+	var way_in := room.hints[0]
+	var way_out := room.hints[1]
+	if way_in == null or way_out == null:
+		_check(false, name, "the room made no hint for a way (in %s, out %s)" % [way_in, way_out])
+		return
+	var frame := room.get_node("Frames/FrameA") as TiltFrame
+	var portrait := room.get_node("Portraits/PortraitB") as HidingPortrait
+	_check(way_in.rects == ([frame.rect()] as Array[Rect2]) and way_in.spots.is_empty(), name, "the way in's hint is not FrameA: %s, %s" % [way_in.rects, way_in.spots])
+	_check(way_out.rects == ([portrait.rect()] as Array[Rect2]) and way_out.spots == PackedVector2Array([Vector2(300, 400)]), name, "the way out's hint is not the spot and PortraitB: %s, %s" % [way_out.rects, way_out.spots])
+	_check(way_in.material == Room.GLOW and way_in.z_index == Room.HINT_Z, name, "the hint is not drawn in the room's glow under the walkers")
+	for caught in Room.HINT_AFTER:
+		_check(not way_in.visible and not way_out.visible, name, "a hint shows after %d catch(es)" % caught)
+		room._on_caught()
+		await _wait_until(func() -> bool: return not room.tossing, 120)
+	_check(run.room_catches[0] == Room.HINT_AFTER and way_in.visible and not way_out.visible, name, "the third catch does not show the way in's hint alone (catches %s, in %s, out %s)" % [run.room_catches, way_in.visible, way_out.visible])
+	room.mime.has_fake = true
+	room._swap()
+	_check(way_out.visible and not way_in.visible, name, "carrying the original does not switch to the way out's hint")
+	room._give_run()
+	var again := await _load_hint_room(run, [^"Frames/FrameA"], [Vector2(300, 400)])
+	_check(again.hints[1].visible and not again.hints[0].visible, name, "coming back into the room on the same play loses the hint")
+	_game.set_setting("reduce_motion", true)
+	var still := again.hints[1].breath()
+	await create_timer(0.3).timeout
+	_check(is_equal_approx(again.hints[1].breath(), still) and is_equal_approx(still, RoomHint.STEADY), name, "under Reduce Motion the hint still breathes")
+	_game.set_setting("reduce_motion", false)
+	var fresh := await _load_hint_room(_hint_run(), [^"Frames/FrameA"], [])
+	_check(not fresh.hints[0].visible and fresh.hints[1] == null, name, "a new play starts with the hint showing, or a way without data has one")
+	var bare := await _load_hint_room(_hint_run(), [], [])
+	_check(bare.hints == ([null, null] as Array[RoomHint]) and bare.find_children("*", "RoomHint", false, false).is_empty(), name, "a room without hint data makes a hint")
+	_game.quiet_errors = true
+	var errors_before := _game.errors.size()
+	var stray := await _load_hint_room(_hint_run(), [^"Actors/Mime", ^"Frames/Nowhere", 7, ^"Frames/FrameB"], [])
+	_check(_game.errors.size() == errors_before + 3 and stray.hints[0].rects == ([(stray.get_node("Frames/FrameB") as TiltFrame).rect()] as Array[Rect2]), name, "bad hint entries are not reported one each (errors %d)" % (_game.errors.size() - errors_before))
+	_game.quiet_errors = false
+	_game.run = null
+
+
+## Every wing room with a trick hints at it each way it is crossed: the way in everywhere, the
+## way out everywhere but the masterpiece's room (the mime turns back there); every entry is
+## one of the room's frames or portraits or a floor spot, and every bot trick tap lands on a
+## hinted frame or portrait or by a hinted spot; trick-free rooms have no hint.
+func _test_wings_have_hints() -> void:
+	var name := "wings_have_hints"
+	for path in Content.WINGS:
+		var wing := load(path) as WingData
+		var targets: Array[Rect2] = []
+		for i in wing.rooms.size():
+			var room := (load(wing.rooms[i]) as PackedScene).instantiate() as Room
+			var label := "%s room %d (%s)" % [path, i, wing.rooms[i].get_file()]
+			if i in wing.trick_free:
+				_check(room.hint_in.is_empty() and room.hint_out.is_empty(), name, "%s is trick-free but has a hint" % label)
+			else:
+				_check(not room.hint_in.is_empty(), name, "%s has no hint on the way in" % label)
+				_check(not room.hint_out.is_empty() or room.has_node("Masterpiece"), name, "%s has no hint on the way out" % label)
+			for entry: Variant in room.hint_in + room.hint_out:
+				var target: Node = room.get_node_or_null(entry) if entry is NodePath else null
+				if entry is Vector2:
+					targets.append(Rect2(entry, Vector2.ZERO).grow(RoomHint.RING_RADIUS))
+				elif target is TiltFrame and target.get_parent() == room.get_node("Frames"):
+					targets.append((target as TiltFrame).rect())
+				elif target is HidingPortrait and target.get_parent() == room.get_node("Portraits"):
+					targets.append((target as HidingPortrait).rect())
+				else:
+					_check(false, name, "%s hints at %s, not a frame, portrait or floor spot" % [label, entry])
+			room.free()
+		for trick in wing.bot_tricks:
+			var tap := wing.bot_route[trick]
+			_check(targets.any(func(target: Rect2) -> bool: return target.has_point(tap)), name, "%s: trick tap %d at %s is on no hint" % [path, trick, tap])
 
 
 ## Stands `guard` still at `at`, facing `facing`.

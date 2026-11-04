@@ -27,6 +27,9 @@ var hung: Dictionary[int, Dictionary] = {}
 ## Per room index: how many times the mime has come in (the ghost mime replays the bot's
 ## stay of the same number).
 var visits: Dictionary[int, int] = {}
+## Per room index: how many times the mime was caught there on this play (Room.HINT_AFTER of
+## them show where the room's trick is).
+var room_catches: Dictionary[int, int] = {}
 ## A replay of the bot's run (the hideout's): the rooms follow the ghost mime, the only thing
 ## that moves; nothing is recorded.
 var replaying := false

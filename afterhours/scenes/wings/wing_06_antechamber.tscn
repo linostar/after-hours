@@ -9,6 +9,8 @@
 [ext_resource type="Texture2D" path="res://art/svg/floor_parquet.svg" id="floor_tile"]
 
 [node name="Room" instance=ExtResource("base")]
+hint_in = [Vector2(385, 475)]
+hint_out = [NodePath("Frames/FrameB")]
 
 [node name="Entrance" parent="."]
 position = Vector2(105, 330)

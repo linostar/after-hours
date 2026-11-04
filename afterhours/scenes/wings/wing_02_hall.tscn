@@ -10,6 +10,8 @@
 [ext_resource type="Texture2D" path="res://art/svg/floor_tatami.svg" id="floor_tile"]
 
 [node name="Room" instance=ExtResource("base")]
+hint_in = [NodePath("Portraits/PortraitB")]
+hint_out = [NodePath("Portraits/PortraitB")]
 sketch_in = NodePath("Frames/FrameA")
 
 [node name="Entrance" parent="."]
