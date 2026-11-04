@@ -28,7 +28,7 @@ texture = ExtResource("floor_tile")
 [node name="Gimmick" type="Node2D" parent="."]
 z_index = -9
 script = ExtResource("gimmick")
-orbits = PackedVector3Array(380, 430, 0, 860, 490, 0)
+orbits = PackedVector3Array(430, 480, 0, 860, 490, 0)
 period = 9
 
 [node name="FrameA" parent="Frames" instance=ExtResource("frame")]
@@ -64,13 +64,13 @@ depth = 60
 height = 80
 
 [node name="Easel" parent="Actors" instance=ExtResource("easel")]
-position = Vector2(300, 260)
+position = Vector2(200, 440)
 
 [node name="Guard" parent="Actors" instance=ExtResource("guard")]
 route = PackedVector2Array(540, 335, 580, 335)
 
 [node name="Guard2" parent="Actors" instance=ExtResource("guard")]
-route = PackedVector2Array(150, 300, 150, 440)
+route = PackedVector2Array(110, 310, 110, 215)
 
 [node name="ToHall" parent="Doors" instance=ExtResource("door")]
 position = Vector2(925, 330)

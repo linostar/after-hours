@@ -13,7 +13,14 @@
 - Room 1, the hall: trick **hide** (the corridor).
 - Room 2, the gallery: trick **lure** (a sentry on the swap spot, the far frame); a parasol gives cover.
 - Sketch: inside the gallery's portrait (Mona Lisa), hidden in after the swap.
-- Bot result: not recorded yet; run `tools/record_wings.sh` (it records the waits, par time, ghost and sketch waits, then proves every trick needed).
+- What the bot taught: the lawn's second guard by the entrance followed the mime's prints from the
+  door, so he walks the south-east lawn (560 to 860, y 400) and follows only the prints left on the way
+  out; waiting at the corridor's mouth left the mime where its guard comes, so the mime waits at the
+  easel; the way out steps aside into the west parasol's shade. In the gallery the sentry followed the
+  prints from the tilted frame to the mime: a parasol now shades the step-aside (860, 365) and one the
+  sketch's portrait (680, 215), and the third guard keeps to the back wall (200 to 260, y 215).
+- Bot result: 227 plays; 79.53 s, par 115; tricks 1, 3, 6, 10 and 12 proved needed; the sketch route
+  escapes with the sketch in 84.23 s.
 
 ## History
 Re-recorded with guards turning smoothly (step 10): 52 plays; the run takes 60.6 s, par 95 s.

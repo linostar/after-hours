@@ -45,7 +45,7 @@ position = Vector2(560, 75)
 painting = "fighting_temeraire"
 
 [node name="FrameD" parent="Frames" instance=ExtResource("frame")]
-position = Vector2(800, 75)
+position = Vector2(880, 75)
 painting = "impression_sunrise"
 
 [node name="ScreenNorthA" type="StaticBody2D" parent="Actors"]

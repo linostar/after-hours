@@ -17,7 +17,12 @@
 - Room 4, the salle (the Mona Lisa under glass; footprints, searchlights): trick **lure** (a sentry on
   the swap spot, the far frame).
 - Sketch: inside the gallery's middle portrait.
-- Bot result: not recorded yet; run `tools/record_wings.sh` (it records the waits, par time, ghost and sketch waits, then proves every trick needed).
+- What the bot taught: the salon and the antechamber take the terrace's fix (the puddle at (390, 478)
+  and the pool at (430, 480), entered from the west, left north-west; the other guards to the west
+  wall); gap B's sentry saw the east frame tilted, so it hangs at (880, 75); the salle takes the wing 3
+  gallery's parasols and its third guard by the back wall.
+- Bot result: 102.73 s, par 145 (the longest wing); tricks 1, 4, 6, 9, 12, 16, 20, 23, 26, 29 and 31
+  proved needed; the sketch route escapes with the sketch in 109.62 s.
 
 ## History
 Re-recorded with guards turning smoothly (step 10): 59 plays; the run takes 61.8 s, par 95 s.

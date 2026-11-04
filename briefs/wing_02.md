@@ -16,8 +16,8 @@
 - What the bot taught: a door-blocking sentry cannot stand at a door the mime returns through (he
   restarts on its arrival point), so the choke moved mid-room; a splash must be at the puddle's
   always-wet centre; a guard now looks round at a noise for INVESTIGATE_LOOK before going back.
-- Bot result: waits recorded (74.3 s, par 110, sketch route escapes); the puzzle proofs were not run
-  (the watchdog was raised after); re-record with `tools/record_wings.sh`.
+- Bot result: 185 plays; 74.25 s, par 110; tricks 1, 4, 7, 11 and 13 proved needed; the sketch route
+  escapes with the sketch in 82.15 s.
 ## Constraints
 - Three rooms (lengthened from two after the first playtest); 3 to 6 minutes; every star reachable (bot-proved).
 - New idea: time. The player waits for the right moment instead of finding a hidden path.

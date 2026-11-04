@@ -17,8 +17,8 @@
   one brushing past within TOUCH_RANGE (it slipped past at first: overtaking in dim light, and round
   his back as he turned); the corridor was narrowed so no one passes the guard; a middle-portrait hide
   on the way back proved unneeded and was dropped.
-- Bot result: recorded before guards looked round at a noise (60.6 s, par 90, every trick proved
-  needed, sketch route escapes); re-record with `tools/record_wings.sh`.
+- Bot result (depth pass, with the look round): 94 plays; 60.63 s, par 90; tricks 2, 5 and 9 proved
+  needed; the sketch route escapes with the sketch in 61.95 s.
 ## Constraints
 - Three rooms (lengthened from two after the first playtest); 3 to 6 minutes for a first-time player; every star reachable (bot-proved).
 - Teach, in order and without words: walk, paint, go through a door, swap, hide, tilt.

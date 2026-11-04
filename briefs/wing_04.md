@@ -15,7 +15,13 @@
   nearest each sentry pulls him (west and middle on the way in, east and middle on the way back).
 - Room 3, the gallery: trick **lure** (a sentry on the swap spot, the far frame).
 - Sketch: inside the hall's middle portrait.
-- Bot result: not recorded yet; run `tools/record_wings.sh` (it records the waits, par time, ghost and sketch waits, then proves every trick needed).
+- What the bot taught: the terrace's pool by the gap brought the sentry straight onto the mime, so the
+  pool lies far from the gap (430, 480), entered from the west and left north-west (320, 300) out of
+  his line and his look round; the easel stands at (200, 440) and the second guard watches the exit
+  approach from the north-west (x 110). The sketch route goes back into the hall's middle portrait
+  after the pickup.
+- Bot result: 156 plays; 89.52 s, par 130; tricks 1, 4, 6, 9, 13, 17, 20, 23 and 25 proved needed; the
+  sketch route escapes with the sketch in 96.40 s.
 
 ## History
 Re-recorded with guards turning smoothly (step 10): 63 plays; the run takes 63 s, par 95 s.

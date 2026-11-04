@@ -40,7 +40,7 @@ width = 120
 
 [node name="Part1" type="Node2D" parent="Gimmick"]
 script = ExtResource("part1")
-puddles = PackedVector3Array(380, 430, 55, 790, 470, 50)
+puddles = PackedVector3Array(390, 478, 55, 790, 470, 50)
 beats = PackedVector2Array(9, 0, 11, 0.5)
 
 [node name="FrameA" parent="Frames" instance=ExtResource("frame")]
@@ -76,13 +76,13 @@ depth = 60
 height = 80
 
 [node name="Easel" parent="Actors" instance=ExtResource("easel")]
-position = Vector2(300, 260)
+position = Vector2(200, 440)
 
 [node name="Guard" parent="Actors" instance=ExtResource("guard")]
 route = PackedVector2Array(540, 335, 580, 335)
 
 [node name="Guard2" parent="Actors" instance=ExtResource("guard")]
-route = PackedVector2Array(150, 300, 150, 440)
+route = PackedVector2Array(110, 310, 110, 215)
 
 [node name="ToGallery" parent="Doors" instance=ExtResource("door")]
 position = Vector2(925, 330)

@@ -65,7 +65,7 @@ position = Vector2(250, 300)
 route = PackedVector2Array(560, 210, 905, 210, 500, 210)
 
 [node name="Guard2" parent="Actors" instance=ExtResource("guard")]
-route = PackedVector2Array(150, 300, 150, 400)
+route = PackedVector2Array(560, 400, 860, 400)
 
 [node name="ToHall" parent="Doors" instance=ExtResource("door")]
 position = Vector2(925, 210)

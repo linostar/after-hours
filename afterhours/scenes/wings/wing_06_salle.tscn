@@ -34,6 +34,7 @@ glass_rect = Rect2(445, 20, 70, 105)
 
 [node name="Part0" type="Node2D" parent="Gimmick"]
 script = ExtResource("part0")
+parasols = PackedVector3Array(300, 330, 50, 860, 365, 50)
 
 [node name="Part1" type="Node2D" parent="Gimmick"]
 script = ExtResource("part1")
@@ -74,7 +75,7 @@ route = PackedVector2Array(455, 248, 505, 248)
 route = PackedVector2Array(130, 470, 420, 470)
 
 [node name="Guard3" parent="Actors" instance=ExtResource("guard")]
-route = PackedVector2Array(200, 250, 200, 330)
+route = PackedVector2Array(200, 215, 260, 215)
 
 [node name="ToHall" parent="Doors" instance=ExtResource("door")]
 position = Vector2(45, 330)
