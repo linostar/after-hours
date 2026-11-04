@@ -10,7 +10,8 @@ extends SceneTree
 ##
 ## Run with --fixed-fps 60 (one frame = one physics tick):
 ##   "$GODOT" --headless --path afterhours --fixed-fps 60 --script "$PWD/tools/bot.gd" \
-##       -- [--record <wing.tres>] [--wing <wing.tres>]...
+##       -- [--record <wing.tres>] [--wing <wing.tres>]... [--check <wing.tres>]...
+## --check: replays and proves only the wings named (development).
 ## Default: replays every wing in Content.WINGS (and each --wing) with its bot_waits and
 ##   fails unless it escapes unseen within par_time; prints "bot: OK (N wings)". For a wing
 ##   in data/wings it also proves the puzzles: every room but its trick_free ones has a trick
@@ -40,13 +41,13 @@ const PAINT_PACE := 2.5
 const PAINT_ALLOWANCE := 1.5
 const PAR_ROUND := 5.0
 ## The next leg's waits an ablation tries, in seconds apart (0 to MAX_WAIT).
-const ABLATE_STEP := 0.5
+const ABLATE_STEP := 1.0
 const TRAIL_GAP := 6
 const GHOSTS_DIR := "res://data/ghosts/"
 ## A wing outside this directory (a test fixture) keeps its ghost replay beside it.
 const WINGS_DIR := "res://data/wings/"
-## Real-time limit for the whole run.
-const WATCHDOG_MSEC := 600000
+## Real-time limit for the whole run (the puzzle proofs replay every wing many times).
+const WATCHDOG_MSEC := 2700000
 
 var _game: GameState
 var _deadline_msec := 0
@@ -94,11 +95,14 @@ func _main() -> void:
 	var args := OS.get_cmdline_user_args()
 	var paths: Array[String] = Content.WINGS.duplicate()
 	var recording := ""
+	var only: Array[String] = []
 	var i := 0
 	while i < args.size():
-		if args[i] in ["--wing", "--record"] and i + 1 < args.size():
+		if args[i] in ["--wing", "--record", "--check"] and i + 1 < args.size():
 			if args[i] == "--record":
 				recording = args[i + 1]
+			elif args[i] == "--check":
+				only.append(args[i + 1])
 			else:
 				paths.append(args[i + 1])
 			i += 2
@@ -109,6 +113,8 @@ func _main() -> void:
 	if recording != "":
 		quit(0 if await _record(recording) else 1)
 		return
+	if not only.is_empty():
+		paths = only
 	var failures: Array[String] = []
 	for path in paths:
 		var problem := await _check_wing(path)

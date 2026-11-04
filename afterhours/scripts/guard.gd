@@ -10,7 +10,7 @@ extends Node2D
 ## - INSPECT: once per pass (re-armed when it no longer sees it), stands facing the hung
 ##   fake (fake_point, while watches_fake) for INSPECT_TIME, then emits inspected.
 ## - INVESTIGATE: walks to a noise it heard (hear, within GuardBrain.HEARING_RANGE) at
-##   INVESTIGATE_SPEED and looks at where it came from.
+##   INVESTIGATE_SPEED and looks round there (INVESTIGATE_LOOK) before going back.
 ## - STRAIGHTEN: a tilted frame it sees (one of frames) gets walked to and, after
 ##   STRAIGHTEN_TIME, straightened (which also settles a noise that came from it).
 ## - SEARCH: walks to search_point at SEARCH_SPEED and looks around for SEARCH_TIME.
@@ -30,6 +30,10 @@ const PATROL_SPEED := 70.0
 const SEARCH_SPEED := 100.0
 const INVESTIGATE_SPEED := 90.0
 const STRAIGHTEN_TIME := 1.0
+## At a noise it walked to, the guard looks round for INVESTIGATE_LOOK, up to LOOK_SWEEP either
+## side of the way it came, before it goes back (a lure buys that much more time).
+const INVESTIGATE_LOOK := 1.5
+const LOOK_SWEEP := PI / 3.0
 ## A noise this close to a frame it straightens is that frame's (no longer to investigate).
 const NOISE_EXPLAINED := 40.0
 ## Below the mime's speed (Mime.SPEED): a mime that runs at once gets away.
@@ -158,6 +162,9 @@ var _straighten_frame: TiltFrame
 ## Whether it saw its target step into a hiding place (the chase does not lose it).
 var _knows_hiding := false
 var _straighten_left := 0.0
+## The look round at an investigated noise: seconds left, and the heading it arrived on.
+var _look_left := 0.0
+var _look_from := Vector2.RIGHT
 var _next := 0
 var _pause := 0.0
 
@@ -203,6 +210,7 @@ func reset() -> void:
 	_knows_hiding = false
 	_straighten_frame = null
 	_straighten_left = 0.0
+	_look_left = 0.0
 	senses = GuardBrain.Senses.new()
 	rig.start_fidget(CharacterRig.Fidget.NONE, 0.0)
 	intent = GuardBrain.Intent.PATROL
@@ -436,9 +444,16 @@ func _chase(delta: float) -> void:
 
 func _investigate(delta: float) -> void:
 	if not _travel(noise_point, INVESTIGATE_SPEED, delta):
+		_look_left = INVESTIGATE_LOOK
+		_look_from = facing
+		return
+	# There: a look round, either side of the way it came, before it goes back.
+	_look_left -= delta
+	var sweep := sin(TAU * (1.0 - _look_left / INVESTIGATE_LOOK)) * LOOK_SWEEP
+	_aim(_look_from.rotated(sweep))
+	if _look_left > 0.0:
 		return
 	senses.noise_heard = false
-	_aim(noise_point - position if not noise_point.is_equal_approx(position) else Vector2.UP)
 	print("[Guard] %s investigated the noise at %s" % [name, noise_point.round()])
 
 

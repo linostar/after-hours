@@ -1994,15 +1994,17 @@ func _test_puddles_clear_of_partitions() -> void:
 
 
 ## Guards patrol round display walls, never through them, nor brushing them: in wing 2's
-## hall the guard's legs down x 700 and up x 260 run straight across a partition; over two
-## of its loops' legs no guard's feet ever come within Partition.WALKER_CLEARANCE of a
-## footprint (so no body overlaps a wall), and the guard still reaches the waypoints past
-## them.
+## gallery a guard sent up and down x 300 runs straight across its left display wall; over
+## its loops no guard's feet ever come within Partition.WALKER_CLEARANCE of a footprint (so
+## no body overlaps a wall), and the guard still reaches the waypoints either side of it.
 func _test_guards_patrol_round_partitions() -> void:
 	var name := "guards_patrol_round_partitions"
-	var room := await _load_wing_room(name, "res://scenes/wings/wing_02_hall.tscn")
+	var room := await _load_wing_room(name, "res://scenes/wings/wing_02_gallery.tscn")
 	if room == null:
 		return
+	var across := room.guards[1]
+	across.route = PackedVector2Array([Vector2(300, 330), Vector2(300, 490)])
+	across.reset()
 	var feet := _footprints(room)
 	# Walkers cut a path's corner by their agents' path_desired_distance; the carve allows
 	# Partition.CORNER_SLACK for it.
@@ -2019,11 +2021,11 @@ func _test_guards_patrol_round_partitions() -> void:
 			var gap := _clearance(guard.position, feet)
 			if gap < Partition.WALKER_CLEARANCE - 0.5:
 				brushed.append([guard.name, guard.position.round(), snappedf(gap, 0.1)])
-		for point: Vector2 in [Vector2(700, 480), Vector2(260, 250)]:
-			if room.guard.position.distance_to(point) < 1.0:
+		for point: Vector2 in [Vector2(300, 330), Vector2(300, 490)]:
+			if across.position.distance_to(point) < 1.0:
 				reached[point] = true
 	_check(brushed.is_empty(), name, "guards came within a body of a partition at [name, at, gap] %s" % [brushed.slice(0, 3)])
-	_check(reached.size() == 2, name, "the hall guard did not reach the waypoints past the partitions (reached %s)" % [reached.keys()])
+	_check(reached.size() == 2, name, "the guard did not reach the waypoints either side of the display wall (reached %s)" % [reached.keys()])
 
 
 ## Every guard's patrol keeps clear of every display wall, in every wing room and the slice
@@ -2892,7 +2894,11 @@ func _test_room_decor() -> void:
 				var blocked := decor.avoid.any(func(each: Rect2) -> bool: return each.intersects(box))
 				_check(not blocked and lamp.x >= RoomDecor.HUD_CLEAR, name, "%s: the lamp at %s hangs over a painting, the gimmick's wall or the HUD" % [wing.rooms[index], lamp])
 			if wing.painting == "mona_lisa" and room.gimmick != null:
-				var parts: Array[Gimmick] = room.gimmick.parts() if room.gimmick is GimmickMix else [room.gimmick]
+				var parts: Array[Gimmick] = []
+				if room.gimmick is GimmickMix:
+					parts = (room.gimmick as GimmickMix).parts()
+				else:
+					parts.append(room.gimmick)
 				for part in parts:
 					_check(not part is Searchlights or not (part as Searchlights).sky, name, "%s paints wing 4's starry sky" % wing.rooms[index])
 	_game.run = null

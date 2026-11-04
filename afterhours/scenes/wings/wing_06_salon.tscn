@@ -1,13 +1,12 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/room_base.tscn" id="base"]
 [ext_resource type="Script" path="res://scripts/gimmicks/gimmick_mix.gd" id="gimmick"]
 [ext_resource type="Script" path="res://scripts/gimmicks/window_light.gd" id="part0"]
 [ext_resource type="Script" path="res://scripts/gimmicks/puddles.gd" id="part1"]
 [ext_resource type="PackedScene" path="res://scenes/tilt_frame.tscn" id="frame"]
-[ext_resource type="PackedScene" path="res://scenes/hiding_portrait.tscn" id="portrait"]
-[ext_resource type="Script" path="res://scripts/partition.gd" id="partition"]
 [ext_resource type="PackedScene" path="res://scenes/easel.tscn" id="easel"]
+[ext_resource type="Script" path="res://scripts/partition.gd" id="partition"]
 [ext_resource type="PackedScene" path="res://scenes/guard.tscn" id="guard"]
 [ext_resource type="PackedScene" path="res://scenes/door.tscn" id="door"]
 [ext_resource type="Texture2D" path="res://art/svg/floor_parquet.svg" id="floor_tile"]
@@ -15,7 +14,7 @@
 [node name="Room" instance=ExtResource("base")]
 
 [node name="Entrance" parent="."]
-position = Vector2(70, 330)
+position = Vector2(70, 470)
 
 [node name="BackWall" parent="."]
 color = Color(0.36, 0.3, 0.22, 1)
@@ -34,46 +33,58 @@ script = ExtResource("gimmick")
 
 [node name="Part0" type="Node2D" parent="Gimmick"]
 script = ExtResource("part0")
-window_x = 640.0
-sweep = 200.0
-period = 13.0
-width = 120.0
+window_x = 680
+sweep = 200
+period = 13
+width = 120
 
 [node name="Part1" type="Node2D" parent="Gimmick"]
 script = ExtResource("part1")
-puddles = PackedVector3Array(480, 400, 70, 140, 455, 65)
-beats = PackedVector2Array(11, 0, 9, 0.5)
+puddles = PackedVector3Array(380, 430, 55, 790, 470, 50)
+beats = PackedVector2Array(9, 0, 11, 0.5)
 
 [node name="FrameA" parent="Frames" instance=ExtResource("frame")]
-position = Vector2(240, 75)
+position = Vector2(420, 75)
 painting = "starry_night"
 
-[node name="PortraitA" parent="Portraits" instance=ExtResource("portrait")]
-position = Vector2(860, 105)
-painting = "pearl_earring"
-face = Vector2(-5, -10)
+[node name="FrameB" parent="Frames" instance=ExtResource("frame")]
+position = Vector2(860, 75)
+painting = "great_wave"
 
-[node name="Partition0" type="StaticBody2D" parent="Actors"]
-position = Vector2(260, 420)
+[node name="ScreenNorth" type="StaticBody2D" parent="Actors"]
+position = Vector2(560, 290)
 script = ExtResource("partition")
 style = 6
-width = 120
-depth = 50
+width = 40
+depth = 118
+height = 60
+
+[node name="ScreenSouth" type="StaticBody2D" parent="Actors"]
+position = Vector2(560, 505)
+script = ExtResource("partition")
+style = 6
+width = 40
+depth = 125
+height = 60
+
+[node name="Shield" type="StaticBody2D" parent="Actors"]
+position = Vector2(700, 330)
+script = ExtResource("partition")
+style = 6
+width = 80
+depth = 60
 height = 80
 
 [node name="Easel" parent="Actors" instance=ExtResource("easel")]
-position = Vector2(360, 260)
+position = Vector2(300, 260)
 
 [node name="Guard" parent="Actors" instance=ExtResource("guard")]
-route = PackedVector2Array(160, 480, 820, 480)
+route = PackedVector2Array(540, 335, 580, 335)
 
 [node name="Guard2" parent="Actors" instance=ExtResource("guard")]
-route = PackedVector2Array(560, 250, 560, 440)
+route = PackedVector2Array(150, 300, 150, 440)
 
-[node name="Guard3" parent="Actors" instance=ExtResource("guard")]
-route = PackedVector2Array(800, 400, 800, 480)
-
-[node name="ToSalle" parent="Doors" instance=ExtResource("door")]
+[node name="ToGallery" parent="Doors" instance=ExtResource("door")]
 position = Vector2(925, 330)
 to_room = 1
 
@@ -84,10 +95,18 @@ opening = Rect2(-45, -40, 24, 80)
 arrival = Vector2(60, 0)
 
 [node name="Plinth" type="StaticBody2D" parent="Actors"]
-position = Vector2(710, 430)
+position = Vector2(660, 500)
 script = ExtResource("partition")
 style = 6
 prop = 2
-width = 34.0
-depth = 28.0
-height = 56.0
+width = 34
+depth = 28
+height = 56
+
+[node name="Bench" type="StaticBody2D" parent="Actors"]
+position = Vector2(220, 500)
+script = ExtResource("partition")
+style = 6
+prop = 1
+width = 96
+depth = 22
