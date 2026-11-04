@@ -489,7 +489,7 @@ func _test_sfx_on_actions() -> void:
 	(room.get_node("PauseButton") as Button).pressed.emit()
 	room.pause_menu.resume()
 	_check(str(shout).begins_with("%s_chase_" % room.guard.voice), name, "the chasing guard did not shout: %s" % [_game.audio.said])
-	for id: StringName in [&"tiptoe", &"tilt", &"hide", &"unhide", &"swap", &"guard_alert", &"caught", &"toss", &"land", &"ui_tap", &"pause", &"resume"]:
+	for id: StringName in [&"tiptoe", &"tilt", &"hide", &"unhide", &"swap", &"guard_alert", &"caught", &"toss", &"splat", &"ui_tap", &"pause", &"resume"]:
 		_check(id in played, name, "%s did not sound; played %s" % [id, played])
 	played.clear()
 	room._escape()
@@ -1024,8 +1024,9 @@ func _test_glimpse_keeps_unseen_star() -> void:
 	_check(seen and room.guard.suspicion >= Detection.SEEN_AT and room.guard.suspicion < 1.0, name, "the mime was not counted as seen when the eye reached half (suspicion %.2f, seen %s)" % [room.guard.suspicion, room.ever_seen])
 
 
-## Seen in the open, the mime is caught and tossed to the entrance; taps are ignored
-## during the toss; then the guard restarts its route and the timer has kept running.
+## Seen in the open, the mime is caught and tossed to the entrance while the guard dusts off
+## its hands; taps are ignored during the toss; it lands flat and dizzy and recovers; then
+## the guard restarts its route and the timer has kept running.
 func _test_guard_sees_and_tosses() -> void:
 	var name := "guard_sees_and_tosses"
 	var room := await _load_room()
@@ -1039,6 +1040,8 @@ func _test_guard_sees_and_tosses() -> void:
 	_check(room.tossing and room.catches == 1, name, "a mime 100 units ahead in the open was not caught within 2 s (suspicion %.2f)" % room.guard.suspicion)
 	_check(room.ever_seen, name, "the room did not record that the mime was seen")
 	_check(not room.guard.active, name, "the guard keeps looking during the toss")
+	await physics_frame
+	_check(room.guard.rig.fidget == CharacterRig.Fidget.DUST and _game.audio.played.has(&"dust_hands"), name, "the catching guard does not dust off its hands (fidget %s, sounds %s)" % [room.guard.rig.fidget, _game.audio.played])
 	var caught_at := room.elapsed
 	await _tap_at(Vector2(600, 480))
 	_check(not room.mime.walking, name, "a tap during the toss started a walk")
@@ -1050,6 +1053,12 @@ func _test_guard_sees_and_tosses() -> void:
 	_check(room.mime.position == room.entrance and room.mime.rotation == 0.0, name, "after the toss the mime is at %s (rotation %f), not upright at the entrance" % [room.mime.position, room.mime.rotation])
 	_check(room.guard.active and room.guard.suspicion == 0.0 and room.guard.position == room.guard.route[0], name, "the guard was not reset to its route's start, calm")
 	_check(room.elapsed - caught_at >= Room.TOSS_SHAKE + Room.TOSS_FLIGHT - 0.05, name, "the timer stopped during the toss (%.2f s passed)" % (room.elapsed - caught_at))
+	# The landing is slapstick: flattened and seeing stars, then back to itself.
+	_check(room.mime.rig.squash.y < 0.8 and room.mime.dizzy_left > 0.0, name, "the mime did not land flat and dizzy (squash %s, dizzy %.2f)" % [room.mime.rig.squash, room.mime.dizzy_left])
+	_check(room.guard.rig.fidget == CharacterRig.Fidget.NONE, name, "the reset guard still dusts its hands")
+	for i in ceili(Mime.DIZZY_TIME * 60.0) + 2:
+		await physics_frame
+	_check(room.mime.rig.squash.is_equal_approx(Vector2.ONE) and room.mime.dizzy_left == 0.0, name, "the mime did not recover from the splat (squash %s, dizzy %.2f)" % [room.mime.rig.squash, room.mime.dizzy_left])
 
 
 ## The partition blocks sight: a mime behind it within range is never seen, while the

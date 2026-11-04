@@ -2,13 +2,13 @@
 
 importer="wav"
 type="AudioStreamWAV"
-uid="uid://dux1r6lqyau05"
-path="res://.godot/imported/land.wav-15cfbf2105511473b2cc9fdd7898f3d1.sample"
+uid="uid://bufm2fxw10kup"
+path="res://.godot/imported/dust_hands.wav-fc94b975eb07ac37ddba883d55a15a2a.sample"
 
 [deps]
 
-source_file="res://audio/sfx/land.wav"
-dest_files=["res://.godot/imported/land.wav-15cfbf2105511473b2cc9fdd7898f3d1.sample"]
+source_file="res://audio/sfx/dust_hands.wav"
+dest_files=["res://.godot/imported/dust_hands.wav-fc94b975eb07ac37ddba883d55a15a2a.sample"]
 
 [params]
 

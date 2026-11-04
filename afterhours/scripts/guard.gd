@@ -36,6 +36,8 @@ const NOISE_EXPLAINED := 40.0
 const CHASE_SPEED := 150.0
 ## How close a chasing guard must get to catch the mime.
 const CATCH_REACH := 28.0
+## How long a guard that caught the mime dusts off its hands (the toss's reset cuts it short).
+const DUST_TIME := 1.4
 const INSPECT_TIME := 1.2
 const SEARCH_TIME := 4.0
 ## How fast a searching guard turns to look around (radians per second).
@@ -383,6 +385,9 @@ func _chase(delta: float) -> void:
 		active = false
 		print("[Guard] %s catches the mime at %s" % [name, target.global_position.round()])
 		say(&"caught")
+		# Job done: it dusts off its hands while the mime flies (the room's reset ends it).
+		rig.start_fidget(CharacterRig.Fidget.DUST, DUST_TIME)
+		Audio.play_for(self, &"dust_hands")
 		caught.emit()
 
 

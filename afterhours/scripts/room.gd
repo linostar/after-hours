@@ -712,5 +712,6 @@ func _end_toss() -> void:
 		gimmick.forget()
 	if ghost != null:
 		ghost.restart()
-	_game.audio.play(&"land")
+	mime.splat()
+	_game.audio.play(&"splat")
 	print("[Room] The mime is back at the entrance at t %.2f" % elapsed)

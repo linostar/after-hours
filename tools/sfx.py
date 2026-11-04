@@ -316,9 +316,17 @@ def fx_toss(rng):
     return [s * e for s, e in zip(oscillate(lerp_curve([(0, 600), (0.55, 1500), (1, 700)], n), sine), envelope(n, 0.02, 0.1))]
 
 
-def fx_land(rng):
-    """The mime landing after the toss: a soft bump."""
-    return mix((thump(120.0, 0.14, 0.8, 26.0), 0, 1.0), (noise(0.06, rng, [(0, 1500), (1, 400)], decay=50.0), 0, 0.3))
+def fx_splat(rng):
+    """The mime landing flat after the toss: a wet squelch of falling noise over a soft bump,
+    then a little springy wobble as it peels itself up."""
+    return mix((thump(95.0, 0.18, 1.0, 16.0), 0, 1.0),
+               (noise(0.16, rng, [(0, 2400), (1, 300)], decay=14.0), 0.0, 0.5),
+               (sweep(330.0, 520.0, 0.22, sine, 0.01, 0.12), 0.16, 0.25))
+
+
+def fx_dust_hands(rng):
+    """A guard dusting off its hands after a catch: three dry brushes of noise, each quieter."""
+    return mix(*[(highpassed(noise(0.07, rng, [(0, 5000), (1, 2500)], decay=30.0)), 0.13 * k, 1.0 - 0.25 * k) for k in range(3)])
 
 
 def fx_guard_hear(rng):
@@ -443,7 +451,8 @@ EFFECTS = {
     "chain_rattle": (fx_chain_rattle, 0.39, "event"),
     "caught": (fx_caught, 0.44, "stinger"),
     "toss": (fx_toss, 0.15, "event"),
-    "land": (fx_land, 0.41, "event"),
+    "splat": (fx_splat, 0.41, "event"),
+    "dust_hands": (fx_dust_hands, 0.3, "event"),
     "guard_hear": (fx_guard_hear, 0.25, "event"),
     "guard_suspect": (fx_guard_suspect, 0.37, "event"),
     "guard_alert": (fx_guard_alert, 0.49, "stinger"),

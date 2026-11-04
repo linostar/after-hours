@@ -23,8 +23,8 @@ signal stepped
 signal gag_started
 
 enum View { FRONT, BACK, RIGHT, LEFT }
-## A guard's fidget while it stands at a waypoint.
-enum Fidget { NONE, STRETCH, WATCH, YAWN }
+## A guard's fidget while it stands at a waypoint, or (DUST) dusting off its hands after a catch.
+enum Fidget { NONE, STRETCH, WATCH, YAWN, DUST }
 
 ## A front or back view turns to the side once the heading's across exceeds this share of
 ## its along (about 35 degrees off vertical), so a diagonal walks side on; a side view turns
@@ -59,6 +59,9 @@ const PAT_HZ := 0.8
 const PAT_SWING := 0.12
 ## How fast a gesture (the gag) blends in and out (weight per second).
 const GESTURE_RATE := 5.0
+## Dusting off the hands: they brush past each other at DUST_HZ (stilled under Reduce Motion).
+const DUST_HZ := 1.6
+const DUST_SWING := 0.3
 ## A yawn stretches the body this much more at its height.
 const YAWN_STRETCH := 0.04
 
@@ -338,7 +341,7 @@ func _pose() -> void:
 ## Stretches the body above the hips as it breathes at rest (and further in a yawn), the
 ## hips kept where they are and the shoulders (the arms) carried with it.
 func _breathe() -> void:
-	var breath := 0.0 if _still() else BREATH_DEPTH * (1.0 - stride) * sin(TAU * BREATH_HZ * clock)
+	var breath := 0.0 if reduce_motion() else BREATH_DEPTH * (1.0 - stride) * sin(TAU * BREATH_HZ * clock)
 	if fidget == Fidget.YAWN:
 		breath += YAWN_STRETCH * _fidget_weight()
 	_body.scale = Vector2(1.0, 1.0 + breath) / ART_SCALE
@@ -365,9 +368,14 @@ func _gesture(i: int) -> void:
 	var weight := 0.0
 	if _gag > 0.0:
 		# The invisible wall: palms flat on it at chest height, patting along it in turn.
-		var pat := 0.0 if _still() else PAT_SWING * sin(TAU * PAT_HZ * clock + PI * i)
+		var pat := 0.0 if reduce_motion() else PAT_SWING * sin(TAU * PAT_HZ * clock + PI * i)
 		target = Vector2(-1.45 + pat, -0.9) if side else Vector2(out * (0.45 + pat), out * 2.55)
 		weight = _gag
+	elif fidget == Fidget.DUST:
+		# Both hands meet in front and brush past each other in turn.
+		var brush := 0.0 if reduce_motion() else DUST_SWING * sin(TAU * DUST_HZ * clock + PI * i)
+		target = Vector2(-0.55 + brush, -1.5) if side else Vector2(-out * 0.3, -out * (1.95 + brush))
+		weight = minf(_fidget_weight() * 3.0, 1.0)
 	elif fidget == Fidget.STRETCH:
 		target = Vector2(-2.9, -0.2) if side else Vector2(out * 2.75, out * 0.25)
 		weight = _fidget_weight()
@@ -484,8 +492,9 @@ func _draw_lids() -> void:
 		_lids.draw_line(centre - Vector2(radius.x, 0.0), centre + Vector2(radius.x, 0.0), LID_LINE, 0.9 * ART_SCALE, true)
 
 
-## Whether Reduce Motion is on (no Game outside the tree: a test's loose rig moves).
-func _still() -> bool:
+## Whether Reduce Motion is on (no Game outside the tree: a test's loose rig moves); the
+## mime's dizzy stars ask it too.
+func reduce_motion() -> bool:
 	if not is_inside_tree():
 		return false
 	var game := get_node_or_null(GameState.AUTOLOAD_PATH) as GameState
