@@ -8,7 +8,6 @@
   stepping-in, to the first guard within hearing range, who comes to look.
 
 ## Depth pass (feat/polish-depth)
-- Four rooms, 8 guards.
 - Room 0, the terrace: trick **searchlight call** on the way in (a still pool on the west side: stepping
   in reveals the mime to the gap's sentry, who comes to look), **frame lure** on the way out.
 - Room 1, the hall: trick **hide** (the corridor); searchlights roam the walled-off floor.
