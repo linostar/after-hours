@@ -53,12 +53,12 @@ painting = "earthly_delights"
 
 [node name="FrameB" parent="Frames" instance=ExtResource("frame")]
 position = Vector2(740, 75)
-painting = "great_wave"
+painting = "impression_sunrise"
 
 [node name="PortraitA" parent="Portraits" instance=ExtResource("portrait")]
 position = Vector2(880, 105)
-painting = "grande_jatte"
-face = Vector2(0, -24)
+painting = "madame_x"
+face = Vector2(0, -33)
 
 [node name="Partition0" type="StaticBody2D" parent="Actors"]
 position = Vector2(300, 300)

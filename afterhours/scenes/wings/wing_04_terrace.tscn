@@ -38,8 +38,8 @@ painting = "earthly_delights"
 
 [node name="PortraitA" parent="Portraits" instance=ExtResource("portrait")]
 position = Vector2(760, 105)
-painting = "pearl_earring"
-face = Vector2(-5, -10)
+painting = "van_gogh_self"
+face = Vector2(5, -12)
 
 [node name="Partition0" type="StaticBody2D" parent="Actors"]
 position = Vector2(240, 440)

@@ -119,6 +119,7 @@ func _tests() -> Array[Callable]:
 		_test_forgery_scoring,
 		_test_forgery_grades,
 		_test_paintings_registry,
+		_test_decoys_unique_per_wing,
 		_test_canvas_traces_and_grades,
 		_test_canvas_close_keeps_strokes,
 		_test_grade_badge_shows_each_wing,
@@ -688,8 +689,11 @@ func _test_paintings_registry() -> void:
 	for entry: Dictionary in JSON.parse_string(FileAccess.get_file_as_string("res://art/scans/SOURCES.json")):
 		credited.append(StringName(entry["id"]))
 		_check(entry["file"] == "%s.webp" % entry["id"], name, "credit '%s' names file '%s'" % [entry["id"], entry["file"]])
-	_check(credited == Paintings.IDS, name, "SOURCES.json ids %s are not Paintings.IDS %s" % [credited, Paintings.IDS])
-	for id in Paintings.IDS:
+	_check(credited == Paintings.ALL, name, "SOURCES.json ids %s are not Paintings.ALL %s" % [credited, Paintings.ALL])
+	var all := Paintings.IDS.duplicate()
+	all.append_array(Paintings.DECOYS)
+	_check(Paintings.ALL == all, name, "Paintings.ALL is not the masterpieces then the decoys")
+	for id in Paintings.ALL:
 		_check(Paintings.SCANS.get(id) != null, name, "%s has no scan" % id)
 		var material := Paintings.style(id, true)
 		_check(material != null and material.shader == Paintings.STYLES[id] and material.get_shader_parameter(&"use_screen") == true, name, "%s's screen style is not its shader reading the screen" % id)
@@ -702,7 +706,29 @@ func _test_paintings_registry() -> void:
 		var listed: Array[StringName] = []
 		for id in hint.split(","):
 			listed.append(StringName(id))
-		_check(listed == Paintings.IDS, name, "%s's painting choices %s are not Paintings.IDS" % [script.resource_path, hint])
+		_check(listed == Paintings.ALL, name, "%s's painting choices %s are not Paintings.ALL" % [script.resource_path, hint])
+
+## Within a wing no decoy painting (a tilt frame's or a hiding portrait's) hangs twice, and
+## none is the wing's own masterpiece; every portrait's face sits inside its frame.
+func _test_decoys_unique_per_wing() -> void:
+	var name := "decoys_unique_per_wing"
+	for wing_path: String in Content.WINGS:
+		var wing := load(wing_path) as WingData
+		var hung: Array[String] = []
+		for room_path: String in wing.rooms:
+			var room := (load(room_path) as PackedScene).instantiate()
+			var decoys: Array[Node] = room.get_node("Frames").get_children()
+			decoys.append_array(room.get_node("Portraits").get_children())
+			for decoy in decoys:
+				var painting: String = decoy.get("painting")
+				_check(painting not in hung, name, "%s: %s hangs %s again" % [wing_path.get_file(), room_path.get_file(), painting])
+				_check(painting != wing.painting, name, "%s: %s hangs the wing's own masterpiece as a decoy" % [wing_path.get_file(), room_path.get_file()])
+				hung.append(painting)
+				if decoy is HidingPortrait:
+					var inside := Rect2(-HidingPortrait.SIZE / 2.0, HidingPortrait.SIZE).grow(-6.0)
+					_check(inside.has_point((decoy as HidingPortrait).face), name, "%s's portrait face %s is outside its frame" % [room_path.get_file(), (decoy as HidingPortrait).face])
+			room.free()
+
 
 ## A finger pressed at the first of `points` (canvas base units), dragged through the
 ## rest and lifted at the last, one event a frame.

@@ -22,7 +22,12 @@
     "source_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Tsunami_by_hokusai_19th_century.jpg/1280px-Tsunami_by_hokusai_19th_century.jpg",
     "licence": "Public domain",
     "sha256": "54c3d6b7a70bd0bfe33b7fd1363a6974b2a763e81674d17cfa98fd6e6af9b3c2",
-    "crop": [0.1, 0, 1, 1],
+    "crop": [
+      0.1,
+      0,
+      1,
+      1
+    ],
     "note": "Left tenth cropped: the title cartouche and signature are writing (No Text rule)."
   },
   {
@@ -72,5 +77,79 @@
     "source_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg/1280px-Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg",
     "licence": "Public domain",
     "sha256": "8056105c343c16563f8afd4615b4653067e168ec41f344ef5b7e8aaea97463ad"
+  },
+  {
+    "id": "madame_x",
+    "file": "madame_x.webp",
+    "artist": "John Singer Sargent",
+    "title": "Madame X (Madame Pierre Gautreau)",
+    "year": 1884,
+    "date": "1883-1884",
+    "page_url": "https://commons.wikimedia.org/wiki/File:Madame_X_(Madame_Pierre_Gautreau),_John_Singer_Sargent,_1884_(unfree_frame_crop).jpg",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/Madame_X_%28Madame_Pierre_Gautreau%29%2C_John_Singer_Sargent%2C_1884_%28unfree_frame_crop%29.jpg/1280px-Madame_X_%28Madame_Pierre_Gautreau%29%2C_John_Singer_Sargent%2C_1884_%28unfree_frame_crop%29.jpg",
+    "licence": "Public domain",
+    "sha256": "6b736732c381edfdb6626242582c72cb95610d9930e2659c27fe292223984e48",
+    "crop": [
+      0,
+      0,
+      1,
+      0.87
+    ],
+    "note": "Bottom cropped: the signature and date at the lower right are writing (No Text rule)."
+  },
+  {
+    "id": "van_gogh_self",
+    "file": "van_gogh_self.webp",
+    "artist": "Vincent van Gogh",
+    "title": "Self-Portrait",
+    "year": 1889,
+    "date": "1889",
+    "page_url": "https://commons.wikimedia.org/wiki/File:Vincent_van_Gogh_-_Self-Portrait_-_Google_Art_Project.jpg",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b2/Vincent_van_Gogh_-_Self-Portrait_-_Google_Art_Project.jpg/1280px-Vincent_van_Gogh_-_Self-Portrait_-_Google_Art_Project.jpg",
+    "licence": "Public domain",
+    "sha256": "ae510f66b30146fb818817c92d615e94c550dd8d460134112b3b88745ff75a6e"
+  },
+  {
+    "id": "castiglione",
+    "file": "castiglione.webp",
+    "artist": "Raphael",
+    "title": "Portrait of Baldassare Castiglione",
+    "year": 1515,
+    "date": "c. 1514-1515",
+    "page_url": "https://commons.wikimedia.org/wiki/File:Baldassare_Castiglione,_by_Raffaello_Sanzio,_from_C2RMF_retouched.jpg",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/94/Baldassare_Castiglione%2C_by_Raffaello_Sanzio%2C_from_C2RMF_retouched.jpg/1280px-Baldassare_Castiglione%2C_by_Raffaello_Sanzio%2C_from_C2RMF_retouched.jpg",
+    "licence": "Public domain",
+    "sha256": "aa6ec8c82ea266571f6b88558422fe9b00ff9d7325e33681d91d853417256180"
+  },
+  {
+    "id": "fighting_temeraire",
+    "file": "fighting_temeraire.webp",
+    "artist": "J. M. W. Turner",
+    "title": "The Fighting Temeraire",
+    "year": 1839,
+    "date": "1839",
+    "page_url": "https://commons.wikimedia.org/wiki/File:The_Fighting_Temeraire,_JMW_Turner,_National_Gallery.jpg",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/The_Fighting_Temeraire%2C_JMW_Turner%2C_National_Gallery.jpg/1280px-The_Fighting_Temeraire%2C_JMW_Turner%2C_National_Gallery.jpg",
+    "licence": "Public domain",
+    "sha256": "e6fd8954fb601ef17718e3809b631b97e5bb58097b93819b9a09a27f51100119"
+  },
+  {
+    "id": "impression_sunrise",
+    "file": "impression_sunrise.webp",
+    "artist": "Claude Monet",
+    "title": "Impression, Sunrise",
+    "year": 1872,
+    "date": "1872",
+    "page_url": "https://commons.wikimedia.org/wiki/File:Monet_-_Impression,_Sunrise.jpg",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/59/Monet_-_Impression%2C_Sunrise.jpg/1280px-Monet_-_Impression%2C_Sunrise.jpg",
+    "licence": "Public domain",
+    "sha256": "81a426d0d2a1aeb383a8b63b9bf6cdca27ac9c5de506d01fffb899539a0fb813",
+    "crop": [
+      0,
+      0,
+      1,
+      0.89
+    ],
+    "note": "Bottom cropped: the signature and date at the lower left are writing (No Text rule)."
   }
 ]

@@ -46,8 +46,8 @@ painting = "grande_jatte"
 
 [node name="PortraitA" parent="Portraits" instance=ExtResource("portrait")]
 position = Vector2(860, 105)
-painting = "mona_lisa"
-face = Vector2(0, -24)
+painting = "madame_x"
+face = Vector2(0, -33)
 
 [node name="Partition0" type="StaticBody2D" parent="Actors"]
 position = Vector2(470, 420)

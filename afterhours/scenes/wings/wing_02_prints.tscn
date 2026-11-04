@@ -34,7 +34,7 @@ beats = PackedVector2Array(9, 0, 10, 0.5)
 
 [node name="FrameA" parent="Frames" instance=ExtResource("frame")]
 position = Vector2(300, 75)
-painting = "pearl_earring"
+painting = "starry_night"
 
 [node name="PortraitA" parent="Portraits" instance=ExtResource("portrait")]
 position = Vector2(520, 105)

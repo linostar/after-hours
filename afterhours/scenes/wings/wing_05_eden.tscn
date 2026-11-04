@@ -26,7 +26,7 @@ texture = ExtResource("floor_tile")
 
 [node name="FrameA" parent="Frames" instance=ExtResource("frame")]
 position = Vector2(300, 75)
-painting = "pearl_earring"
+painting = "fighting_temeraire"
 
 [node name="PortraitA" parent="Portraits" instance=ExtResource("portrait")]
 position = Vector2(800, 105)

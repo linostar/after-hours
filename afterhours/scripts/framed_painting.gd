@@ -10,8 +10,8 @@ const LIP := Color(0.24, 0.17, 0.08)
 const WOOD := Color(0.45, 0.3, 0.18)
 const WOOD_SHADE := Color(0.3, 0.19, 0.1)
 
-## Its painting (a Paintings id; the enum lists Paintings.IDS).
-@export_enum("pearl_earring", "great_wave", "grande_jatte", "starry_night", "earthly_delights", "mona_lisa") var painting := "starry_night":
+## Its painting (a Paintings id; the enum lists Paintings.ALL).
+@export_enum("pearl_earring", "great_wave", "grande_jatte", "starry_night", "earthly_delights", "mona_lisa", "madame_x", "van_gogh_self", "castiglione", "fighting_temeraire", "impression_sunrise") var painting := "starry_night":
 	set(value):
 		painting = value
 		if is_node_ready():

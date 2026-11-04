@@ -16,8 +16,8 @@ const RIPPLE_COLOR := Color(0.95, 0.85, 0.4, 0.8)
 const STAND_Y := 195.0
 const VIEW_Y := 180.0
 
-## Its picture (a Paintings id; the enum lists Paintings.IDS).
-@export_enum("pearl_earring", "great_wave", "grande_jatte", "starry_night", "earthly_delights", "mona_lisa") var painting := "great_wave":
+## Its picture (a Paintings id; the enum lists Paintings.ALL).
+@export_enum("pearl_earring", "great_wave", "grande_jatte", "starry_night", "earthly_delights", "mona_lisa", "madame_x", "van_gogh_self", "castiglione", "fighting_temeraire", "impression_sunrise") var painting := "great_wave":
 	set(value):
 		painting = value
 		if is_node_ready():
