@@ -13,7 +13,7 @@ Everything between the two rules below is the public page; paste it as is.
 - **Embed options:** viewport 960 x 540, fullscreen button on, "SharedArrayBuffer support" off. Tick "Mobile friendly" and choose landscape orientation.
 - **Classification:** Game. Genre: Puzzle. Tags: stealth, heist, art, museum, painting, mime, no-text, mobile, touch, godot.
 - **Cover image:** `submission/cover.png` (630 x 500).
-- **Screenshots:** `submission/1-title.png` to `submission/9-hideout.png`, in that order (1920 x 1080, landscape).
+- **Screenshots:** `submission/1-title.png` to `submission/12-unlock.png`, in that order (1920 x 1080, landscape).
 - **Trailer / gameplay video:** `build/afterhours_demo.mp4` (27.8 s; itch takes a YouTube or Vimeo link, so upload it there first, or attach it to the jam post).
 - **Jam:** submit the page to the jam; it uses the optional theme "Great Works of Art" and the mandatory restriction "No Text".
 
@@ -65,16 +65,16 @@ Six public-domain masterpieces are the levels, the puzzles and the reward. Each 
 
 ## How AI was used
 
-After Hours was made with Claude (Anthropic), used through Claude Code, and the guards' voices were rendered locally with the OmniVoice text-to-speech model (k2-fsa/OmniVoice), run through VoiceStudio, an open-source local voice app. There are no asset packs and no other AI tools. Apart from the six public-domain paintings and the engine, everything was made for this jam:
+After Hours was made with Claude (Anthropic), used through Claude Code, and the guards' voices were rendered locally with the OmniVoice text-to-speech model (k2-fsa/OmniVoice), run through VoiceStudio, an open-source local voice app. There are no asset packs and no other AI tools. Apart from the eleven public-domain paintings (six masterpieces and five decoys) and the engine, everything was made for this jam:
 
-- **Code:** about 5,800 lines of GDScript in Godot 4.7.1. Game rules (vision and suspicion, the guards' brain, forgery grading, stars, saves) are pure functions, separate from the scenes, so every rule can be tested.
+- **Code:** about 7,100 lines of GDScript in Godot 4.7.1. Game rules (vision and suspicion, the guards' brain, forgery grading, stars, saves) are pure functions, separate from the scenes, so every rule can be tested.
 - **Art as code:** all 53 sprites, props, icons, floors and the logo are hand-written SVG (the mime and the guards are jointed rigs with a walk cycle), and 16 shaders give each painting its style: Vermeer's window light, Hokusai's woodblock bands, Seurat's breathing dots, Van Gogh's swirling strokes, Bosch's varnish, Leonardo's sfumato smoke.
 - **Sound:** all 35 sound effects are synthesised by a Python synthesiser Claude wrote. Nothing is sampled.
 - **Music:** eight loops composed around one original caper motif and rendered by a Python synthesiser Claude wrote: a jazzy caper for the lobby and a loop for each wing in its painting's era (harpsichord for Vermeer, koto for Hokusai, music-hall accordion for Seurat, swirling strings for Van Gogh, shawm and tabor for Bosch, lute for Leonardo).
 - **Voices:** Claude wrote the guards' lines and described two voices (a weary watchman and a jumpy rookie); OmniVoice designed the voices from those descriptions (no cloned voices) and rendered the 32 lines. A script checks each line by transcribing it back with VoiceStudio's built-in speech recogniser, retrying any take that doesn't say its text.
 - **Level design with a playtest bot:** Claude designed each wing from a written brief, and a bot plays it through simulated touches like a player would, painting included. When it can't get through unseen, the log shows who spotted it where; the layout is fixed and the bot runs again. Every wing is proven beatable with all three stars, and the bot's runs become the ghost-mime tutorial and the hideout replays.
 - **Guard AI (no language model):** a utility-scoring brain picks each guard's intent (patrol, investigate, straighten, inspect, search, chase) from what it sees and hears. It's deterministic and runs offline.
-- **Quality:** 105 automated gameplay tests (about 1,400 checks), the playtest bot on every wing, a project checker that enforces the No Text rule, touch-first input and the no-flashing rule (with 18 test projects proving each check fires), and browser tests of the web build on desktop and an emulated phone. The cover, screenshots and gameplay video were captured from the real game by scripts.
+- **Quality:** 111 automated gameplay tests (about 1,650 checks), the playtest bot on every wing, a project checker that enforces the No Text rule, touch-first input and the no-flashing rule (with 18 test projects proving each check fires), and browser tests of the web build on desktop and an emulated phone. The cover, screenshots and gameplay video were captured from the real game by scripts.
 
 ## Content
 
@@ -90,6 +90,7 @@ Mild cartoon theft, no flashing, no gore. Alarm and danger effects pulse slowly 
   - Vincent van Gogh, *The Starry Night*, 1889
   - Hieronymus Bosch, *The Garden of Earthly Delights*, c. 1490-1510
   - Leonardo da Vinci, *Mona Lisa*, c. 1503-1519
+  - Decoys on the walls: John Singer Sargent, *Madame X*, 1883-1884; Vincent van Gogh, *Self-Portrait*, 1889; Raphael, *Portrait of Baldassare Castiglione*, c. 1514-1515; J. M. W. Turner, *The Fighting Temeraire*, 1839; Claude Monet, *Impression, Sunrise*, 1872
 - Guard voices: rendered with OmniVoice (k2-fsa) in VoiceStudio (https://github.com/debpalash/VoiceStudio), from voice designs written by Claude.
 - No fonts are used anywhere in the game.
 - Engine: Godot Engine 4.7.1 (MIT license), https://godotengine.org.
