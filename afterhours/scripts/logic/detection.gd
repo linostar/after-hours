@@ -39,6 +39,26 @@ static func suspicion_after(current: float, seen: bool, distance: float, cone_ra
 	return minf(current + (FILL_FAR + FILL_NEAR * closeness) * light * delta, 1.0)
 
 
+## Within this distance, in the cone, a guard cannot miss the mime: it counts as seen at once
+## (close_seen). A mime running past a guard under his nose, or round him to a door he faces, is
+## seen; a glimpse's grace is for the cone's far reach. Shade (light 0) still hides it.
+const CLOSE_RANGE := 70.0
+
+
+## A guard bumps into a mime this close whichever way he faces (Guard.touches): it is seen
+## (and within CLOSE_RANGE, at once), unless it keeps still in shade. No slipping round a guard's
+## back as he turns.
+const TOUCH_RANGE := 30.0
+
+
+## `current` suspicion raised to at least SEEN_AT when the mime is `seen` within CLOSE_RANGE
+## (`distance`) and not in shade (`light` above 0); otherwise `current` unchanged.
+static func close_seen(current: float, seen: bool, distance: float, light := 1.0) -> float:
+	if seen and light > 0.0 and distance <= CLOSE_RANGE:
+		return maxf(current, SEEN_AT)
+	return current
+
+
 ## Whether `suspicion` has risen far enough for the mime to count as seen (SEEN_AT).
 static func is_seen(suspicion: float) -> bool:
 	return suspicion >= SEEN_AT

@@ -254,6 +254,16 @@ func hear(point: Vector2) -> bool:
 func can_see(point: Vector2) -> bool:
 	if not Detection.in_cone(global_position, facing, point, CONE_RANGE, CONE_HALF_ANGLE):
 		return false
+	return _clear_to(point)
+
+
+## Whether `point` is close enough to bump into (Detection.TOUCH_RANGE, whichever way the
+## guard faces) with no wall between.
+func touches(point: Vector2) -> bool:
+	return global_position.distance_to(point) <= Detection.TOUCH_RANGE and _clear_to(point)
+
+
+func _clear_to(point: Vector2) -> bool:
 	var query := PhysicsRayQueryParameters2D.create(global_position, point, SIGHT_MASK)
 	return get_world_2d().direct_space_state.intersect_ray(query).is_empty()
 
@@ -501,9 +511,10 @@ func _look(delta: float) -> void:
 	if target == null:
 		return
 	var light := gimmick.light_at(target.global_position) if gimmick != null else 1.0
-	var seen := target.visible and light > 0.0 and can_see(target.global_position)
+	var seen := target.visible and light > 0.0 and (can_see(target.global_position) or touches(target.global_position))
 	var before := suspicion
-	suspicion = Detection.suspicion_after(suspicion, seen, global_position.distance_to(target.global_position), CONE_RANGE, delta, light)
+	var distance := global_position.distance_to(target.global_position)
+	suspicion = Detection.close_seen(Detection.suspicion_after(suspicion, seen, distance, CONE_RANGE, delta, light), seen, distance, light)
 	senses.suspicion = suspicion
 	if _knows_hiding and target.visible:
 		# Out of its hiding place again: the chase can lose it like any other.

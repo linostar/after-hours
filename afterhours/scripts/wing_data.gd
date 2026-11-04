@@ -17,3 +17,12 @@ extends Resource
 ## before each (found by bot.gd --record, which also sets par_time).
 @export var bot_route: PackedVector2Array = PackedVector2Array()
 @export var bot_waits: PackedFloat32Array = PackedFloat32Array()
+## The route's trick taps (indices into bot_route: a tilt that lures, a hide, a step into a
+## puddle or a searchlight...): bot.gd proves each one needed (without it the mime is seen or
+## caught whatever it waits) and that every room but those in trick_free has one.
+@export var bot_tricks: PackedInt32Array = PackedInt32Array()
+@export var trick_free: PackedInt32Array = PackedInt32Array()
+## A second route that picks up the wing's hidden sketch and still escapes (never shown by
+## the ghost mime), and its waits (bot.gd --record).
+@export var sketch_route: PackedVector2Array = PackedVector2Array()
+@export var sketch_waits: PackedFloat32Array = PackedFloat32Array()

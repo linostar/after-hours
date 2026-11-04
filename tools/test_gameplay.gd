@@ -346,6 +346,10 @@ func _test_detection_suspicion() -> void:
 	_check(Detection.suspicion_after(0.01, false, 0.0, 150.0, 1.0) == 0.0, name, "suspicion drains below 0")
 	_check(Detection.suspicion_after(0.99, true, 0.0, 150.0, 1.0) == 1.0, name, "suspicion fills above 1")
 	_check(Detection.is_full(1.0) and not Detection.is_full(0.999), name, "full is not exactly suspicion 1")
+	# Under the guard's nose the mime is seen at once; a glimpse's grace is only for the far
+	# reach, and shade still hides it.
+	_check(Detection.close_seen(0.1, true, Detection.CLOSE_RANGE) == Detection.SEEN_AT and Detection.close_seen(0.8, true, 10.0) == 0.8, name, "a mime within CLOSE_RANGE is not seen at once")
+	_check(Detection.close_seen(0.1, true, Detection.CLOSE_RANGE + 1.0) == 0.1 and Detection.close_seen(0.1, false, 10.0) == 0.1 and Detection.close_seen(0.1, true, 10.0, 0.0) == 0.1, name, "close_seen raised suspicion beyond reach, unseen or in shade")
 	# Seen point-blank from nothing, a catch takes 1 / (FILL_FAR + FILL_NEAR) seconds at 60 ticks per second.
 	var suspicion := 0.0
 	var ticks := 0

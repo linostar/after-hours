@@ -64,6 +64,16 @@ static func validate(wing: WingData, path: String) -> Array[String]:
 		if point.x < 0.0 or point.y < 0.0 or point.x > BASE.x or point.y > BASE.y:
 			problems.append("%s: bot_route tap %s is off the %s screen" % [path, point, BASE])
 			break
+	for trick in wing.bot_tricks:
+		if trick < 0 or trick >= wing.bot_route.size():
+			problems.append("%s: bot_tricks %d is not one of bot_route's %d taps" % [path, trick, wing.bot_route.size()])
+	for room in wing.trick_free:
+		if room < 0 or room >= wing.rooms.size():
+			problems.append("%s: trick_free %d is not one of the %d rooms" % [path, room, wing.rooms.size()])
+	for point in wing.sketch_route:
+		if point.x < 0.0 or point.y < 0.0 or point.x > BASE.x or point.y > BASE.y:
+			problems.append("%s: sketch_route tap %s is off the %s screen" % [path, point, BASE])
+			break
 	return problems
 
 

@@ -480,7 +480,7 @@ func _physics_process(delta: float) -> void:
 		_tilt(tilt_target)
 	if hide_target != null and not tossing and not mime.walking and mime.position.distance_to(hide_target.spot()) <= SWAP_REACH:
 		_hide_in(hide_target)
-	if sketch_intent and not tossing and not mime.walking and mime.position.distance_to(sketch.position) <= SKETCH_REACH:
+	if sketch_intent and not tossing and not mime.walking and mime.position.distance_to(sketch.position) <= SKETCH_REACH and sketch.state == Sketch.State.LYING:
 		_take_sketch()
 	if fake_hung and not found_out:
 		_fake_icon.visible = guards.any(func(each: Guard) -> bool: return each.inspecting)
@@ -586,7 +586,7 @@ func _on_floor_tapped(at: Vector2) -> void:
 	tilt_target = null
 	hide_target = null
 	sketch_intent = false
-	if sketch != null and sketch.state == Sketch.State.LYING and sketch.rect().has_point(at):
+	if sketch != null and (sketch.state == Sketch.State.FALLING or sketch.state == Sketch.State.LYING) and sketch.rect().has_point(at):
 		sketch_intent = true
 		mime.walk_to(sketch.position)
 		return
@@ -656,7 +656,7 @@ func _usables() -> Array[Array]:
 			usables.append([frame.spot(), frame.position] as Array[Vector2])
 	for portrait in _portraits:
 		usables.append([portrait.spot(), portrait.position] as Array[Vector2])
-	if sketch != null and sketch.state == Sketch.State.LYING:
+	if sketch != null and (sketch.state == Sketch.State.FALLING or sketch.state == Sketch.State.LYING):
 		usables.append([sketch.position, sketch.position] as Array[Vector2])
 	for door in doors:
 		if door.to_room != Door.EXIT or mime.carrying:
