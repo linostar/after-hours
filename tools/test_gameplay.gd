@@ -171,6 +171,8 @@ func _tests() -> Array[Callable]:
 		_test_good_and_perfect_fakes_pass,
 		_test_catch_cuts_inspection_short,
 		_test_results_buttons,
+		_test_new_best_detected,
+		_test_results_celebrate,
 		_test_guard_bad_route_reports,
 		_test_room_timer_waits_for_fade,
 		_test_mime_carrying_before_ready,
@@ -2817,6 +2819,44 @@ func _test_results_buttons() -> void:
 	await _tap_control(results.get_node("Panel/HomeButton") as Button)
 	await _wait_until(func() -> bool: return not _game.is_transitioning(), 120)
 	_check(current_scene is Hub and _game.state == GameState.Flow.HUB, name, "home did not return to the hub")
+
+
+## An escape beats a best only against a record: a first escape beats none; then more stars
+## beat the stars and a faster time the time, each on its own.
+func _test_new_best_detected() -> void:
+	var name := "new_best_detected"
+	var data := Save.defaults()
+	var two: Array[bool] = [true, true, false]
+	var three: Array[bool] = [true, true, true]
+	_check(Save.improvement(data, "wing_01", three, 30.0) == {"stars": false, "time": false}, name, "a first escape beat a record")
+	Save.record(data, "wing_01", two, 40.0)
+	_check(Save.improvement(data, "wing_01", three, 50.0) == {"stars": true, "time": false}, name, "more stars, slower, did not beat only the stars")
+	_check(Save.improvement(data, "wing_01", two, 30.0) == {"stars": false, "time": true}, name, "the same stars, faster, did not beat only the time")
+	_check(Save.improvement(data, "wing_01", two, 40.0) == {"stars": false, "time": false}, name, "a tie beat a best")
+
+
+## A three-star result bursts into confetti while the mime bows; a rosette pops in for each
+## best beaten (by the stars, on the clock); fewer stars and no best show neither.
+func _test_results_celebrate() -> void:
+	var name := "results_celebrate"
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.active = false
+	var results := room.get_node("ResultsLayer/Results") as Results
+	var wait := (Results.STAR_GAP + Results.POP_TIME) * 3.0 + Results.STAR_GAP * 3.0 + 0.2
+	results.present([true, true, false] as Array[bool])
+	await create_timer(wait).timeout
+	_check(not results.confetti.playing() and results.mime.fidget == CharacterRig.Fidget.NONE and not results.stars_best.visible and not results.time_best.visible, name, "two stars and no best still celebrated")
+	results.present([true, true, true] as Array[bool], {"stars": true, "time": false})
+	await create_timer(wait).timeout
+	_check(results.confetti.playing() and results.mime.fidget == CharacterRig.Fidget.BOW and _game.audio.played.has(&"confetti"), name, "three stars did not burst into confetti with a bow")
+	_check(results.stars_best.visible and results.stars_best.scale.is_equal_approx(Vector2.ONE) and not results.time_best.visible, name, "a new best star count did not pin its rosette by the stars alone")
+	results.present([true, true, true] as Array[bool], {"stars": false, "time": true})
+	await create_timer(wait).timeout
+	_check(results.time_best.visible and not results.stars_best.visible, name, "a new best time did not pin its rosette on the clock alone")
+	await create_timer(Confetti.LIFE).timeout
+	_check(not results.confetti.playing(), name, "the confetti outlived its %.1f s" % Confetti.LIFE)
 
 
 ## A route the guard cannot patrol (under 2 points) is reported through the error badge.

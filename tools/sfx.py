@@ -384,6 +384,17 @@ def fx_mime_gag(rng):
                (sweep(1700.0, 2200.0, 0.09, triangle, 0.01, 0.04), 0.22, 0.8))
 
 
+def fx_confetti(rng):
+    """A three-star burst: a party popper's pop, then a sparkle of bells running down."""
+    pop = mix((thump(160.0, 0.08, 0.5, 40.0), 0, 1.0), (highpassed(noise(0.05, rng, [(0, 7000), (1, 3000)], decay=60.0)), 0, 0.8))
+    return mix((pop, 0, 1.0), (arpeggio([27, 24, F6, C6, A5], 0.06, 0.25, 14.0, BELL), 0.06, 0.5))
+
+
+def fx_new_best(rng):
+    """A new best's rosette: a short vibraphone ta-da up a fourth."""
+    return arpeggio([C6, F6], 0.1, 0.5, 8.0, VIBES)
+
+
 def fx_star(rng):
     """A star earned on the results: a bright bell ping (played higher star by star)."""
     return ping(note_hz(C6), 0.7, 6.0, BELL)
@@ -464,6 +475,8 @@ EFFECTS = {
     "no_star": (fx_no_star, 0.57, "event"),
     "shrug": (fx_shrug, 0.4, "ui"),
     "mime_gag": (fx_mime_gag, 0.12, "quiet"),
+    "confetti": (fx_confetti, 0.55, "stinger"),
+    "new_best": (fx_new_best, 0.4, "stinger"),
     "ui_tap": (fx_ui_tap, 0.42, "ui"),
     "toggle_on": (fx_toggle_on, 0.26, "ui"),
     "toggle_off": (fx_toggle_off, 0.25, "ui"),

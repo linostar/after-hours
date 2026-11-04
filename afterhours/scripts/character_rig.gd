@@ -24,8 +24,9 @@ signal gag_started
 
 enum View { FRONT, BACK, RIGHT, LEFT }
 ## A gesture played over a time: a guard's fidget at a waypoint (STRETCH, WATCH, YAWN),
-## dusting off its hands after a catch (DUST), the mime tipping its beret (TIP, the escape).
-enum Fidget { NONE, STRETCH, WATCH, YAWN, DUST, TIP }
+## dusting off its hands after a catch (DUST), the mime tipping its beret (TIP, the escape)
+## and bowing (BOW, a three-star result).
+enum Fidget { NONE, STRETCH, WATCH, YAWN, DUST, TIP, BOW }
 
 ## A front or back view turns to the side once the heading's across exceeds this share of
 ## its along (about 35 degrees off vertical), so a diagonal walks side on; a side view turns
@@ -63,8 +64,9 @@ const GESTURE_RATE := 5.0
 ## Dusting off the hands: they brush past each other at DUST_HZ (stilled under Reduce Motion).
 const DUST_HZ := 1.6
 const DUST_SWING := 0.3
-## A yawn stretches the body this much more at its height.
+## A yawn stretches the body this much more at its height; a bow dips it this much.
 const YAWN_STRETCH := 0.04
+const BOW_DIP := 0.14
 
 @export var body_front: Texture2D
 @export var body_back: Texture2D
@@ -345,6 +347,8 @@ func _breathe() -> void:
 	var breath := 0.0 if reduce_motion() else BREATH_DEPTH * (1.0 - stride) * sin(TAU * BREATH_HZ * clock)
 	if fidget == Fidget.YAWN:
 		breath += YAWN_STRETCH * _fidget_weight()
+	elif fidget == Fidget.BOW:
+		breath -= BOW_DIP * _fidget_weight()
 	_body.scale = Vector2(1.0, 1.0 + breath) / ART_SCALE
 	# Scaled about the feet: moving it down by the hips' rise keeps the hips still.
 	_body.position.y += -hip.y * breath
@@ -377,6 +381,13 @@ func _gesture(i: int) -> void:
 		var brush := 0.0 if reduce_motion() else DUST_SWING * sin(TAU * DUST_HZ * clock + PI * i)
 		target = Vector2(-0.55 + brush, -1.5) if side else Vector2(-out * 0.3, -out * (1.95 + brush))
 		weight = minf(_fidget_weight() * 3.0, 1.0)
+	elif fidget == Fidget.BOW:
+		# One hand across the waist, the other swept out wide.
+		if i == 1:
+			target = Vector2(-0.4, -1.6) if side else Vector2(-out * 0.3, -out * 1.7)
+		else:
+			target = Vector2(0.9, 0.2) if side else Vector2(out * 1.1, out * 0.3)
+		weight = _fidget_weight()
 	elif fidget == Fidget.TIP and i == 1:
 		# The near hand up to the beret's brim and back down.
 		target = Vector2(-2.6, -0.8) if side else Vector2(out * 2.4, -out * 1.3)

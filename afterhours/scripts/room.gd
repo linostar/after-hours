@@ -109,6 +109,8 @@ var finished := false
 ## Whether the escape beat plays (finished, the results not shown yet).
 var escaping := false
 var stars: Array[bool] = []
+## The bests the escape beat (Save.improvement), for the results' rosettes.
+var beaten := {}
 ## The wing play this room belongs to.
 var run: WingRun
 ## Whether the mime is going through a door to another room (the room stops).
@@ -681,7 +683,7 @@ func _escape() -> void:
 	stars = Stars.earned(ever_seen, elapsed, par_time)
 	print("[Room] Escaped with the original at t %.2f (par %.0f, seen %s)" % [elapsed, par_time, ever_seen])
 	_game.audio.play(&"escape")
-	_game.record_escape(stars, elapsed)
+	beaten = _game.record_escape(stars, elapsed)
 	_play_escape_beat()
 
 
@@ -722,7 +724,7 @@ func _end_escape() -> void:
 	if not escaping:
 		return
 	escaping = false
-	_results.present(stars)
+	_results.present(stars, beaten)
 
 
 func _on_spotted() -> void:

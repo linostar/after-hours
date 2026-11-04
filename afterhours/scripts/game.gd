@@ -177,15 +177,18 @@ func setting(key: String) -> bool:
 
 
 ## Records the run's escape (its stars and time) for its wing and writes the save when it
-## is a best. A run of a room loaded on its own (no wing file) is not recorded.
-func record_escape(stars: Array[bool], time: float) -> void:
+## is a best; returns what it beat (Save.improvement). A run of a room loaded on its own (no
+## wing file) is not recorded and beats nothing.
+func record_escape(stars: Array[bool], time: float) -> Dictionary:
 	if run == null or run.wing.resource_path.is_empty():
 		print("[Game] Escape not recorded: the run has no wing file")
-		return
+		return {"stars": false, "time": false}
 	var id := Content.wing_id(run.wing.resource_path)
+	var beaten := Save.improvement(save, id, stars, time)
 	if Save.record(save, id, stars, time):
 		print("[Game] New best for %s: %d star(s), %.2f s" % [id, Save.stars_of(save, id), save["wings"][id]["time"]])
 		write_save()
+	return beaten
 
 
 ## Grows the desktop window to WINDOW_SCREEN_SHARE of the usable screen at 16:9 and centres
