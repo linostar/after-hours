@@ -162,6 +162,7 @@ func _tests() -> Array[Callable]:
 		_test_hub_settings,
 		_test_goto_missing_scene_reports,
 		_test_room_swap_and_escape,
+		_test_escape_beat_skips,
 		_test_room_swap_cancel_and_locked_exit,
 		_test_room_easel_paints_fake,
 		_test_room_catch_while_painting,
@@ -493,7 +494,7 @@ func _test_sfx_on_actions() -> void:
 		_check(id in played, name, "%s did not sound; played %s" % [id, played])
 	played.clear()
 	room._escape()
-	await create_timer((Results.STAR_GAP + Results.POP_TIME) * 3.0 + 0.1).timeout
+	await create_timer(Room.escape_beat_time() + (Results.STAR_GAP + Results.POP_TIME) * 3.0 + 0.1).timeout
 	_check(played.count(&"escape") == 1 and played.count(&"star") + played.count(&"no_star") == 3, name, "the escape and its three stars did not sound once each: %s" % [played])
 	_check(_game.audio.music == "results", name, "the results play %s, not the results loop" % _game.audio.music)
 	# The swap and escape are this room's run's: the next room starts a fresh one. The
@@ -2555,7 +2556,11 @@ func _test_room_swap_and_escape() -> void:
 	_check(escaped, name, "the mime never escaped (at %s)" % room.mime.position)
 	_check(room.stars == [true, true, true], name, "an unseen escape at %.1f s earned %s" % [room.elapsed, room.stars])
 	var results := room.get_node("ResultsLayer/Results") as Results
-	_check(results.visible, name, "the results overlay is hidden after the escape")
+	# The escape beat first: the beret tipped, the slip out, the door shut; then the results.
+	await physics_frame
+	_check(room.escaping and not results.visible and room.mime.rig.fidget == CharacterRig.Fidget.TIP, name, "the escape went straight to the results without its beat (escaping %s, fidget %s)" % [room.escaping, room.mime.rig.fidget])
+	var shown := await _wait_until(func() -> bool: return results.visible, ceili(Room.escape_beat_time() * 60.0) + 10)
+	_check(shown and not room.escaping and room.exit_door.shut == 1.0 and room.mime.rig.modulate.a == 0.0, name, "after the beat the results are not shown over a shut door with the mime gone (shown %s, shut %.2f, mime alpha %.2f)" % [shown, room.exit_door.shut, room.mime.rig.modulate.a])
 	# Every star has popped in by 3 x (STAR_GAP + POP_TIME), each gold as earned.
 	for i in ceili(3.0 * (Results.STAR_GAP + Results.POP_TIME) * 60.0) + 6:
 		await physics_frame
@@ -2566,6 +2571,28 @@ func _test_room_swap_and_escape() -> void:
 	for i in 30:
 		await physics_frame
 	_check(room.elapsed == finished_at, name, "the timer kept running after the escape")
+
+
+## A tap (or E) during the escape beat skips it: the results show at once, the door shut and
+## the mime gone; the stars were already recorded.
+func _test_escape_beat_skips() -> void:
+	var name := "escape_beat_skips"
+	for by_key: bool in [false, true]:
+		var room := await _load_room()
+		if room == null:
+			return
+		room.guard.active = false
+		room.mime.carrying = true
+		room._escape()
+		var results := room.get_node("ResultsLayer/Results") as Results
+		await physics_frame
+		_check(room.escaping and not results.visible, name, "the escape beat did not start")
+		if by_key:
+			room._keys.interacted.emit()
+		else:
+			await _tap_at(Vector2(480, 400))
+		_check(not room.escaping and results.visible and room.exit_door.shut == 1.0 and room.mime.rig.modulate.a == 0.0, name, "a %s did not skip the escape beat to the results" % ("key" if by_key else "tap"))
+		_check(room.stars.size() == 3, name, "the skipped escape has no stars")
 
 
 ## Tapping away mid-swap cancels it; the exit does nothing without the original.

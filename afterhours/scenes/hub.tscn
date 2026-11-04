@@ -50,6 +50,7 @@ position = Vector2(480, 470)
 position = Vector2(45, 400)
 opening = Rect2(-45, -40, 24, 80)
 arrival = Vector2(60, 0)
+secret = true
 
 [node name="Actors" type="Node2D" parent="."]
 y_sort_enabled = true

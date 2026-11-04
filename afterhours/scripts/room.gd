@@ -27,8 +27,9 @@ extends Node2D
 ## once per pass, a "?" over the painting while one does; a fake found out
 ## (Forgery.is_noticed; inspections count across the guards) turns the "?" into "!" for
 ## good, and the guard who found it out searches around it. Reaching the exit ends the
-## wing: the stars (Stars, against par_time) are recorded (Game.record_escape) and show in
-## the results overlay. A guard that
+## wing: the stars (Stars, against par_time) are recorded (Game.record_escape) and, after
+## the escape beat (the mime tips its beret and slips out, the door shuts; a tap skips it),
+## show in the results overlay. A guard that
 ## chases the mime down (Guard) shakes it and tosses it back to the entrance (TOSS_SHAKE,
 ## then TOSS_FLIGHT along an arc TOSS_HEIGHT high), closing the canvas if it was painting
 ## (its finished strokes are kept); taps are ignored meanwhile, then every guard starts its
@@ -68,6 +69,11 @@ const SHAKE_ANGLE := 0.3
 const CAUGHT_SHAKE := 7.0
 const SWAP_PUNCH := 0.04
 const PUNCH_TIME := 0.3
+## The escape beat: the beret tip, the slip through the doorway, the pause after the door
+## shuts before the results.
+const ESCAPE_TIP := 0.6
+const ESCAPE_SLIP := 0.45
+const ESCAPE_HOLD := 0.3
 ## The museum after dark: a CanvasModulate tints the whole room moonlit blue. What gives
 ## light (the guards' cones and eyes, the easel's glow, the gimmicks' lamps, windows and
 ## pools: GLOW, an unshaded material) and what the player reads or taps (the pause button,
@@ -100,6 +106,8 @@ var fake_hung := false
 var inspections := 0
 var found_out := false
 var finished := false
+## Whether the escape beat plays (finished, the results not shown yet).
+var escaping := false
 var stars: Array[bool] = []
 ## The wing play this room belongs to.
 var run: WingRun
@@ -119,6 +127,7 @@ var gimmick: Gimmick
 var ghost: GhostMime
 ## In a replay (WingRun.replaying), the room the bot went to after this stay (-1: the end).
 var _replay_next := -1
+var _escape_beat: Tween
 ## Seconds until the mime's next footstep on noisy floor can make a noise.
 var _step_noise_wait := 0.0
 
@@ -171,6 +180,7 @@ func _ready() -> void:
 			_game.report_error("Room '%s': door '%s' leads to room %d, but the wing has %d room(s)" % [scene_file_path, child.name, child.to_room, run.wing.rooms.size()])
 		else:
 			doors.append(child)
+			child.painting = run.wing.painting
 			if child.to_room == Door.EXIT and exit_door == null:
 				exit_door = child
 	if run.came_from != WingRun.START:
@@ -463,6 +473,9 @@ func _leave(door: Door) -> void:
 
 
 func _on_floor_tapped(at: Vector2) -> void:
+	if escaping:
+		_skip_escape()
+		return
 	if tossing or finished or leaving:
 		return
 	if run.replaying:
@@ -515,6 +528,9 @@ func _accepts_input() -> bool:
 ## E: steps out of a portrait, or taps the nearest usable thing within INTERACT_REACH of
 ## where the mime would stand for it; with nothing in reach the mime shrugs.
 func _on_interacted() -> void:
+	if escaping:
+		_skip_escape()
+		return
 	if not _accepts_input():
 		return
 	if hidden_in != null:
@@ -661,10 +677,51 @@ func _escape() -> void:
 	for each in guards:
 		each.active = false
 	mime.place_at(mime.position)
+	mime.busy = true
 	stars = Stars.earned(ever_seen, elapsed, par_time)
 	print("[Room] Escaped with the original at t %.2f (par %.0f, seen %s)" % [elapsed, par_time, ever_seen])
 	_game.audio.play(&"escape")
 	_game.record_escape(stars, elapsed)
+	_play_escape_beat()
+
+
+## The escape's curtain call before the results: the mime turns to the room and tips its
+## beret (ESCAPE_TIP), slips into the exit's doorway fading out (ESCAPE_SLIP), the door
+## swings shut, and after ESCAPE_HOLD the results show. A tap (or E) skips to them.
+func _play_escape_beat() -> void:
+	escaping = true
+	mime.face(Vector2.DOWN)
+	mime.rig.start_fidget(CharacterRig.Fidget.TIP, ESCAPE_TIP)
+	var doorway := exit_door.position + exit_door.opening.get_center()
+	_escape_beat = create_tween()
+	_escape_beat.tween_interval(ESCAPE_TIP)
+	_escape_beat.tween_callback(mime.glide.bind(doorway, ESCAPE_SLIP))
+	_escape_beat.tween_callback(mime.fade_out.bind(ESCAPE_SLIP))
+	_escape_beat.tween_interval(ESCAPE_SLIP)
+	_escape_beat.tween_callback(exit_door.swing_shut)
+	_escape_beat.tween_interval(Door.SHUT_TIME + ESCAPE_HOLD)
+	_escape_beat.tween_callback(_end_escape)
+	print("[Room] Escape beat")
+
+
+## How long the escape beat runs before the results show.
+static func escape_beat_time() -> float:
+	return ESCAPE_TIP + ESCAPE_SLIP + Door.SHUT_TIME + ESCAPE_HOLD
+
+
+## Skips the rest of the escape beat: the mime gone, the door shut, the results now.
+func _skip_escape() -> void:
+	_escape_beat.kill()
+	mime.rig.modulate.a = 0.0
+	exit_door.shut = 1.0
+	print("[Room] Escape beat skipped")
+	_end_escape()
+
+
+func _end_escape() -> void:
+	if not escaping:
+		return
+	escaping = false
 	_results.present(stars)
 
 

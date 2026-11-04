@@ -23,8 +23,9 @@ signal stepped
 signal gag_started
 
 enum View { FRONT, BACK, RIGHT, LEFT }
-## A guard's fidget while it stands at a waypoint, or (DUST) dusting off its hands after a catch.
-enum Fidget { NONE, STRETCH, WATCH, YAWN, DUST }
+## A gesture played over a time: a guard's fidget at a waypoint (STRETCH, WATCH, YAWN),
+## dusting off its hands after a catch (DUST), the mime tipping its beret (TIP, the escape).
+enum Fidget { NONE, STRETCH, WATCH, YAWN, DUST, TIP }
 
 ## A front or back view turns to the side once the heading's across exceeds this share of
 ## its along (about 35 degrees off vertical), so a diagonal walks side on; a side view turns
@@ -376,6 +377,10 @@ func _gesture(i: int) -> void:
 		var brush := 0.0 if reduce_motion() else DUST_SWING * sin(TAU * DUST_HZ * clock + PI * i)
 		target = Vector2(-0.55 + brush, -1.5) if side else Vector2(-out * 0.3, -out * (1.95 + brush))
 		weight = minf(_fidget_weight() * 3.0, 1.0)
+	elif fidget == Fidget.TIP and i == 1:
+		# The near hand up to the beret's brim and back down.
+		target = Vector2(-2.6, -0.8) if side else Vector2(out * 2.4, -out * 1.3)
+		weight = _fidget_weight()
 	elif fidget == Fidget.STRETCH:
 		target = Vector2(-2.9, -0.2) if side else Vector2(out * 2.75, out * 0.25)
 		weight = _fidget_weight()

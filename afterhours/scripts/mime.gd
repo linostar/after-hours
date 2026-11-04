@@ -147,6 +147,29 @@ func shrug() -> void:
 	print("[Mime] Shrugged: nothing in reach")
 
 
+## Walks straight to `point` over `time` (the escape's slip through the doorway, off the
+## navmesh): the walk cycle runs on the distance as on a path walk. Returns its tween.
+func glide(point: Vector2, time: float) -> Tween:
+	walking = false
+	face_toward(point)
+	var tween := create_tween()
+	tween.tween_method(_glide_step.bind(position, point), 0.0, 1.0, time)
+	return tween
+
+
+func _glide_step(t: float, from: Vector2, to: Vector2) -> void:
+	var at := from.lerp(to, t)
+	_moved += position.distance_to(at)
+	position = at
+
+
+## Fades the drawing out over `time` (out of sight through the doorway). Returns its tween.
+func fade_out(time: float) -> Tween:
+	var tween := create_tween()
+	tween.tween_property(rig, "modulate:a", 0.0, time)
+	return tween
+
+
 ## Lands flat from a toss: squashed, springing back, dizzy stars circling for DIZZY_TIME.
 func splat() -> void:
 	_squash_tween()
