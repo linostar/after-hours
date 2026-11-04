@@ -1,31 +1,24 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/hideout.gd" id="1_hideout"]
 [ext_resource type="Texture2D" path="res://art/svg/icon_home.svg" id="2_home"]
 [ext_resource type="PackedScene" path="res://scenes/rig_mime.tscn" id="3_mime"]
+[ext_resource type="Texture2D" path="res://art/svg/floor_planks.svg" id="4_floor"]
+[ext_resource type="Script" path="res://scripts/hideout_decor.gd" id="5_decor"]
 
 [node name="Hideout" type="Node2D"]
 script = ExtResource("1_hideout")
 
-[node name="BackWall" type="Polygon2D" parent="."]
-z_index = -10
-color = Color(0.24, 0.15, 0.12, 1)
-polygon = PackedVector2Array(0, 0, 960, 0, 960, 170, 0, 170)
-
-[node name="Beam" type="Polygon2D" parent="."]
-z_index = -10
-color = Color(0.17, 0.1, 0.08, 1)
-polygon = PackedVector2Array(0, 150, 960, 150, 960, 170, 0, 170)
-
 [node name="Floor" type="Polygon2D" parent="."]
 z_index = -10
-color = Color(0.3, 0.22, 0.16, 1)
-polygon = PackedVector2Array(0, 170, 960, 170, 960, 540, 0, 540)
+color = Color(0.8, 0.78, 0.8, 1)
+texture_repeat = 2
+texture = ExtResource("4_floor")
+polygon = PackedVector2Array(0, 200, 960, 200, 960, 540, 0, 540)
 
-[node name="Rug" type="Polygon2D" parent="."]
+[node name="Decor" type="Node2D" parent="."]
 z_index = -9
-color = Color(0.42, 0.16, 0.18, 1)
-polygon = PackedVector2Array(330, 300, 630, 300, 680, 460, 280, 460)
+script = ExtResource("5_decor")
 
 [node name="Originals" type="Node2D" parent="."]
 

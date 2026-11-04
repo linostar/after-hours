@@ -2376,6 +2376,8 @@ func _test_hideout_replays_ghost() -> void:
 	var replay := current_scene.get_node_or_null("Replay1") as Button
 	_check(replay != null and replay.size.x >= 44.0 and replay.size.y >= 44.0 and not replay.accessibility_name.is_empty(), name, "wing 1's original has no 44x44 named replay button")
 	_check(current_scene.get_node_or_null("Replay2") == null, name, "an unrobbed wing offers a replay")
+	_check(replay != null and HideoutDecor.plaque_rect(0).encloses(replay.get_rect()), name, "wing 1's replay button is not on its frame's plaque")
+	_check((current_scene.get_node("Decor") as HideoutDecor).stolen == ([true, false, false, false, false, false] as Array[bool]), name, "the lair's plaques do not show which originals were stolen")
 	if replay == null:
 		_game.save = Save.defaults()
 		return

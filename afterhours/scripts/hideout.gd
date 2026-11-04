@@ -5,7 +5,8 @@ extends Node2D
 ## gilt frame when its best escape earned all three stars and in plain wood otherwise; a
 ## wing not yet robbed leaves its frame empty. Under each stolen original a replay button
 ## (Game.replay_ghost) shows the ghost mime's escape from its wing. The home button goes back
-## to the hub. The mime stands about, alive at rest (CharacterRig: breathing, blinking, its
+## to the hub. The lair is drawn by HideoutDecor (each replay button on its frame's
+## plaque). The mime stands about, alive at rest (CharacterRig: breathing, blinking, its
 ## invisible-wall gag).
 
 const FIRST_X := 120.0
@@ -43,8 +44,9 @@ func _ready() -> void:
 		original.painting = wing.painting
 		$Originals.add_child(original)
 		originals.append(original)
-		_add_replay_button(i, at)
+		_add_replay_button(i)
 		hung += 1
+	($Decor as HideoutDecor).stolen.assign(originals.map(func(each: FramedPainting) -> bool: return each != null))
 	_home.pressed.connect(_game.goto.bind(GameState.Flow.HUB))
 	_home.grab_focus()
 	_game.arrive(GameState.Flow.HIDEOUT)
@@ -55,8 +57,8 @@ func _physics_process(delta: float) -> void:
 	_mime.walk(0.0, delta)
 
 
-## The button under wing `index`'s original at `at` that replays the bot's escape from it.
-func _add_replay_button(index: int, at: Vector2) -> void:
+## The button on wing `index`'s plaque that replays the bot's escape from it.
+func _add_replay_button(index: int) -> void:
 	var button := Button.new()
 	button.name = "Replay%d" % (index + 1)
 	button.accessibility_name = "Watch the ghost escape from wing %d" % (index + 1)
@@ -65,7 +67,7 @@ func _add_replay_button(index: int, at: Vector2) -> void:
 	button.expand_icon = true
 	button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	button.size = Vector2.ONE * REPLAY_SIZE
-	button.position = at + Vector2(0.0, REPLAY_DROP) - button.size / 2.0
+	button.position = HideoutDecor.plaque_rect(index).get_center() - button.size / 2.0
 	button.pressed.connect(_game.replay_ghost.bind(Content.WINGS[index]))
 	add_child(button)
 
