@@ -91,9 +91,18 @@ const RIG_NIGHT := preload("res://shaders/rig_night.gdshader")
 const LIGHTS_Z := -5
 ## The back wall's dressing (RoomDecor) sits on the wall polygons, under the gimmick.
 const DECOR_Z := -9
+## The sketch falls behind the paintings and lies on the floor under everything that walks.
+const SKETCH_Z := -4
+## Where the sketch lies from the spot below its hiding place (beside the mime's feet), and
+## how close the mime must come to pick it up.
+const SKETCH_REST := Vector2(30, 24)
+const SKETCH_REACH := 12.0
 
 ## The par time for the third star, in seconds.
 @export var par_time := 45.0
+## Where the wing's hidden sketch is tucked (a TiltFrame under Frames or a HidingPortrait under
+## Portraits) in the one room of the wing that hides it; empty elsewhere.
+@export_node_path("TiltFrame", "HidingPortrait") var sketch_in: NodePath
 
 ## Seconds since the room started (the wing timer: a toss does not stop it).
 var elapsed := 0.0
@@ -108,6 +117,11 @@ var paint_intent := false
 var tilt_target: TiltFrame
 ## The portrait the mime is heading to hide in, and the one it hides in.
 var hide_target: HidingPortrait
+## The wing's hidden sketch in this room (null in a room without it), the frame or portrait
+## it is tucked in, and whether the mime is heading to pick it up.
+var sketch: Sketch
+var sketch_source: Node2D
+var sketch_intent := false
 var hidden_in: HidingPortrait
 ## The quality (Forgery) of the fake the mime carries, or of the one hung by the swap.
 var fake_quality := 0.0
@@ -249,6 +263,7 @@ func _ready() -> void:
 		else:
 			_game.report_error("Room '%s': Portraits child '%s' is a %s, not a HidingPortrait" % [scene_file_path, child.name, child.get_class()])
 	_light_the_room()
+	_place_sketch()
 	_canvas.watchers = guards
 	_canvas.painted.connect(_on_painted)
 	if fake_hung:
@@ -455,6 +470,7 @@ func _physics_process(delta: float) -> void:
 		paint_intent = false
 		tilt_target = null
 		hide_target = null
+		sketch_intent = false
 		mime.nudge(walk, delta)
 	if paint_intent and not tossing and not mime.walking and mime.position.distance_to(easel.spot()) <= SWAP_REACH:
 		paint_intent = false
@@ -464,6 +480,8 @@ func _physics_process(delta: float) -> void:
 		_tilt(tilt_target)
 	if hide_target != null and not tossing and not mime.walking and mime.position.distance_to(hide_target.spot()) <= SWAP_REACH:
 		_hide_in(hide_target)
+	if sketch_intent and not tossing and not mime.walking and mime.position.distance_to(sketch.position) <= SKETCH_REACH:
+		_take_sketch()
 	if fake_hung and not found_out:
 		_fake_icon.visible = guards.any(func(each: Guard) -> bool: return each.inspecting)
 	if swap_intent and not tossing and not mime.walking and mime.position.distance_to(swap_spot()) <= SWAP_REACH:
@@ -567,6 +585,11 @@ func _on_floor_tapped(at: Vector2) -> void:
 	paint_intent = false
 	tilt_target = null
 	hide_target = null
+	sketch_intent = false
+	if sketch != null and sketch.state == Sketch.State.LYING and sketch.rect().has_point(at):
+		sketch_intent = true
+		mime.walk_to(sketch.position)
+		return
 	for portrait in _portraits:
 		if portrait.rect().has_point(at):
 			hide_target = portrait
@@ -633,6 +656,8 @@ func _usables() -> Array[Array]:
 			usables.append([frame.spot(), frame.position] as Array[Vector2])
 	for portrait in _portraits:
 		usables.append([portrait.spot(), portrait.position] as Array[Vector2])
+	if sketch != null and sketch.state == Sketch.State.LYING:
+		usables.append([sketch.position, sketch.position] as Array[Vector2])
 	for door in doors:
 		if door.to_room != Door.EXIT or mime.carrying:
 			usables.append([door.position, door.position] as Array[Vector2])
@@ -667,6 +692,7 @@ func _hide_in(portrait: HidingPortrait) -> void:
 		_style_view.show()
 	print("[Room] Hid in the portrait at %s at t %.2f (seen going in: %s)" % [portrait.position.round(), elapsed, seen])
 	_game.audio.play(&"hide")
+	_reveal_sketch(portrait)
 
 
 func _step_out() -> void:
@@ -687,6 +713,58 @@ func _tilt(frame: TiltFrame) -> void:
 	if heard != null:
 		heard.hear(frame.view_point())
 	print("[Room] Tilted the frame at %s at t %.2f (heard by: %s)" % [frame.position.round(), elapsed, str(heard.name) if heard != null else "nobody"])
+	_reveal_sketch(frame)
+
+
+## The wing's sketch (if this room hides it, sketch_in): lying where it fell if it already
+## fell on this play, gone if the mime has it, else tucked away until its hiding place is
+## used. A sketch_in that is not one of the room's frames or portraits is reported.
+func _place_sketch() -> void:
+	if sketch_in.is_empty():
+		return
+	var source := get_node_or_null(sketch_in)
+	if not (source is TiltFrame and source in _frames) and not (source is HidingPortrait and source in _portraits):
+		_game.report_error("Room '%s': sketch_in '%s' is not one of the room's frames or portraits" % [scene_file_path, sketch_in])
+		return
+	var texture: Texture2D = Paintings.SKETCHES.get(StringName(run.wing.painting))
+	if texture == null:
+		_game.report_error("Room '%s': no sketch for painting '%s'" % [scene_file_path, run.wing.painting])
+		return
+	sketch_source = source
+	sketch = Sketch.new()
+	sketch.name = "Sketch"
+	sketch.texture = texture
+	var below := (source as TiltFrame).spot() if source is TiltFrame else (source as HidingPortrait).spot()
+	sketch.position = below + SKETCH_REST
+	sketch.modulate = lit_boost()
+	sketch.z_index = SKETCH_Z
+	add_child(sketch)
+	if run.has_sketch:
+		sketch.state = Sketch.State.TAKEN
+		sketch.hide()
+	elif run.sketch_dropped and not run.replaying:
+		sketch.lie()
+	print("[Room] Sketch hides in %s, falls to %s" % [sketch_source.name, sketch.position])
+
+
+## Using the sketch's hiding place (`source` tilted or hidden in) lets it fall, once a play.
+func _reveal_sketch(source: Node2D) -> void:
+	if sketch == null or source != sketch_source or sketch.state != Sketch.State.HIDDEN or run.replaying:
+		return
+	run.sketch_dropped = true
+	sketch.drop(source.position)
+	_game.audio.play(&"sketch_drop")
+	print("[Room] The sketch falls from %s at t %.2f" % [source.name, elapsed])
+
+
+## The mime picks the sketch up: kept by the run and saved at once (Game.record_sketch).
+func _take_sketch() -> void:
+	sketch_intent = false
+	run.has_sketch = true
+	sketch.take()
+	_game.audio.play(&"sketch_found")
+	_game.record_sketch()
+	print("[Room] Picked up the sketch at t %.2f" % elapsed)
 
 
 ## The active guard nearest `point` within `reach` (GuardBrain.HEARING_RANGE unless a quieter
@@ -799,7 +877,7 @@ func _end_escape() -> void:
 	if not escaping:
 		return
 	escaping = false
-	_results.present(stars, beaten)
+	_results.present(stars, beaten, Paintings.SKETCHES.get(StringName(run.wing.painting)) if run.has_sketch else null)
 
 
 func _on_spotted() -> void:
@@ -813,6 +891,7 @@ func _on_caught() -> void:
 	paint_intent = false
 	tilt_target = null
 	hide_target = null
+	sketch_intent = false
 	if hidden_in != null:
 		_step_out()
 	_canvas.close()

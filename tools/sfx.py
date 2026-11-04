@@ -402,6 +402,20 @@ def fx_confetti(rng):
     return mix((pop, 0, 1.0), (arpeggio([27, 24, F6, C6, A5], 0.06, 0.25, 14.0, BELL), 0.06, 0.5))
 
 
+def fx_sketch_drop(rng):
+    """A hidden sketch slipping out and fluttering down: soft paper rustles, each lower."""
+    parts = []
+    for k, centre in enumerate([3200.0, 2600.0, 2100.0, 1700.0]):
+        rustle = bandpass(noise(0.09, rng, [(0, 6000), (1, 3000)], attack=0.02, release=0.05), centre, 1.6)
+        parts.append((rustle, k * 0.11, 0.9 - k * 0.15))
+    return mix(*parts)
+
+
+def fx_sketch_found(rng):
+    """The sketch picked up: a little vibraphone discovery (C minor), up a third and a fifth to a bell."""
+    return mix((arpeggio([C6, Eb6, C6 + 7], 0.08, 0.45, 9.0, VIBES), 0, 0.8), (ping(note_hz(C6 + 12), 0.6, 7.0, BELL), 0.24, 0.45))
+
+
 def fx_new_best(rng):
     """A new best's rosette: a short vibraphone ta-da up a fourth."""
     return arpeggio([C6, F6], 0.1, 0.5, 8.0, VIBES)
@@ -490,6 +504,8 @@ EFFECTS = {
     "mime_gag": (fx_mime_gag, 0.12, "quiet"),
     "confetti": (fx_confetti, 0.55, "stinger"),
     "new_best": (fx_new_best, 0.4, "stinger"),
+    "sketch_drop": (fx_sketch_drop, 0.3, "event"),
+    "sketch_found": (fx_sketch_found, 0.4, "stinger"),
     "ui_tap": (fx_ui_tap, 0.42, "ui"),
     "toggle_on": (fx_toggle_on, 0.26, "ui"),
     "toggle_off": (fx_toggle_off, 0.25, "ui"),

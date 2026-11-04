@@ -43,6 +43,16 @@ const STYLES: Dictionary[StringName, Shader] = {
 	&"fighting_temeraire": preload("res://shaders/style_pearl_earring.gdshader"),
 	&"impression_sunrise": preload("res://shaders/style_grande_jatte.gdshader"),
 }
+## Each wing's hidden sketch: a red chalk study of its masterpiece, drawn by Claude (no scan,
+## no credit needed).
+const SKETCHES: Dictionary[StringName, Texture2D] = {
+	&"pearl_earring": preload("res://art/svg/sketch_pearl_earring.svg"),
+	&"great_wave": preload("res://art/svg/sketch_great_wave.svg"),
+	&"grande_jatte": preload("res://art/svg/sketch_grande_jatte.svg"),
+	&"starry_night": preload("res://art/svg/sketch_starry_night.svg"),
+	&"earthly_delights": preload("res://art/svg/sketch_earthly_delights.svg"),
+	&"mona_lisa": preload("res://art/svg/sketch_mona_lisa.svg"),
+}
 
 
 ## A new material drawing `id`'s style: over the node's own texture, or with `on_screen`

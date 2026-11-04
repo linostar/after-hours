@@ -166,6 +166,7 @@ func _tests() -> Array[Callable]:
 		_test_escape_beat_skips,
 		_test_room_hud,
 		_test_room_decor,
+		_test_sketch_found,
 		_test_room_swap_cancel_and_locked_exit,
 		_test_room_easel_paints_fake,
 		_test_room_catch_while_painting,
@@ -963,6 +964,105 @@ func _load_two_guard_room(route: PackedVector2Array) -> Room:
 	if not await _wait_until(func() -> bool: return NavigationServer2D.map_get_closest_point_owner(map, room.mime.position).is_valid(), 60):
 		_check(false, "load_two_guard_room", "the room's navigation map never synced")
 	return room
+
+
+## The slice room hiding the sketch in `source` (a path under the room), made current.
+func _load_sketch_room(source: NodePath) -> Room:
+	var room := (load(ROOM_PATH) as PackedScene).instantiate() as Room
+	room.sketch_in = source
+	var old := current_scene
+	root.add_child(room)
+	current_scene = room
+	if old != null:
+		old.queue_free()
+	for i in 3:
+		await physics_frame
+	var map := room.get_world_2d().navigation_map
+	await _wait_until(func() -> bool: return NavigationServer2D.map_get_closest_point_owner(map, room.mime.position).is_valid(), 60)
+	room.guard.active = false
+	return room
+
+
+## The hidden sketch: unseen until its hiding place is used (a tilted frame, a portrait hidden
+## in), then it flutters down and lies on the floor; a tap (or E) picks it up, which the run
+## keeps and the HUD and results show; a dropped sketch lies there again on a later visit;
+## Game.record_sketch saves it for a wing file's run; the hub door and the hideout show a
+## found sketch; a bad sketch_in is reported.
+func _test_sketch_found() -> void:
+	var name := "sketch_found"
+	var room := await _load_sketch_room(^"Frames/FrameA")
+	if room == null:
+		return
+	var sketch := room.sketch
+	_check(sketch != null and sketch.state == Sketch.State.HIDDEN and sketch.texture == Paintings.SKETCHES[StringName(room.run.wing.painting)], name, "the sketch is not tucked away unseen with its wing's drawing")
+	await _tap_at(sketch.position)
+	_check(not room.sketch_intent, name, "a tap on a hidden sketch's spot heads for it")
+	room._tilt(room.get_node("Frames/FrameA") as TiltFrame)
+	_check(sketch.state == Sketch.State.FALLING and room.run.sketch_dropped and _game.audio.played.has(&"sketch_drop"), name, "tilting its frame did not let the sketch fall")
+	await create_timer(Sketch.FALL_TIME + 0.1).timeout
+	_check(sketch.state == Sketch.State.LYING, name, "the sketch did not land")
+	var map := room.get_world_2d().navigation_map
+	_check(NavigationServer2D.map_get_closest_point(map, sketch.position).distance_to(sketch.position) < 1.0, name, "the sketch lies off the walkable floor at %s" % sketch.position)
+	await _tap_at(sketch.position)
+	_check(room.sketch_intent, name, "a tap on the sketch does not walk the mime to it")
+	_check(await _wait_until(func() -> bool: return room.run.has_sketch, 900), name, "the mime never picked the sketch up")
+	_check(sketch.state == Sketch.State.TAKEN and _game.audio.played.has(&"sketch_found"), name, "picking it up did not take it with its sound")
+	await process_frame
+	await process_frame
+	_check(room.hud.has_sketch, name, "the HUD does not show the sketch")
+	room.mime.carrying = true
+	room._escape()
+	room._skip_escape()
+	var results := room.get_node("ResultsLayer/Results") as Results
+	await create_timer(Results.STAR_GAP * 6.0 + Results.POP_TIME + 0.2).timeout
+	_check(results.sketch.visible and results.sketch.texture == sketch.texture, name, "the results do not show the sketch")
+	# By E, from a portrait, and lying again on a later visit after it fell.
+	_game.run = null
+	var portrait_room := await _load_sketch_room(^"Portraits/PortraitA")
+	var portrait := portrait_room.get_node("Portraits/PortraitA") as HidingPortrait
+	portrait_room._hide_in(portrait)
+	_check(portrait_room.sketch.state == Sketch.State.FALLING, name, "hiding in its portrait did not let the sketch fall")
+	portrait_room._step_out()
+	await create_timer(Sketch.FALL_TIME + 0.1).timeout
+	portrait_room.mime.place_at(portrait_room.sketch.position + Vector2(20, 0))
+	portrait_room._keys.interacted.emit()
+	_check(portrait_room.sketch_intent, name, "E beside the sketch does not head for it")
+	_check(await _wait_until(func() -> bool: return portrait_room.run.has_sketch, 600), name, "E never picked the sketch up")
+	var revisit := (load(ROOM_PATH) as PackedScene).instantiate() as Room
+	revisit.sketch_in = ^"Frames/FrameB"
+	var run := WingRun.new((load(Content.WINGS[0]) as WingData))
+	run.wing = run.wing.duplicate()
+	run.wing.rooms = [ROOM_PATH]
+	run.sketch_dropped = true
+	_game.run = run
+	var old := current_scene
+	root.add_child(revisit)
+	current_scene = revisit
+	old.queue_free()
+	await physics_frame
+	_check(revisit.sketch.state == Sketch.State.LYING, name, "a sketch that fell on this play does not lie there on a later visit")
+	_game.run = null
+	# Saved at once for a wing file's run; shown on the hub door and pinned in the hideout.
+	_game.save = Save.defaults()
+	_game.run = WingRun.new(load(Content.WINGS[1]) as WingData)
+	_game.record_sketch()
+	_check(Save.has_sketch(_game.save, "wing_02") and Save.has_sketch(Save.parse(FileAccess.get_file_as_string(_game.save_path), [] as Array[String]), "wing_02"), name, "the sketch was not saved at once")
+	_game.run = null
+	_game.goto(GameState.Flow.HUB)
+	await _wait_until(func() -> bool: return current_scene is Hub and not _game.is_transitioning(), 300)
+	var hub := current_scene as Hub
+	_check(hub != null and hub.wing_doors[1].sketch and not hub.wing_doors[0].sketch, name, "the hub door does not show the found sketch")
+	_game.goto(GameState.Flow.HIDEOUT)
+	await _wait_until(func() -> bool: return current_scene is Hideout and not _game.is_transitioning(), 300)
+	var hideout := current_scene as Hideout
+	_check(hideout != null and hideout.get_node_or_null("Originals/Sketch2") is Sprite2D and hideout.get_node_or_null("Originals/Sketch1") == null, name, "the hideout does not pin the found sketch")
+	# A sketch_in that is not one of the room's frames or portraits is reported.
+	_game.quiet_errors = true
+	var errors_before := _game.errors.size()
+	var stray := await _load_sketch_room(^"Actors/Mime")
+	_check(_game.errors.size() == errors_before + 1 and stray.sketch == null, name, "a bad sketch_in is not reported")
+	_game.quiet_errors = false
+	_game.save = Save.defaults()
 
 
 ## Stands `guard` still at `at`, facing `facing`.
@@ -2701,7 +2801,7 @@ func _test_room_hud() -> void:
 		return
 	room.guard.active = false
 	var hud := room.hud
-	var areas: Array[Rect2] = [RoomHud.clock_rect(), RoomHud.plate_rect()]
+	var areas: Array[Rect2] = [RoomHud.clock_rect(), RoomHud.plate_rect(), RoomHud.sketch_rect()]
 	var canvas := room.get_node("EaselLayer/ForgeryCanvas/Easel") as Control
 	for area in areas:
 		_check(hud.visible and Rect2(Vector2.ZERO, Vector2(960, 540)).encloses(area) and not area.intersects(room.get_node("PauseButton").get_rect()) and not area.intersects(canvas.get_global_rect()), name, "the HUD (%s) is off the world, over the pause button or the canvas board" % area)

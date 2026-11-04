@@ -5,8 +5,9 @@ extends Node2D
 ## gilt frame when its best escape earned all three stars and in plain wood otherwise; a
 ## wing not yet robbed leaves its frame empty. Under each stolen original a replay button
 ## (Game.replay_ghost) shows the ghost mime's escape from its wing. The home button goes back
-## to the hub. The lair is drawn by HideoutDecor (each replay button on its frame's
-## plaque). The mime stands about, alive at rest (CharacterRig: breathing, blinking, its
+## to the hub. A wing's hidden sketch, once found (Save.has_sketch), is pinned to the wall
+## at its frame's top corner, robbed or not. The lair is drawn by HideoutDecor (each replay
+## button on its frame's plaque). The mime stands about, alive at rest (CharacterRig: breathing, blinking, its
 ## invisible-wall gag).
 
 const FIRST_X := 120.0
@@ -17,6 +18,12 @@ const REPLAY_ICON := preload("res://art/svg/icon_replay.svg")
 ## A replay button's side, and its centre's drop below its frame's centre.
 const REPLAY_SIZE := 48.0
 const REPLAY_DROP := 84.0
+## A found sketch: its size on the wall, its centre from its frame's centre, its slant, and
+## the pin through its top.
+const SKETCH_SIZE := Vector2(34, 42)
+const SKETCH_OFFSET := Vector2(58, -38)
+const SKETCH_SLANT := 0.16
+const PIN := Color(0.78, 0.16, 0.14)
 
 ## Per wing (Content.WINGS order): its painting, or null while it is not stolen.
 var originals: Array[FramedPainting] = []
@@ -31,6 +38,8 @@ func _ready() -> void:
 	var hung := 0
 	for i in Content.WINGS.size():
 		var at := Vector2(FIRST_X + i * GAP, FRAME_Y)
+		if Save.has_sketch(_game.save, ids[i]):
+			_pin_sketch(i, StringName((load(Content.WINGS[i]) as WingData).painting))
 		var wing := load(Content.WINGS[i]) as WingData if Save.finished(_game.save, ids[i]) else null
 		if wing == null:
 			originals.append(null)
@@ -55,6 +64,23 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	_mime.walk(0.0, delta)
+
+
+## Wing `index`'s found sketch of `painting`, pinned at its frame's top corner over the frame.
+func _pin_sketch(index: int, painting: StringName) -> void:
+	var texture: Texture2D = Paintings.SKETCHES.get(painting)
+	if texture == null:
+		_game.report_error("Hideout: no sketch for painting '%s' (wing %d)" % [painting, index + 1])
+		return
+	var paper := Sprite2D.new()
+	paper.name = "Sketch%d" % (index + 1)
+	paper.texture = texture
+	paper.scale = SKETCH_SIZE / texture.get_size()
+	paper.position = Vector2(FIRST_X + index * GAP, FRAME_Y) + SKETCH_OFFSET
+	paper.rotation = SKETCH_SLANT
+	paper.z_index = 1
+	paper.draw.connect(func() -> void: paper.draw_circle(Vector2(0, -texture.get_height() * 0.5 + 5.0), 3.0 / paper.scale.x, PIN))
+	$Originals.add_child(paper)
 
 
 ## The button on wing `index`'s plaque that replays the bot's escape from it.
