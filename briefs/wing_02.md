@@ -1,5 +1,15 @@
 # Wing 2 brief: The Great Wave off Kanagawa (Hokusai)
 
+## Depth pass (feat/polish-depth)
+- Three rooms, 5 guards. Each room past the print room's crossing needs one trick (bot ablation).
+- Room 0, the print room (easel, exit): trick **puddle lure**. A sentry paces before the right door;
+  wading through the puddle on the far side splashes, and he comes to look while the mime slips past.
+- Room 1, the hall: trick **hide**. One guard walks the back row to the far door and turns back; the
+  lower floor is closed off; the mime hides in the portrait as he passes.
+- Room 2, the gallery: trick **lure (choose the frame)**. Two guards; a tilt pulls only the nearest in
+  earshot, so the frame by the swap guard pulls him off and the other would pull the wrong one.
+- Sketch: behind the hall's spare frame (tilting it makes the noise too).
+
 ## Constraints
 - Three rooms (lengthened from two after the first playtest); 3 to 6 minutes; every star reachable (bot-proved).
 - New idea: time. The player waits for the right moment instead of finding a hidden path.

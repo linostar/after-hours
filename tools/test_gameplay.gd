@@ -532,8 +532,16 @@ func _test_save_shape() -> void:
 	_check(Save.unlocked(Save.defaults(), ids, 0) and not Save.unlocked(Save.defaults(), ids, 1), name, "a fresh save opens more than wing 1")
 	var older := Save.parse('{"version": 1, "wings": {}, "settings": {"music": false}}', problems)
 	_check(problems.is_empty() and older["settings"] == {"music": false, "sound": true, "reduce_motion": false, "assist": false}, name, "a missing setting does not take its default: %s" % [older])
-	for bad: String in ["{", "[]", '{"version": 2, "wings": {}}', '{"version": 1, "wings": []}', '{"version": 1, "wings": {"wing_01": {"stars": 4, "time": 1}}}',
-			'{"version": 1, "wings": {"wing_01": {"stars": 1.5, "time": 1}}}', '{"version": 1, "wings": {}, "settings": {"music": 1}}']:
+	# A version 1 save (before sketches) upgrades: every best and setting kept, no sketch yet.
+	var v1 := Save.parse('{"version": 1, "wings": {"wing_01": {"stars": 3, "time": 61.5}, "wing_02": {"stars": 1, "time": 140}}, "settings": {"music": false, "sound": true, "reduce_motion": true, "assist": false}}', problems)
+	_check(problems.is_empty() and v1["version"] == Save.VERSION and v1["wings"] == {"wing_01": {"stars": 3, "time": 61.5}, "wing_02": {"stars": 1, "time": 140.0}} and v1["sketches"] == {}
+			and v1["settings"] == {"music": false, "sound": true, "reduce_motion": true, "assist": false}, name, "a version 1 save does not upgrade with its bests and settings: %s, %s" % [v1, problems])
+	_check(Save.record_sketch(data, "wing_02") and not Save.record_sketch(data, "wing_02") and Save.has_sketch(data, "wing_02") and not Save.has_sketch(data, "wing_01"), name, "a found sketch is not kept once: %s" % [data["sketches"]])
+	back = Save.parse(Save.to_json(data), problems)
+	_check(problems.is_empty() and back == data, name, "a save with a sketch does not read back as written: %s, %s" % [back, problems])
+	for bad: String in ["{", "[]", '{"version": 3, "wings": {}}', '{"version": 1, "wings": []}', '{"version": 1, "wings": {"wing_01": {"stars": 4, "time": 1}}}',
+			'{"version": 1, "wings": {"wing_01": {"stars": 1.5, "time": 1}}}', '{"version": 1, "wings": {}, "settings": {"music": 1}}',
+			'{"version": 2, "wings": {}, "sketches": []}', '{"version": 2, "wings": {}, "sketches": {"wing_01": 1}}']:
 		problems.clear()
 		_check(Save.parse(bad, problems).is_empty() and problems.size() == 1, name, "save '%s' is not refused with one problem: %s" % [bad, problems])
 

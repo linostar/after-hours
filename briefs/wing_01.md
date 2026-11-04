@@ -1,5 +1,18 @@
 # Wing 1 brief: Girl with a Pearl Earring (Vermeer), the tutorial
 
+## Depth pass (feat/polish-depth)
+- Three rooms, 4 guards (the ramp: 4, 5, 6, 8, 9, 12 across the wings). Teach, in order: walk, paint,
+  door, then hiding in the hall and tilting in the gallery, each one a room's needed trick (proved by the
+  bot's ablation: the route without the trick is seen under every wait).
+- Room 0, the foyer (safe, no guard): unchanged; trying the Mona Lisa portrait here finds the wing's
+  **sketch** (it drops to the floor below; tap it).
+- Room 1, the hall: trick **hide**. A guard walks the back row to the far door and turns back; the
+  lower floor is closed off by the partitions and a second guard; the mime follows the first guard,
+  steps into the portrait as he turns and goes on once he has passed.
+- Room 2, the gallery: trick **lure**. A sentry paces before the masterpiece facing along the swap
+  row; tilting the frame at the far end of the back wall, out of his cone, pulls him off; the mime swaps
+  while he straightens it.
+
 ## Constraints
 - Three rooms (lengthened from two after the first playtest); 3 to 6 minutes for a first-time player; every star reachable (bot-proved).
 - Teach, in order and without words: walk, paint, go through a door, swap, hide, tilt.

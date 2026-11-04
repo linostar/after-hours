@@ -201,6 +201,18 @@ func record_escape(stars: Array[bool], time: float) -> Dictionary:
 	return beaten
 
 
+## Keeps the run's wing's sketch as found (Save.record_sketch) and writes the save at once, so
+## leaving the wing early does not lose it. A run of a room loaded on its own is not recorded.
+func record_sketch() -> void:
+	if run == null or run.wing.resource_path.is_empty():
+		print("[Game] Sketch not recorded: the run has no wing file")
+		return
+	var id := Content.wing_id(run.wing.resource_path)
+	if Save.record_sketch(save, id):
+		print("[Game] Sketch found for %s" % id)
+		write_save()
+
+
 ## Grows the desktop window to WINDOW_SCREEN_SHARE of the usable screen at 16:9 and centres
 ## it. The web canvas fills its page and headless runs have no screen, so both are skipped.
 func _fit_window() -> void:
