@@ -11,16 +11,18 @@
 // door where it logs itself ("[Hub] Wing door 1 at ... (open, 0 star(s))"), require "[Game]
 // Arrived at ROOM" (the foyer, no guard), tap the easel and drag along every ghost stroke the canvas
 // logs ("[Forgery] Ghosts in base units ...") until "[Room] Fake ready"; through the door
-// to room 1 (the hall) and on through its door to room 2 (the gallery); there wait until
-// the guard reaches its bottom-right corner ("[Guard] Guard reaches waypoint 2", from where
-// it walks the bottom leg facing away from the painting) and tap the masterpiece until
-// "[Room] Swapped"; back through the hall to the foyer and tap its exit until "[Room]
+// to room 1 (the hall: hide in its middle portrait at once, wait for the corridor guard to turn
+// at the far door, "[Guard] Guard reaches waypoint 1", and to come back past, then step out
+// and through its door to room 2); in the gallery go low round the right, tilt the far frame
+// ("[Room] Tilted the frame") to lure the sentry off the swap spot, step aside, and tap the
+// masterpiece until "[Room] Swapped"; back into the hall (hide in its far portrait at once,
+// step out once the guard turns at the far door) to the foyer and tap its exit until "[Room]
 // Escaped", require "[Results] Stars", tap home and require the hub to show wing 1's
 // stars and wing 2's door open. World points (rooms and the hub log base units of the
 // 960x540 world) are shifted by the world's offset on screen ("[Game] Screen fit: ...
 // world at (x, y)": the world is centred on the safe area of a wider screen). A catch
-// ("[Room] Caught") is waited out until the mime is back at the entrance, then the tap is
-// repeated, at most ATTEMPTS times.
+// ("[Room] Caught") is waited out until the mime is back at the entrance, then the tap (or
+// the room's whole sequence) is repeated, at most ATTEMPTS times.
 // Usage: node tools/smoke_web.mjs [buildDir]   (default: build/web)
 // Env:   SMOKE_BOOT_TIMEOUT_MS (default 30000), SMOKE_SETTLE_MS (default 2000),
 //        SMOKE_STEP_TIMEOUT_MS (each waited-for log line, default 20000)
@@ -67,9 +69,13 @@ const GHOSTS = /^\[Forgery\] Ghosts in base units (.+)$/;
 const DRAG_STEP_MS = 20;
 // How many times a tap is repeated after a catch tossed the mime back to the entrance.
 const ATTEMPTS = 5;
-// The gallery guard at its bottom-right corner: it then walks the bottom leg facing away
-// from the painting, the window a watching player takes.
-const GUARD_SAFE = /^\[Guard\] Guard reaches waypoint 2 /;
+// "[Room] Frame|Portrait <name> at (x, y)": where a tilt frame or hiding portrait hangs.
+const hungLog = (kind, name) => new RegExp(`^\\[Room\\] ${kind} ${name} at \\(([\\d.-]+), ([\\d.-]+)\\)`);
+// The hall's corridor guard turns at the far door (its waypoint 1).
+const FAR_TURN = /^\[Guard\] Guard reaches waypoint 1 /;
+// From the far turn until the hall guard has walked back past the middle portrait.
+const PASSED_MIDDLE_MS = 8000;
+const CAUGHT = /^\[Room\] Caught/;
 // A room change logs its arrival before the fade back in ends, and the fade's cover takes
 // every touch until then (Game.FADE_TIME 0.25 s): taps wait this long after an arrival.
 const FADE_WAIT_MS = 500;
@@ -184,6 +190,34 @@ async function tapUntil(page, logs, pointer, point, goal, what, window = null) {
   throw new Error(`${what}: caught on every one of ${ATTEMPTS} attempts`);
 }
 
+// Runs `steps` (an async function of the log index it starts at) until it ends without a catch;
+// a catch ends the try (steps' waits watch for it via `watch`): it is waited out until the mime is
+// back at the entrance, then steps run again, at most ATTEMPTS times. Returns the attempt.
+async function untilClean(page, logs, what, steps) {
+  for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+    const from = logs.length;
+    const watch = async (pattern, label, timeoutMs = STEP_TIMEOUT_MS) => {
+      const hit = await waitForLog(page, logs, new RegExp(`${pattern.source}|${CAUGHT.source}`), label, from, timeoutMs);
+      if (CAUGHT.test(hit[0])) throw Object.assign(new Error('caught'), { caughtAt: hit.index });
+      return hit;
+    };
+    try {
+      await steps(from, watch);
+      return attempt;
+    } catch (error) {
+      if (error.caughtAt === undefined) throw error;
+      await waitForLog(page, logs, /^\[Room\] The mime is back at the entrance/, 'the end of the toss', error.caughtAt);
+    }
+  }
+  throw new Error(`${what}: caught on every one of ${ATTEMPTS} attempts`);
+}
+
+// The point a hung frame's or portrait's log names, logged at or after `from`.
+async function hungAt(page, logs, kind, name, from) {
+  const hung = await waitForLog(page, logs, hungLog(kind, name), `${kind} ${name}`, from);
+  return { x: Number(hung[1]), y: Number(hung[2]) };
+}
+
 // The point a door log (doorLog) names, logged at or after `from`.
 async function doorAt(page, logs, to, from) {
   const door = await waitForLog(page, logs, doorLog(to), `the door to room ${to}`, from);
@@ -221,20 +255,48 @@ async function playWing1(page, logs, pointer, run) {
   from = logs.length;
   await tapUntil(page, logs, pointer, toHall, arrived, 'the hall');
   const toGallery = await doorAt(page, logs, 2, from);
+  const middle = await hungAt(page, logs, 'Portrait', 'PortraitA', from);
+  const far = await hungAt(page, logs, 'Portrait', 'PortraitB', from);
   await page.waitForTimeout(FADE_WAIT_MS);
-  from = logs.length;
-  await tapUntil(page, logs, pointer, toGallery, arrived, 'the gallery');
+  // The hall: into the middle portrait behind the guard; out once he has turned and passed it.
+  await untilClean(page, logs, 'the hall', async (start, watch) => {
+    await pointer.tap(await pagePoint(page, middle.x, middle.y, worldOffset(logs)));
+    await watch(/^\[Room\] Hid in the portrait/, 'hiding in the hall');
+    await watch(FAR_TURN, 'the hall guard\'s far turn', GUARD_WAIT_MS);
+    await page.waitForTimeout(PASSED_MIDDLE_MS);
+    await pointer.tap(await pagePoint(page, toGallery.x, toGallery.y, worldOffset(logs)));
+    await watch(arrived, 'the gallery');
+  });
+  from = logs.findLastIndex((line) => arrived.test(line));
   const masterpiece = await waitForLog(page, logs, MASTERPIECE_RECT, 'the masterpiece', from);
   const [rx, ry, rw, rh] = masterpiece.slice(1).map(Number);
   const backToHall = await doorAt(page, logs, 1, from);
+  const lure = await hungAt(page, logs, 'Frame', 'FrameA', from);
   await page.waitForTimeout(FADE_WAIT_MS);
-  const swaps = await tapUntil(page, logs, pointer, { x: rx + rw / 2, y: ry + rh / 2 }, /^\[Room\] Swapped/, 'the swap', GUARD_SAFE);
+  // The gallery: low round the right, tilt the far frame, step aside as the sentry comes, swap.
+  const swaps = await untilClean(page, logs, 'the swap', async (start, watch) => {
+    await pointer.tap(await pagePoint(page, lure.x - 80, 380, worldOffset(logs)));
+    await watch(/^\[Mime\] Arrived/, 'below the far frame');
+    await pointer.tap(await pagePoint(page, lure.x, lure.y, worldOffset(logs)));
+    await watch(/^\[Room\] Tilted the frame/, 'the tilt');
+    await pointer.tap(await pagePoint(page, lure.x + 20, 360, worldOffset(logs)));
+    await watch(/^\[Guard\] Guard now STRAIGHTEN/, 'the sentry at the frame');
+    await pointer.tap(await pagePoint(page, rx + rw / 2, ry + rh / 2, worldOffset(logs)));
+    await watch(/^\[Room\] Swapped/, 'the swap');
+  });
   from = logs.length;
   await tapUntil(page, logs, pointer, backToHall, arrived, 'the hall again');
   const toFoyer = await doorAt(page, logs, 0, from);
   await page.waitForTimeout(FADE_WAIT_MS);
-  from = logs.length;
-  await tapUntil(page, logs, pointer, toFoyer, arrived, 'the foyer again');
+  // Back through the hall: into the far portrait at once; out once the guard turns past it.
+  await untilClean(page, logs, 'the hall again', async (start, watch) => {
+    await pointer.tap(await pagePoint(page, far.x, far.y, worldOffset(logs)));
+    await watch(/^\[Room\] Hid in the portrait/, 'hiding in the hall again');
+    await watch(FAR_TURN, 'the hall guard\'s far turn again', GUARD_WAIT_MS);
+    await pointer.tap(await pagePoint(page, toFoyer.x, toFoyer.y, worldOffset(logs)));
+    await watch(arrived, 'the foyer again');
+  });
+  from = logs.findLastIndex((line) => arrived.test(line));
   const exit = await doorAt(page, logs, -1, from);
   await page.waitForTimeout(FADE_WAIT_MS);
   const exits = await tapUntil(page, logs, pointer, exit, /^\[Room\] Escaped/, 'the escape');

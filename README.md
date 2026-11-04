@@ -22,6 +22,7 @@ Google Chrome. Run from the repo root.
 - Validate (import, asset checks, project check, gameplay tests, bot replays): `tools/validate.sh`
 - Play one wing directly: `"$GODOT" --path afterhours -- --wing N`
 - Re-record every wing's bot run: `tools/record_wings.sh`
+- Replay and prove one wing's puzzles (every trick needed, the sketch route): `"$GODOT" --headless --path afterhours --fixed-fps 60 --script "$PWD/tools/bot.gd" -- --check res://data/wings/wing_NN.tres`
 - Regenerate audio: `python3 tools/sfx.py`, `python3 tools/music.py`, `python3 tools/voices.py`
   (VoiceStudio running), then `"$GODOT" --headless --path afterhours --import`
 - Release build (validate, web export, smoke test, zip): `tools/build_web.sh` → `build/afterhours.zip`

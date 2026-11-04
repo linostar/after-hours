@@ -290,6 +290,10 @@ func _ready() -> void:
 		print("[Room] Easel at %s" % easel.rect())
 	for door in doors:
 		print("[Room] Door to %d at %s" % [door.to_room, door.position])
+	for frame in _frames:
+		print("[Room] Frame %s at %s" % [frame.name, frame.position])
+	for portrait in _portraits:
+		print("[Room] Portrait %s at %s" % [portrait.name, portrait.position])
 
 
 ## The modulate that lifts a node out of the night to LIT_SHARE of its full brightness (the

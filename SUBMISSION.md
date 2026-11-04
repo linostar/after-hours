@@ -13,7 +13,7 @@ Everything between the two rules below is the public page; paste it as is.
 - **Embed options:** viewport 960 x 540, fullscreen button on, "SharedArrayBuffer support" off. Tick "Mobile friendly" and choose landscape orientation.
 - **Classification:** Game. Genre: Puzzle. Tags: stealth, heist, art, museum, painting, mime, no-text, mobile, touch, godot.
 - **Cover image:** `submission/cover.png` (630 x 500).
-- **Screenshots:** `submission/1-title.png` to `submission/12-unlock.png`, in that order (1920 x 1080, landscape).
+- **Screenshots:** `submission/1-title.png` to `submission/13-sketch.png`, in that order (1920 x 1080, landscape).
 - **Trailer / gameplay video:** `build/afterhours_demo.mp4` (27.8 s; itch takes a YouTube or Vimeo link, so upload it there first, or attach it to the jam post).
 - **Jam:** submit the page to the jam; it uses the optional theme "Great Works of Art" and the mandatory restriction "No Text".
 
@@ -25,14 +25,14 @@ Everything between the two rules below is the public page; paste it as is.
 
 A silent mime slips into a museum after dark with one plan: paint a forgery of each of six great masterpieces, hang the fake where the original was, and walk out with the real thing before anyone notices.
 
-Each wing of the museum is three rooms and one painting:
+Each wing of the museum is one painting and three to five rooms, growing longer and better guarded as you go (from three guards in the first wing to twelve in the finale):
 
 1. **Girl with a Pearl Earring** (Vermeer): a shaft of window light sweeps the room.
-2. **The Great Wave** (Hokusai): burst pipes gush in rhythm, and the puddles they leave are slow and loud underfoot.
-3. **A Sunday on La Grande Jatte** (Seurat): the dotted lawn keeps your footprints, and the guards follow them; parasols give shade.
-4. **The Starry Night** (Van Gogh): swirling stars sweep across the floor like searchlights.
-5. **The Garden of Earthly Delights** (Bosch): a triptych of three long rooms; the distance is the challenge.
-6. **Mona Lisa** (Leonardo): the finale under glass, where every earlier trick returns.
+2. **The Great Wave** (Hokusai): burst pipes gush in rhythm, and the puddles they leave are slow and loud underfoot; a splash calls a guard over.
+3. **A Sunday on La Grande Jatte** (Seurat): the dotted lawn keeps your footprints, and a parasol's shade hides you even under a guard's nose.
+4. **The Starry Night** (Van Gogh): swirling stars sweep across the floor like searchlights, and an observatory has a sentry at each of its two gates.
+5. **The Garden of Earthly Delights** (Bosch): an antechamber, then the triptych's three panels, and only the right frame pulls the right guard.
+6. **Mona Lisa** (Leonardo): five rooms of the Louvre after dark, the painting under glass, where every earlier trick returns.
 
 How you play:
 
@@ -42,9 +42,11 @@ How you play:
 - **Hide inside a portrait** and watch the room through the painting's own style. Guards pass you by, unless they saw you step in.
 - **Swap** the fake for the original and get out. Caught? You get tossed back to the room's entrance (still holding the painting).
 
-Each wing gives up to three stars: swap done, never seen, under par time. Stolen originals hang in your hideout, gold-framed for three stars, and come alive in their painting's style; from there you can watch a replay of a perfect run. A see-through "ghost" mime shows the way the first time through each wing.
+Every room is a small puzzle with one trick it needs: a sentry who never leaves his post until you lure him off, a corridor guard you can only let pass from inside a portrait, a crossing only shade can hide. Waiting alone never gets you through. A stopwatch and three icons in the corner show your time against par and what's left to do (paint, swap, escape), and each wing hides a red chalk sketch of its masterpiece for those who use the right frame or portrait.
 
-The guards are a bumbling pair (and later trio) with their own voices. They patrol, hear noises, straighten crooked frames, inspect suspicious paintings, search and chase. They run on classic game AI, not a language model, and play out the same way every time, so a plan that works once works again.
+Each wing gives up to three stars: swap done, never seen, under par time. Stolen originals hang in your hideout, gold-framed for three stars, and come alive in their painting's style, with every sketch you found pinned beside them; from there you can watch a replay of a perfect run. A see-through "ghost" mime shows the way the first time through each wing.
+
+The guards are a bumbling lot with their own voices, each carrying a lantern whose light is what he sees. They patrol, hear noises and go to look round, straighten crooked frames, inspect suspicious paintings, search and chase. They run on classic game AI, not a language model, and play out the same way every time, so a plan that works once works again.
 
 - **Controls:** touch or mouse (tap and drag). Keyboard: WASD or arrows to move, E to interact, Space to pause, and every menu works with arrow keys and Enter.
 - **Settings:** music, sound, reduced motion (no screen shake, a plain fade instead of the iris wipe) and Assist (one press paints a Good forgery).
@@ -52,7 +54,7 @@ The guards are a bumbling pair (and later trio) with their own voices. They patr
 
 ## The restriction: No Text
 
-There is no written word anywhere in the game: no menus, labels, tutorials, numbers or error messages. Scores are stars, par time is a clock icon, the tutorial is the ghost mime, and settings are icons. The only exception is the title logo, which the jam allows. The project ships no fonts at all, and a checker fails the build if any text node, font or drawn string appears in code or scenes. The guards talk, but nothing they say is needed: every line has an icon and a sound effect, so the game plays fully muted or in any language.
+There is no written word anywhere in the game: no menus, labels, tutorials, numbers or error messages. Scores are stars, par time is a stopwatch that fills toward a mark, the tutorial is the ghost mime, and settings are icons. The only exception is the title logo, which the jam allows. The project ships no fonts at all, and a checker fails the build if any text node, font or drawn string appears in code or scenes. The guards talk, but nothing they say is needed: every line has an icon and a sound effect, so the game plays fully muted or in any language.
 
 ## The theme: Great Works of Art
 
@@ -67,14 +69,14 @@ Six public-domain masterpieces are the levels, the puzzles and the reward. Each 
 
 After Hours was made with Claude (Anthropic), used through Claude Code, and the guards' voices were rendered locally with the OmniVoice text-to-speech model (k2-fsa/OmniVoice), run through VoiceStudio, an open-source local voice app. There are no asset packs and no other AI tools. Apart from the eleven public-domain paintings (six masterpieces and five decoys) and the engine, everything was made for this jam:
 
-- **Code:** about 7,100 lines of GDScript in Godot 4.7.1. Game rules (vision and suspicion, the guards' brain, forgery grading, stars, saves) are pure functions, separate from the scenes, so every rule can be tested.
-- **Art as code:** all 56 sprites, props, icons, floors and the logo are hand-written SVG (the mime and the guards are jointed rigs with a walk cycle), and 16 shaders give each painting its style: Vermeer's window light, Hokusai's woodblock bands, Seurat's breathing dots, Van Gogh's swirling strokes, Bosch's varnish, Leonardo's sfumato smoke.
-- **Sound:** all 35 sound effects are synthesised by a Python synthesiser Claude wrote. Nothing is sampled.
+- **Code:** about 8,400 lines of GDScript in Godot 4.7.1. Game rules (vision and suspicion, the guards' brain, forgery grading, stars, saves) are pure functions, separate from the scenes, so every rule can be tested.
+- **Art as code:** all 65 sprites, props, icons, sketches, floors and the logo are hand-written SVG, every room's walls, lamps and lighting are drawn in code in its painting's style, (the mime and the guards are jointed rigs with a walk cycle), and 18 shaders give each painting its style: Vermeer's window light, Hokusai's woodblock bands, Seurat's breathing dots, Van Gogh's swirling strokes, Bosch's varnish, Leonardo's sfumato smoke.
+- **Sound:** all 42 sound effects are synthesised by a Python synthesiser Claude wrote. Nothing is sampled.
 - **Music:** eight loops composed around one original caper motif and rendered by a Python synthesiser Claude wrote: a jazzy caper for the lobby and a loop for each wing in its painting's era (harpsichord for Vermeer, koto for Hokusai, music-hall accordion for Seurat, swirling strings for Van Gogh, shawm and tabor for Bosch, lute for Leonardo).
 - **Voices:** Claude wrote the guards' lines and described two voices (a weary watchman and a jumpy rookie); OmniVoice designed the voices from those descriptions (no cloned voices) and rendered the 32 lines. A script checks each line by transcribing it back with VoiceStudio's built-in speech recogniser, retrying any take that doesn't say its text.
-- **Level design with a playtest bot:** Claude designed each wing from a written brief, and a bot plays it through simulated touches like a player would, painting included. When it can't get through unseen, the log shows who spotted it where; the layout is fixed and the bot runs again. Every wing is proven beatable with all three stars, and the bot's runs become the ghost-mime tutorial and the hideout replays.
+- **Level design with a playtest bot:** Claude designed each wing from a written brief, and a bot plays it through simulated touches like a player would, painting included. When it can't get through unseen, the log shows who spotted it where; the layout is fixed and the bot runs again. The bot also proves every room's trick is needed: it replays the run without the trick, waiting any time from 0 to 16 seconds, and the run must get the mime seen or caught. Every wing is proven beatable with all three stars, its sketch reachable, and the bot's runs become the ghost-mime tutorial and the hideout replays.
 - **Guard AI (no language model):** a utility-scoring brain picks each guard's intent (patrol, investigate, straighten, inspect, search, chase) from what it sees and hears. It's deterministic and runs offline.
-- **Quality:** 111 automated gameplay tests (about 1,650 checks), the playtest bot on every wing, a project checker that enforces the No Text rule, touch-first input and the no-flashing rule (with 18 test projects proving each check fires), and browser tests of the web build on desktop and an emulated phone. The cover, screenshots and gameplay video were captured from the real game by scripts.
+- **Quality:** 114 automated gameplay tests (about 1,960 checks), the playtest bot on every wing, a project checker that enforces the No Text rule, touch-first input and the no-flashing rule (with 18 test projects proving each check fires), and browser tests of the web build on desktop and an emulated phone. The cover, screenshots and gameplay video were captured from the real game by scripts.
 
 ## Content
 

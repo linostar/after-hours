@@ -2,16 +2,13 @@
 
 ## Depth pass (feat/polish-depth)
 - Four rooms: an antechamber, then the triptych's three panels (Eden, the Garden, Hell); 9 guards.
-  Each room needs one trick (bot ablation).
-- Room 0, the antechamber (new; easel, exit low left): trick **lure**. A sentry paces before the door
-  to Eden; a frame tilted at the far end pulls him off.
-- Room 1, Eden: trick **hide**. The back-row guard turns at the far door.
-- Room 2, the Garden: trick **lure (choose the frame)**. Three guards; the nearest in earshot answers a
-  tilt, so only one frame pulls the guard who stands the way across.
-- Room 3, Hell (masterpiece): trick **hide**. The swap guard turns at the painting; the mime waits him
-  out inside the portrait beside it.
-- Sketch: inside the Garden's portrait.
-
+- Room 0, the antechamber (new): trick **frame lure** both ways at its gap's sentry.
+- Room 1, Eden: trick **hide** (the corridor).
+- Room 2, the Garden: trick **choose the frame**. The left frame pulls the guard by the back wall, the
+  next one the gap's sentry; on the way back the east frame pulls the sentry clear of the third guard.
+- Room 3, Hell: trick **lure** (a sentry on the swap spot, the far frame).
+- Sketch: inside the Garden's portrait, on the way back.
+- Bot result: not recorded yet; run `tools/record_wings.sh` (it records the waits, par time, ghost and sketch waits, then proves every trick needed).
 ## Constraints
 - Three linked rooms, the triptych: Eden, the Garden, Hell. Lengthened with more guards after the first playtest. 3 to 6 minutes; every star
   reachable (bot-proved).

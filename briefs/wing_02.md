@@ -1,15 +1,23 @@
 # Wing 2 brief: The Great Wave off Kanagawa (Hokusai)
 
 ## Depth pass (feat/polish-depth)
-- Three rooms, 5 guards. Each room past the print room's crossing needs one trick (bot ablation).
-- Room 0, the print room (easel, exit): trick **puddle lure**. A sentry paces before the right door;
-  wading through the puddle on the far side splashes, and he comes to look while the mime slips past.
-- Room 1, the hall: trick **hide**. One guard walks the back row to the far door and turns back; the
-  lower floor is closed off; the mime hides in the portrait as he passes.
-- Room 2, the gallery: trick **lure (choose the frame)**. Two guards; a tilt pulls only the nearest in
-  earshot, so the frame by the swap guard pulls him off and the other would pull the wrong one.
-- Sketch: behind the hall's spare frame (tilting it makes the noise too).
-
+- Three rooms, 5 guards.
+- Room 0, the print room: trick **puddle lure** on the way in, **frame lure** on the way out. A screen
+  divides the room floor to wall with one narrow gap a sentry paces. Wade the west puddle to splash
+  (he is nearest in earshot), step north out of his way, slip through the gap behind him; on the way
+  back tilt the east frame and slip west along the bottom, a shield screening the way. A second guard
+  keeps the exit.
+- Room 1, the hall: trick **hide** (the corridor). A burst pipe's puddle at the wall edge wets the
+  return path only at full size: its beat is timed so it is dry when the guard has passed.
+- Room 2, the gallery: trick **choose the frame**. The sentry paces the swap spot; the left frame is
+  nearer the left guard (it pulls him), the right one only the sentry's earshot.
+- Sketch: behind the hall's first frame (tilting it is a noise too); the sketch route hides in the
+  middle portrait as the guard comes back.
+- What the bot taught: a door-blocking sentry cannot stand at a door the mime returns through (he
+  restarts on its arrival point), so the choke moved mid-room; a splash must be at the puddle's
+  always-wet centre; a guard now looks round at a noise for INVESTIGATE_LOOK before going back.
+- Bot result: waits recorded (74.3 s, par 110, sketch route escapes); the puzzle proofs were not run
+  (the watchdog was raised after); re-record with `tools/record_wings.sh`.
 ## Constraints
 - Three rooms (lengthened from two after the first playtest); 3 to 6 minutes; every star reachable (bot-proved).
 - New idea: time. The player waits for the right moment instead of finding a hidden path.

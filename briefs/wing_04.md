@@ -8,16 +8,15 @@
   stepping-in, to the first guard within hearing range, who comes to look.
 
 ## Depth pass (feat/polish-depth)
-- Room 0, the terrace (easel, exit low left): trick **searchlight call**. A sentry paces before the right
-  door. The mime steps into a searchlight pool on the far side of the room on purpose; the sentry comes
-  to look, and the mime slips round him to the door.
-- Room 1, the hall: trick **hide**. A guard walks the back row to the far door and turns back; the
-  lower floor is closed off; the mime hides in the portrait as he passes.
-- Room 2, the observatory (new): trick **lure chain**. Two sentries stand the way across; one tilted
-  frame pulls the first, a second frame the other.
-- Room 3, the gallery (masterpiece): trick **hide**. The swap guard turns at the painting; the mime
-  waits him out inside the portrait beside it.
-- Sketch: behind the observatory's third frame, the one the route does not use.
+- Four rooms, 8 guards.
+- Room 0, the terrace: trick **searchlight call** on the way in (a still pool on the west side: stepping
+  in reveals the mime to the gap's sentry, who comes to look), **frame lure** on the way out.
+- Room 1, the hall: trick **hide** (the corridor); searchlights roam the walled-off floor.
+- Room 2, the observatory (new): trick **lure chain**. Two screens, a sentry in each gap; the frame
+  nearest each sentry pulls him (west and middle on the way in, east and middle on the way back).
+- Room 3, the gallery: trick **lure** (a sentry on the swap spot, the far frame).
+- Sketch: inside the hall's middle portrait.
+- Bot result: not recorded yet; run `tools/record_wings.sh` (it records the waits, par time, ghost and sketch waits, then proves every trick needed).
 
 ## History
 Re-recorded with guards turning smoothly (step 10): 63 plays; the run takes 63 s, par 95 s.

@@ -7,16 +7,17 @@
 - Each room past the salon's crossing needs one trick, proved by the bot's ablation.
 
 ## Depth pass (feat/polish-depth)
-- Room 0, the salon (easel, exit low left; window light and burst pipes): trick **puddle lure**. A sentry
-  paces before the right door; a splash in the far puddle calls him over.
-- Room 1, the gallery (burst pipes): trick **hide**. The back-row guard turns at the far door.
-- Room 2, the grande galerie (new; dotted parquet keeps footprints): trick **lure chain**. Two sentries;
-  a frame for each.
-- Room 3, the antechamber (new; searchlights): trick **searchlight call**. Three guards; a pool on the
-  far side calls the door sentry.
-- Room 4, the salle (the Mona Lisa under glass; window light and searchlights): trick **hide**. Three
-  guards; the swap guard turns at the case and the mime waits inside the portrait.
-- Sketch: behind the grande galerie's spare frame.
+- Five rooms, 12 guards; the Louvre after dark (red damask, gilt, marble; no starry sky).
+- Room 0, the salon (window light, burst pipes): trick **puddle lure** in, **frame lure** out (the
+  print room's gap).
+- Room 1, the gallery (burst pipes): trick **hide** (the corridor).
+- Room 2, the grande galerie (new; window light): trick **lure chain** (two gaps, a sentry in each, a
+  third guard below).
+- Room 3, the antechamber (new; searchlights): trick **searchlight call** in, **frame lure** out.
+- Room 4, the salle (the Mona Lisa under glass; footprints, searchlights): trick **lure** (a sentry on
+  the swap spot, the far frame).
+- Sketch: inside the gallery's middle portrait.
+- Bot result: not recorded yet; run `tools/record_wings.sh` (it records the waits, par time, ghost and sketch waits, then proves every trick needed).
 
 ## History
 Re-recorded with guards turning smoothly (step 10): 59 plays; the run takes 61.8 s, par 95 s.
