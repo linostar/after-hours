@@ -77,9 +77,18 @@ const ESCAPE_HOLD := 0.3
 ## The museum after dark: a CanvasModulate tints the whole room moonlit blue. What gives
 ## light (the guards' cones and eyes, the easel's glow, the gimmicks' lamps, windows and
 ## pools: GLOW, an unshaded material) and what the player reads or taps (the pause button,
-## the fake's icon, tap ripples) is drawn at full brightness, against the dark.
-const NIGHT := Color(0.44, 0.49, 0.76)
+## the fake's icon, tap ripples) is drawn at full brightness, against the dark. The
+## picture lights (RoomLights) pick out what the player uses, drawn at LIT_SHARE of full
+## brightness (lit_boost: the paintings, frames and portraits, the masterpiece, the doors,
+## the easel, the carried painting); the characters draw through RIG_NIGHT (as bright, with
+## a moonlit rim), so all of them read in the darkest corner.
+const NIGHT := Color(0.26, 0.29, 0.52)
+const LIT_SHARE := 0.88
 const GLOW := preload("res://art/glow.tres")
+const RIG_NIGHT := preload("res://shaders/rig_night.gdshader")
+## The lights' washes sit over the wall and floor, under the paintings and everything on
+## the floor (their lamps draw over the frames).
+const LIGHTS_Z := -5
 
 ## The par time for the third star, in seconds.
 @export var par_time := 45.0
@@ -130,6 +139,8 @@ var ghost: GhostMime
 ## In a replay (WingRun.replaying), the room the bot went to after this stay (-1: the end).
 var _replay_next := -1
 var _escape_beat: Tween
+## The characters' night material (RIG_NIGHT), shared by every rig in the room.
+var _rig_night: ShaderMaterial
 ## The tweens the escape beat started (the slip, the fade, the door's swing).
 var _escape_parts: Array[Tween] = []
 ## Seconds until the mime's next footstep on noisy floor can make a noise.
@@ -235,6 +246,7 @@ func _ready() -> void:
 			_portraits.append(child)
 		else:
 			_game.report_error("Room '%s': Portraits child '%s' is a %s, not a HidingPortrait" % [scene_file_path, child.name, child.get_class()])
+	_light_the_room()
 	_canvas.watchers = guards
 	_canvas.painted.connect(_on_painted)
 	if fake_hung:
@@ -261,6 +273,43 @@ func _ready() -> void:
 		print("[Room] Easel at %s" % easel.rect())
 	for door in doors:
 		print("[Room] Door to %d at %s" % [door.to_room, door.position])
+
+
+## The modulate that lifts a node out of the night to LIT_SHARE of its full brightness (the
+## CanvasModulate multiplies it back down).
+static func lit_boost() -> Color:
+	return Color(LIT_SHARE / NIGHT.r, LIT_SHARE / NIGHT.g, LIT_SHARE / NIGHT.b)
+
+
+## Lights the room after dark: the picture lights over every painting, the boost on what the
+## player uses, the night material on every character's rig.
+func _light_the_room() -> void:
+	var boost := lit_boost()
+	var lights := RoomLights.new()
+	lights.name = "Lights"
+	lights.z_index = LIGHTS_Z
+	add_child(lights)
+	var paintings: Array[Rect2] = []
+	for frame in _frames:
+		paintings.append(frame.rect())
+		frame.modulate = boost
+	for portrait in _portraits:
+		paintings.append(portrait.rect())
+		portrait.modulate = boost
+	if masterpiece != null:
+		paintings.append(painting_rect())
+		masterpiece.modulate = boost
+	lights.paintings = paintings
+	for door in doors:
+		door.modulate = boost
+	if easel != null:
+		easel.modulate = boost
+	mime.carried_light = boost
+	_rig_night = ShaderMaterial.new()
+	_rig_night.shader = RIG_NIGHT
+	mime.rig.material = _rig_night
+	for each in guards:
+		each.rig.material = _rig_night
 
 
 ## This room as a one-room wing (when it is loaded on its own): its own painting, ghost
@@ -296,6 +345,7 @@ func _add_ghost(visit: int) -> void:
 	ghost.samples = samples
 	ghost.period = replay["period"]
 	$Actors.add_child(ghost)
+	ghost.rig.material = _rig_night
 	print("[Room] Ghost mime replays visit %d of room %d (%d samples)" % [visit + 1, run.room, samples.size()])
 
 

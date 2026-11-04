@@ -1798,9 +1798,27 @@ func _test_room_at_night() -> void:
 		return
 	var night := room.get_node_or_null("Night") as CanvasModulate
 	_check(night != null and night.color == Room.NIGHT, name, "the room has no night tint")
-	for path: String in ["PauseButton", "FakeIcon", "Actors/Guard", "Actors/Guard/Cone"]:
+	for path: String in ["PauseButton", "FakeIcon", "Actors/Guard", "Actors/Guard/Cone", "Hud"]:
 		var item := room.get_node(path) as CanvasItem
-		_check(item.material == Room.GLOW, name, "%s is not lit against the night" % path)
+		_check(item.material is CanvasItemMaterial and (item.material as CanvasItemMaterial).light_mode == CanvasItemMaterial.LIGHT_MODE_UNSHADED, name, "%s is not lit against the night" % path)
+	# The cone is the lantern's light: added over the floor, through the light texture.
+	var cone := room.get_node("Actors/Guard/Cone") as Polygon2D
+	_check((cone.material as CanvasItemMaterial).blend_mode == CanvasItemMaterial.BLEND_MODE_ADD and cone.texture == Guard.CONE_LIGHT and cone.uv.size() == cone.polygon.size(), name, "the cone is not the lantern's added light")
+	_check(room.guard.rig.find_child("Lantern", true, false) is Sprite2D, name, "the guard carries no lantern")
+	# What the player uses is lifted out of the dark; the characters draw through the night material.
+	var lights := room.get_node_or_null("Lights") as RoomLights
+	var painting_count := room.get_node("Frames").get_child_count() + room.get_node("Portraits").get_child_count() + (1 if room.masterpiece != null else 0)
+	_check(lights != null and lights.paintings.size() == painting_count, name, "not every painting has its picture light")
+	var boosted: Array[CanvasItem] = [room.masterpiece, room.easel]
+	boosted.append_array(room.doors)
+	boosted.append_array(room.get_node("Frames").get_children())
+	boosted.append_array(room.get_node("Portraits").get_children())
+	for item in boosted:
+		_check(item.modulate.is_equal_approx(Room.lit_boost()), name, "%s is not picked out of the night" % item.name)
+	var night_lit := Room.lit_boost() * Room.NIGHT
+	_check(is_equal_approx(night_lit.r, Room.LIT_SHARE) and is_equal_approx(night_lit.b, Room.LIT_SHARE), name, "the boost does not cancel the night to LIT_SHARE")
+	for rig: CharacterRig in [room.mime.rig, room.guard.rig]:
+		_check(rig.material is ShaderMaterial and (rig.material as ShaderMaterial).shader == Room.RIG_NIGHT and rig.get_children().all(func(part: Node) -> bool: return not part is Sprite2D or (part as CanvasItem).use_parent_material), name, "%s does not draw through the night material" % rig.get_parent().name)
 	for wing: String in Content.WINGS:
 		var first := (load((load(wing) as WingData).rooms[0]) as PackedScene).instantiate()
 		var lefts := 0
@@ -2792,10 +2810,10 @@ func _test_room_easel_paints_fake() -> void:
 	_check(not glow.visible and not canvas.visible, name, "after painting the easel still glows or the canvas stays open")
 	_check(Forgery.grade(room.fake_quality) == Forgery.Grade.PERFECT, name, "an exact trace of the room's painting graded %s (%.2f)" % [Forgery.Grade.keys()[Forgery.grade(room.fake_quality)], room.fake_quality])
 	var carried := room.mime.get_node("Carried") as FramedPainting
-	_check(carried.visible and carried.modulate == Mime.FAKE_TINT, name, "the carried fake does not show, tinted")
+	_check(carried.visible and carried.modulate.is_equal_approx(Mime.FAKE_TINT * room.mime.carried_light), name, "the carried fake does not show, tinted")
 	await _tap_at(room.painting_rect().get_center())
 	_check(await _wait_until(func() -> bool: return room.mime.carrying, 900), name, "the fake never swapped for the original")
-	_check(not room.mime.has_fake and carried.modulate == Color.WHITE, name, "after the swap the mime still has the fake, or the original shows tinted")
+	_check(not room.mime.has_fake and carried.modulate.is_equal_approx(room.mime.carried_light), name, "after the swap the mime still has the fake, or the original shows tinted")
 	await _tap_at(room.easel.rect().get_center())
 	_check(not room.paint_intent, name, "carrying the original, a tap on the easel meant paint")
 

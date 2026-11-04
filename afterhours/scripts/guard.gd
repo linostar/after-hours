@@ -61,8 +61,19 @@ const CONE_HALF_ANGLE := PI * 32.0 / 180.0
 const CONE_RAYS := 24
 ## Physics layers that block sight (walls, partitions).
 const SIGHT_MASK := 1
-const CONE_COLOR := Color(1.0, 0.92, 0.55, 0.26)
-const CONE_ALERT_COLOR := Color(1.0, 0.35, 0.25, 0.3)
+## The cone is the lantern's light on the floor: these colours added over the dark room
+## through CONE_LIGHT (brightest at the guard, its edge still clear at CONE_RANGE).
+const CONE_COLOR := Color(1.0, 0.82, 0.45, 0.42)
+const CONE_ALERT_COLOR := Color(1.0, 0.3, 0.2, 0.48)
+const CONE_LIGHT := preload("res://art/light_cone.tres")
+const LIGHT_POOL := preload("res://art/light_pool.tres")
+const LIGHT_ADD := preload("res://art/light_add.tres")
+const GLOW := preload("res://art/glow.tres")
+const LANTERN := preload("res://art/svg/lantern.svg")
+## The lantern's halo: its colour and diameter (forearm-local units, SVG units at
+## CharacterRig.ART_SCALE).
+const LANTERN_HALO := Color(1.0, 0.8, 0.4, 0.55)
+const LANTERN_HALO_SIZE := 110.0
 ## The suspicion eye, drawn above the head (guard-local).
 const EYE_CENTER := Vector2(0, -116)
 const EYE_SIZE := Vector2(22, 12)
@@ -155,6 +166,28 @@ var _pause := 0.0
 @onready var _icon: Sprite2D = $IntentIcon
 ## Its drawing: faces where it looks and strides as it walks.
 @onready var rig: CharacterRig = $Rig
+
+
+## The lantern in its near hand (drawn bright, with a warm halo): its light is the cone.
+func _ready() -> void:
+	_cone.texture = CONE_LIGHT
+	_cone.material = LIGHT_ADD
+	var lantern := Sprite2D.new()
+	lantern.name = "Lantern"
+	lantern.texture = LANTERN
+	lantern.centered = false
+	lantern.offset = Vector2(-LANTERN.get_width() / 2.0, 0.0)
+	lantern.material = GLOW
+	var halo := Sprite2D.new()
+	halo.name = "Halo"
+	halo.texture = LIGHT_POOL
+	halo.material = LIGHT_ADD
+	halo.modulate = LANTERN_HALO
+	halo.position = Vector2(0.0, LANTERN.get_height() * 0.5)
+	halo.scale = Vector2.ONE * LANTERN_HALO_SIZE / LIGHT_POOL.get_width()
+	halo.show_behind_parent = true
+	lantern.add_child(halo)
+	rig.hold(lantern)
 
 
 ## Back to the start of the route, calm, facing its first leg, its senses cleared. A
@@ -503,6 +536,12 @@ func _update_cone() -> void:
 		var hit := space.intersect_ray(PhysicsRayQueryParameters2D.create(global_position, end, SIGHT_MASK))
 		points.append(to_local(hit["position"] if not hit.is_empty() else end))
 	_cone.polygon = points
+	# The light texture is centred on the guard: CONE_RANGE out is the texture's edge.
+	var uv := PackedVector2Array()
+	var half := CONE_LIGHT.get_width() / 2.0
+	for point in points:
+		uv.append(Vector2.ONE * half + point * (half / CONE_RANGE))
+	_cone.uv = uv
 	_cone.color = cone_color(suspicion, intent == GuardBrain.Intent.CHASE or intent == GuardBrain.Intent.SEARCH)
 
 

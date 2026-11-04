@@ -45,6 +45,13 @@ var walking := false
 var busy := false
 ## The room's gimmick (null for none): how fast it walks where it stands.
 var gimmick: Gimmick
+## How bright the carried painting draws (a room after dark lifts it out of the night:
+## Room.lit_boost); its tint (FAKE_TINT for the fake) on top.
+var carried_light := Color.WHITE:
+	set(value):
+		carried_light = value
+		if is_node_ready():
+			_sync_carried()
 var swap_progress := 0.0:
 	set(value):
 		swap_progress = value
@@ -192,7 +199,7 @@ func _squash_tween() -> void:
 
 func _sync_carried() -> void:
 	_carried.visible = carrying or has_fake
-	_carried.modulate = Color.WHITE if carrying else FAKE_TINT
+	_carried.modulate = (Color.WHITE if carrying else FAKE_TINT) * carried_light
 
 
 # The room nudges the mime from its own _physics_process, which runs before this one (the
