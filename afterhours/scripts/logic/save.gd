@@ -59,6 +59,16 @@ static func parse(text: String, problems: Array[String]) -> Dictionary:
 	return data
 
 
+## What an escape from wing `id` with `stars` after `time` seconds beats, before it is
+## recorded: {"stars": more stars than the best, "time": faster than the best}. A first
+## escape beats no record (both false: there was none to beat).
+static func improvement(data: Dictionary, id: String, stars: Array[bool], time: float) -> Dictionary:
+	var best: Dictionary = data["wings"].get(id, {})
+	if best.is_empty():
+		return {"stars": false, "time": false}
+	return {"stars": Stars.count(stars) > best["stars"], "time": time < best["time"]}
+
+
 ## Keeps an escape from wing `id` with `stars` (Stars.Star order) after `time` seconds:
 ## the best star count and the best time, each on its own. Returns whether either improved.
 static func record(data: Dictionary, id: String, stars: Array[bool], time: float) -> bool:

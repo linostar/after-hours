@@ -21,8 +21,8 @@ extends Node2D
 ##   (saw_hiding): then it chases to the hiding place and pulls it out, until the target
 ##   steps out again.
 ## The room's gimmick (Gimmick.light_at) scales how fast suspicion fills; in its shade the
-## guard cannot see the mime. It walks the room's navmesh (Agent). The cone is drawn on the floor (red while it
-## chases or searches), the suspicion as an eye above its head that fills and reddens, and
+## guard cannot see the mime. It walks the room's navmesh (Agent). The cone is drawn on the floor (warming with
+## suspicion, red while it chases or searches; cone_color), the suspicion as an eye above its head that fills and reddens, and
 ## the intent as an icon above that (INTENT_ICONS; none while patrolling) that pops in
 ## when the intent changes.
 
@@ -36,6 +36,8 @@ const NOISE_EXPLAINED := 40.0
 const CHASE_SPEED := 150.0
 ## How close a chasing guard must get to catch the mime.
 const CATCH_REACH := 28.0
+## How long a guard that caught the mime dusts off its hands (the toss's reset cuts it short).
+const DUST_TIME := 1.4
 const INSPECT_TIME := 1.2
 const SEARCH_TIME := 4.0
 ## How fast a searching guard turns to look around (radians per second).
@@ -48,8 +50,10 @@ const TURN_IN_PLACE := PI / 6.0
 ## A chase re-plans its path only once the mime has moved this far from the path's goal.
 const CHASE_REPATH := 8.0
 ## Seconds the guard stands at each waypoint, still facing the leg it walked, before it
-## turns to the next one (it always faces the way it walks).
+## turns to the next one (it always faces the way it walks); it fidgets through the pause,
+## FIDGETS in turn by waypoint (cut short when anything else takes its attention).
 const WAYPOINT_PAUSE := 0.8
+const FIDGETS: Array[CharacterRig.Fidget] = [CharacterRig.Fidget.STRETCH, CharacterRig.Fidget.WATCH, CharacterRig.Fidget.YAWN]
 const CONE_RANGE := 180.0
 ## 32 degrees either side of the facing.
 const CONE_HALF_ANGLE := PI * 32.0 / 180.0
@@ -167,6 +171,7 @@ func reset() -> void:
 	_straighten_frame = null
 	_straighten_left = 0.0
 	senses = GuardBrain.Senses.new()
+	rig.start_fidget(CharacterRig.Fidget.NONE, 0.0)
 	intent = GuardBrain.Intent.PATROL
 	_show_intent()
 	active = true
@@ -290,6 +295,7 @@ func _show_intent() -> void:
 func _leave(left: GuardBrain.Intent) -> void:
 	if left == GuardBrain.Intent.PATROL:
 		_returning = true
+		rig.start_fidget(CharacterRig.Fidget.NONE, 0.0)
 	if left == GuardBrain.Intent.INSPECT and inspecting:
 		# Cut short: it does not count, and the fake can be inspected again.
 		inspecting = false
@@ -367,6 +373,7 @@ func _patrol(delta: float) -> void:
 		print("[Guard] %s reaches waypoint %d at %s" % [name, _next, goal.round()])
 		_next = (_next + 1) % route.size()
 		_pause = WAYPOINT_PAUSE
+		rig.start_fidget(FIDGETS[_next % FIDGETS.size()], WAYPOINT_PAUSE)
 
 
 func _chase(delta: float) -> void:
@@ -378,6 +385,9 @@ func _chase(delta: float) -> void:
 		active = false
 		print("[Guard] %s catches the mime at %s" % [name, target.global_position.round()])
 		say(&"caught")
+		# Job done: it dusts off its hands while the mime flies (the room's reset ends it).
+		rig.start_fidget(CharacterRig.Fidget.DUST, DUST_TIME)
+		Audio.play_for(self, &"dust_hands")
 		caught.emit()
 
 
@@ -493,8 +503,14 @@ func _update_cone() -> void:
 		var hit := space.intersect_ray(PhysicsRayQueryParameters2D.create(global_position, end, SIGHT_MASK))
 		points.append(to_local(hit["position"] if not hit.is_empty() else end))
 	_cone.polygon = points
-	var alert := intent == GuardBrain.Intent.CHASE or intent == GuardBrain.Intent.SEARCH
-	_cone.color = CONE_ALERT_COLOR if alert else CONE_COLOR.lerp(CONE_ALERT_COLOR, suspicion)
+	_cone.color = cone_color(suspicion, intent == GuardBrain.Intent.CHASE or intent == GuardBrain.Intent.SEARCH)
+
+
+## The cone's colour: calm at no suspicion, warming smoothly toward the alert red as
+## `cone_suspicion` rises (no step, so it never flashes), and red while `alert` (chasing or
+## searching).
+static func cone_color(cone_suspicion: float, alert: bool) -> Color:
+	return CONE_ALERT_COLOR if alert else CONE_COLOR.lerp(CONE_ALERT_COLOR, clampf(cone_suspicion, 0.0, 1.0))
 
 
 func _draw() -> void:

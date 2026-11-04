@@ -110,6 +110,7 @@ func _tests() -> Array[Callable]:
 		_test_detection_cone,
 		_test_detection_suspicion,
 		_test_detection_light,
+		_test_cone_warms_with_suspicion,
 		_test_stars,
 		_test_save_shape,
 		_test_save_load_write_and_corrupt,
@@ -118,6 +119,7 @@ func _tests() -> Array[Callable]:
 		_test_forgery_scoring,
 		_test_forgery_grades,
 		_test_paintings_registry,
+		_test_decoys_unique_per_wing,
 		_test_canvas_traces_and_grades,
 		_test_canvas_close_keeps_strokes,
 		_test_grade_badge_shows_each_wing,
@@ -161,6 +163,7 @@ func _tests() -> Array[Callable]:
 		_test_hub_settings,
 		_test_goto_missing_scene_reports,
 		_test_room_swap_and_escape,
+		_test_escape_beat_skips,
 		_test_room_swap_cancel_and_locked_exit,
 		_test_room_easel_paints_fake,
 		_test_room_catch_while_painting,
@@ -169,6 +172,8 @@ func _tests() -> Array[Callable]:
 		_test_good_and_perfect_fakes_pass,
 		_test_catch_cuts_inspection_short,
 		_test_results_buttons,
+		_test_new_best_detected,
+		_test_results_celebrate,
 		_test_guard_bad_route_reports,
 		_test_room_timer_waits_for_fade,
 		_test_mime_carrying_before_ready,
@@ -197,6 +202,7 @@ func _tests() -> Array[Callable]:
 		_test_guards_patrol_round_partitions,
 		_test_patrol_paths_clear_walls,
 		_test_rig_walk_cycle,
+		_test_rig_rest_life,
 		_test_rig_joints_bend,
 		_test_mime_faces_its_way,
 		_test_ghost_faces_travel,
@@ -279,6 +285,15 @@ func _test_title_arrives() -> void:
 	_check(_game.scene_paths[GameState.Flow.TITLE] == TITLE_PATH, name, "Game.scene_paths[TITLE] is not %s" % TITLE_PATH)
 	var frame := current_scene.get_node_or_null("Frame") as TextureRect
 	_check(frame != null and frame.texture != null and frame.is_visible_in_tree(), name, "the title's Frame art is missing or hidden")
+	# The museum at night behind it, the mime sneaking across; the play button's focus ring the
+	# theme's gilt glow (a round border, not the engine's white box).
+	var night := current_scene.get_node_or_null("Night") as TitleScene
+	var walked_from := night.mime.phase if night != null else 0.0
+	for i in 30:
+		await process_frame
+	_check(night != null and night.mime.phase != walked_from, name, "the title has no night scene with the mime sneaking across")
+	var focus := (current_scene.get_node("PlayButton") as Button).get_theme_stylebox("focus") as StyleBoxFlat
+	_check(focus != null and not focus.draw_center and focus.border_width_top > 0 and focus.border_color.r > 0.9 and focus.border_color.b < 0.5 and focus.corner_radius_top_left >= 64, name, "the play button's focus ring is not the round gilt glow (%s)" % focus)
 	_check(not _game.error_badge_visible(), name, "the error badge shows on a clean start (errors: %s)" % [_game.errors])
 
 
@@ -487,11 +502,11 @@ func _test_sfx_on_actions() -> void:
 	(room.get_node("PauseButton") as Button).pressed.emit()
 	room.pause_menu.resume()
 	_check(str(shout).begins_with("%s_chase_" % room.guard.voice), name, "the chasing guard did not shout: %s" % [_game.audio.said])
-	for id: StringName in [&"tiptoe", &"tilt", &"hide", &"unhide", &"swap", &"guard_alert", &"caught", &"toss", &"land", &"ui_tap", &"pause", &"resume"]:
+	for id: StringName in [&"tiptoe", &"tilt", &"hide", &"unhide", &"swap", &"guard_alert", &"caught", &"toss", &"splat", &"ui_tap", &"pause", &"resume"]:
 		_check(id in played, name, "%s did not sound; played %s" % [id, played])
 	played.clear()
 	room._escape()
-	await create_timer((Results.STAR_GAP + Results.POP_TIME) * 3.0 + 0.1).timeout
+	await create_timer(Room.escape_beat_time() + (Results.STAR_GAP + Results.POP_TIME) * 3.0 + 0.1).timeout
 	_check(played.count(&"escape") == 1 and played.count(&"star") + played.count(&"no_star") == 3, name, "the escape and its three stars did not sound once each: %s" % [played])
 	_check(_game.audio.music == "results", name, "the results play %s, not the results loop" % _game.audio.music)
 	# The swap and escape are this room's run's: the next room starts a fresh one. The
@@ -674,8 +689,11 @@ func _test_paintings_registry() -> void:
 	for entry: Dictionary in JSON.parse_string(FileAccess.get_file_as_string("res://art/scans/SOURCES.json")):
 		credited.append(StringName(entry["id"]))
 		_check(entry["file"] == "%s.webp" % entry["id"], name, "credit '%s' names file '%s'" % [entry["id"], entry["file"]])
-	_check(credited == Paintings.IDS, name, "SOURCES.json ids %s are not Paintings.IDS %s" % [credited, Paintings.IDS])
-	for id in Paintings.IDS:
+	_check(credited == Paintings.ALL, name, "SOURCES.json ids %s are not Paintings.ALL %s" % [credited, Paintings.ALL])
+	var all := Paintings.IDS.duplicate()
+	all.append_array(Paintings.DECOYS)
+	_check(Paintings.ALL == all, name, "Paintings.ALL is not the masterpieces then the decoys")
+	for id in Paintings.ALL:
 		_check(Paintings.SCANS.get(id) != null, name, "%s has no scan" % id)
 		var material := Paintings.style(id, true)
 		_check(material != null and material.shader == Paintings.STYLES[id] and material.get_shader_parameter(&"use_screen") == true, name, "%s's screen style is not its shader reading the screen" % id)
@@ -688,7 +706,29 @@ func _test_paintings_registry() -> void:
 		var listed: Array[StringName] = []
 		for id in hint.split(","):
 			listed.append(StringName(id))
-		_check(listed == Paintings.IDS, name, "%s's painting choices %s are not Paintings.IDS" % [script.resource_path, hint])
+		_check(listed == Paintings.ALL, name, "%s's painting choices %s are not Paintings.ALL" % [script.resource_path, hint])
+
+## Within a wing no decoy painting (a tilt frame's or a hiding portrait's) hangs twice, and
+## none is the wing's own masterpiece; every portrait's face sits inside its frame.
+func _test_decoys_unique_per_wing() -> void:
+	var name := "decoys_unique_per_wing"
+	for wing_path: String in Content.WINGS:
+		var wing := load(wing_path) as WingData
+		var hung: Array[String] = []
+		for room_path: String in wing.rooms:
+			var room := (load(room_path) as PackedScene).instantiate()
+			var decoys: Array[Node] = room.get_node("Frames").get_children()
+			decoys.append_array(room.get_node("Portraits").get_children())
+			for decoy in decoys:
+				var painting: String = decoy.get("painting")
+				_check(painting not in hung, name, "%s: %s hangs %s again" % [wing_path.get_file(), room_path.get_file(), painting])
+				_check(painting != wing.painting, name, "%s: %s hangs the wing's own masterpiece as a decoy" % [wing_path.get_file(), room_path.get_file()])
+				hung.append(painting)
+				if decoy is HidingPortrait:
+					var inside := Rect2(-HidingPortrait.SIZE / 2.0, HidingPortrait.SIZE).grow(-6.0)
+					_check(inside.has_point((decoy as HidingPortrait).face), name, "%s's portrait face %s is outside its frame" % [room_path.get_file(), (decoy as HidingPortrait).face])
+			room.free()
+
 
 ## A finger pressed at the first of `points` (canvas base units), dragged through the
 ## rest and lifted at the last, one event a frame.
@@ -1022,8 +1062,9 @@ func _test_glimpse_keeps_unseen_star() -> void:
 	_check(seen and room.guard.suspicion >= Detection.SEEN_AT and room.guard.suspicion < 1.0, name, "the mime was not counted as seen when the eye reached half (suspicion %.2f, seen %s)" % [room.guard.suspicion, room.ever_seen])
 
 
-## Seen in the open, the mime is caught and tossed to the entrance; taps are ignored
-## during the toss; then the guard restarts its route and the timer has kept running.
+## Seen in the open, the mime is caught and tossed to the entrance while the guard dusts off
+## its hands; taps are ignored during the toss; it lands flat and dizzy and recovers; then
+## the guard restarts its route and the timer has kept running.
 func _test_guard_sees_and_tosses() -> void:
 	var name := "guard_sees_and_tosses"
 	var room := await _load_room()
@@ -1037,6 +1078,8 @@ func _test_guard_sees_and_tosses() -> void:
 	_check(room.tossing and room.catches == 1, name, "a mime 100 units ahead in the open was not caught within 2 s (suspicion %.2f)" % room.guard.suspicion)
 	_check(room.ever_seen, name, "the room did not record that the mime was seen")
 	_check(not room.guard.active, name, "the guard keeps looking during the toss")
+	await physics_frame
+	_check(room.guard.rig.fidget == CharacterRig.Fidget.DUST and _game.audio.played.has(&"dust_hands"), name, "the catching guard does not dust off its hands (fidget %s, sounds %s)" % [room.guard.rig.fidget, _game.audio.played])
 	var caught_at := room.elapsed
 	await _tap_at(Vector2(600, 480))
 	_check(not room.mime.walking, name, "a tap during the toss started a walk")
@@ -1048,6 +1091,12 @@ func _test_guard_sees_and_tosses() -> void:
 	_check(room.mime.position == room.entrance and room.mime.rotation == 0.0, name, "after the toss the mime is at %s (rotation %f), not upright at the entrance" % [room.mime.position, room.mime.rotation])
 	_check(room.guard.active and room.guard.suspicion == 0.0 and room.guard.position == room.guard.route[0], name, "the guard was not reset to its route's start, calm")
 	_check(room.elapsed - caught_at >= Room.TOSS_SHAKE + Room.TOSS_FLIGHT - 0.05, name, "the timer stopped during the toss (%.2f s passed)" % (room.elapsed - caught_at))
+	# The landing is slapstick: flattened and seeing stars, then back to itself.
+	_check(room.mime.rig.squash.y < 0.8 and room.mime.dizzy_left > 0.0, name, "the mime did not land flat and dizzy (squash %s, dizzy %.2f)" % [room.mime.rig.squash, room.mime.dizzy_left])
+	_check(room.guard.rig.fidget == CharacterRig.Fidget.NONE, name, "the reset guard still dusts its hands")
+	for i in ceili(Mime.DIZZY_TIME * 60.0) + 2:
+		await physics_frame
+	_check(room.mime.rig.squash.is_equal_approx(Vector2.ONE) and room.mime.dizzy_left == 0.0, name, "the mime did not recover from the splat (squash %s, dizzy %.2f)" % [room.mime.rig.squash, room.mime.dizzy_left])
 
 
 ## The partition blocks sight: a mime behind it within range is never seen, while the
@@ -1670,15 +1719,17 @@ func _test_juice_on_actions() -> void:
 	var ripple := room.get_node_or_null("TapRipple") as TapRipple
 	_check(ripple != null and ripple.position.is_equal_approx(target), name, "a floor tap left no ripple where it landed")
 	var bobbed := false
+	# Breathing at rest moves the body by at most this (its hips kept still): a bob is more.
+	var breath := -room.mime.rig.hip.y * CharacterRig.BREATH_DEPTH
 	for i in 20:
 		await physics_frame
 		await process_frame
-		bobbed = bobbed or room.get_node("Actors/Mime/Rig/Body").position.y != 0.0
+		bobbed = bobbed or absf(room.get_node("Actors/Mime/Rig/Body").position.y) > breath
 	_check(bobbed, name, "the walking mime does not bob")
 	await _walk_trace(room.mime, 300)
 	for i in 6:
 		await process_frame
-	_check(room.get_node("Actors/Mime/Rig/Body").position.y == 0.0, name, "the mime still bobs standing still")
+	_check(room.mime.rig.stride == 0.0 and absf(room.get_node("Actors/Mime/Rig/Body").position.y) <= breath + 0.001, name, "the mime still bobs standing still")
 	_check(room.get_node_or_null("TapRipple") == null, name, "the ripple outlived its %.2f s" % TapRipple.LIFE)
 	var pause_button := room.get_node("PauseButton") as Button
 	pause_button.button_down.emit()
@@ -1976,6 +2027,70 @@ func _test_rig_walk_cycle() -> void:
 	rig.free()
 
 
+## At rest a rig lives: the mime's starts its invisible-wall gag (once, with gag_started) only
+## after gag_after idle and drops it the moment it walks; busy (not idle) it never gags; the
+## body breathes (still under Reduce Motion) and the eyes blink now and then (never from
+## behind). A guard fidgets through its waypoint pause and stops when it walks on.
+func _test_rig_rest_life() -> void:
+	var name := "rig_rest_life"
+	const DT := 1.0 / 60.0
+	var rig := (load("res://scenes/rig_mime.tscn") as PackedScene).instantiate() as CharacterRig
+	root.add_child(rig)
+	var gags := [0]
+	rig.gag_started.connect(func() -> void: gags[0] += 1)
+	var arm := rig.get_node("Arm0") as Sprite2D
+	var body := rig.get_node("Body") as Sprite2D
+	var heights: Array[float] = []
+	var blinks := 0
+	# A full blink cycle, busy (no gag yet).
+	for i in ceili(60.0 / CharacterRig.BLINK_HZ) + 1:
+		rig.walk(0.0, DT, false)
+		heights.append(body.scale.y)
+		if rig.blinking():
+			blinks += 1
+	_check(heights.max() - heights.min() > CharacterRig.BREATH_DEPTH / CharacterRig.ART_SCALE, name, "the resting body did not breathe (scale %.4f..%.4f)" % [heights.min(), heights.max()])
+	var expected_blinks := roundi(CharacterRig.BLINK_TIME * 60.0)
+	_check(blinks >= expected_blinks - 1 and blinks <= expected_blinks + 1, name, "%d blinking frames in one %.1f s blink cycle, not about %d" % [blinks, 1.0 / CharacterRig.BLINK_HZ, expected_blinks])
+	for i in roundi((rig.gag_after - 0.1) * 60.0):
+		rig.walk(0.0, DT)
+	_check(not rig.gagging and gags[0] == 0, name, "the mime gagged before gag_after %.1f s idle" % rig.gag_after)
+	for i in 30:
+		rig.walk(0.0, DT)
+	_check(rig.gagging and gags[0] == 1 and arm.rotation > 0.3, name, "after gag_after idle the mime is not at the invisible wall (gagging %s, %d starts, arm %.2f)" % [rig.gagging, gags[0], arm.rotation])
+	rig.walk(rig.step_length / 10.0, DT)
+	_check(not rig.gagging and rig.rest == 0.0, name, "walking did not stop the gag at once")
+	for i in roundi((rig.gag_after + 1.0) * 60.0):
+		rig.walk(0.0, DT, false)
+	_check(not rig.gagging and gags[0] == 1, name, "a busy mime gagged")
+	rig.face(Vector2.UP)
+	var back_blinks := 0
+	for i in roundi(2.0 / CharacterRig.BLINK_HZ * 60.0):
+		rig.walk(0.0, DT, false)
+		if rig.blinking():
+			back_blinks += 1
+	_check(back_blinks == 0, name, "the back view blinked")
+	var was := _game.setting("reduce_motion")
+	_game.set_setting("reduce_motion", true)
+	heights.clear()
+	for i in 120:
+		rig.walk(0.0, DT, false)
+		heights.append(body.scale.y)
+	_check(is_equal_approx(heights.min(), heights.max()), name, "under Reduce Motion the body still breathes")
+	_game.set_setting("reduce_motion", was)
+	rig.free()
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.target = null
+	var corner := room.guard.route[1]
+	var reached := await _wait_until(func() -> bool: return room.guard.position == corner, 600)
+	var expected := Guard.FIDGETS[2 % Guard.FIDGETS.size()]
+	_check(reached and room.guard.rig.fidget == expected, name, "at its waypoint the guard does not fidget %s (reached %s, fidget %s)" % [expected, reached, room.guard.rig.fidget])
+	var walked_on := await _wait_until(func() -> bool: return room.guard.position != corner, 240)
+	await physics_frame
+	_check(walked_on and room.guard.rig.fidget == CharacterRig.Fidget.NONE, name, "the guard still fidgets after walking on (fidget %s)" % room.guard.rig.fidget)
+
+
 ## Every limb of both rigs is two parts at a joint (upper arm and forearm, thigh and shin),
 ## drawn from SVGs imported at ART_SCALE; walking bends (or, front and back, foreshortens)
 ## every knee and elbow in every view (front, back, side, mirrored left), and standing still
@@ -2100,18 +2215,19 @@ func _test_no_flash_rates() -> void:
 			shaders += 1
 			_check(float(found.get_string(2)) < LIMIT_HZ, name, "%s's %s is %s" % [file, found.get_string(1), found.get_string(2)])
 	_check(shaders >= 7, name, "found only %d shader speeds (the regex no longer matches?)" % shaders)
-	# Every gimmick's decorative rate (a *_HZ constant: drips, splashes, foam, flow, motes,
-	# the glass's glint).
+	# Every repeating rate in a script (a *_HZ constant: the gimmicks' drips, splashes, foam,
+	# flow, motes and glint; the rigs' breath, blink and pat; the logo's sway).
 	var rates := 0
-	for file in DirAccess.get_files_at("res://scripts/gimmicks"):
-		if not file.ends_with(".gd"):
-			continue
-		var constants := (load("res://scripts/gimmicks/" + file) as Script).get_script_constant_map()
-		for constant: String in constants:
-			if constant.ends_with("_HZ"):
-				rates += 1
-				_check(float(constants[constant]) < LIMIT_HZ, name, "%s's %s is %s Hz" % [file, constant, constants[constant]])
-	_check(rates >= 6, name, "found only %d gimmick decoration rates" % rates)
+	for folder: String in ["res://scripts", "res://scripts/gimmicks", "res://scripts/ui"]:
+		for file in DirAccess.get_files_at(folder):
+			if not file.ends_with(".gd"):
+				continue
+			var constants := (load(folder.path_join(file)) as Script).get_script_constant_map()
+			for constant: String in constants:
+				if constant.ends_with("_HZ"):
+					rates += 1
+					_check(float(constants[constant]) < LIMIT_HZ, name, "%s's %s is %s Hz" % [file, constant, constants[constant]])
+	_check(rates >= 10, name, "found only %d repeating rates" % rates)
 	var gimmicks := 0
 	for wing_path in Content.WINGS:
 		for room_path: String in (load(wing_path) as WingData).rooms:
@@ -2263,8 +2379,20 @@ func _test_hub_doors_unlock_and_enter() -> void:
 	hub = current_scene as Hub
 	_check(hub.wing_doors[0].finished and hub.wing_doors[0].stars == 2 and hub.wing_doors[1].open and not hub.wing_doors[2].open, name, "after wing 1 its door does not show 2 stars and open wing 2 only")
 	_check(hub.mime.position.distance_to(hub.wing_doors[0].position + Hub.BACK_FROM_WING) <= 1.0, name, "back from wing 1 the mime is at %s, not in front of its door" % hub.mime.position)
+	# Wing 2 just opened: its door plays the unlock once (chains off, painting bright), then
+	# a later visit shows it plain open.
+	_check(hub.wing_doors[1].unlocking and _game.just_unlocked == -1, name, "wing 2's door did not start its unlock beat (or the flag was kept)")
+	var unlocked := await _wait_until(func() -> bool: return not hub.wing_doors[1].unlocking, ceili((WingDoor.UNLOCK_DELAY + WingDoor.UNLOCK_TIME) * 60.0) + 20)
+	_check(unlocked and _game.audio.played.has(&"chains_fall"), name, "wing 2's unlock beat did not finish with its sound")
+	_game.goto(GameState.Flow.HIDEOUT)
+	await _wait_until(func() -> bool: return current_scene is Hideout and not _game.is_transitioning(), 120)
+	_game.goto(GameState.Flow.HUB)
+	await _wait_until(func() -> bool: return current_scene is Hub and not _game.is_transitioning(), 120)
+	hub = current_scene as Hub
+	_check(hub.wing_doors[1].open and not hub.wing_doors.any(func(door: WingDoor) -> bool: return door.unlocking), name, "a later visit played an unlock again")
 	_game.run = null
 	_game.save = Save.defaults()
+	_game.just_unlocked = -1
 	DirAccess.remove_absolute(_game.save_path)
 	_game.scene_paths[GameState.Flow.ROOM] = ROOM_PATH
 
@@ -2283,6 +2411,8 @@ func _test_hideout_replays_ghost() -> void:
 	var replay := current_scene.get_node_or_null("Replay1") as Button
 	_check(replay != null and replay.size.x >= 44.0 and replay.size.y >= 44.0 and not replay.accessibility_name.is_empty(), name, "wing 1's original has no 44x44 named replay button")
 	_check(current_scene.get_node_or_null("Replay2") == null, name, "an unrobbed wing offers a replay")
+	_check(replay != null and HideoutDecor.plaque_rect(0).encloses(replay.get_rect()), name, "wing 1's replay button is not on its frame's plaque")
+	_check((current_scene.get_node("Decor") as HideoutDecor).stolen == ([true, false, false, false, false, false] as Array[bool]), name, "the lair's plaques do not show which originals were stolen")
 	if replay == null:
 		_game.save = Save.defaults()
 		return
@@ -2477,7 +2607,11 @@ func _test_room_swap_and_escape() -> void:
 	_check(escaped, name, "the mime never escaped (at %s)" % room.mime.position)
 	_check(room.stars == [true, true, true], name, "an unseen escape at %.1f s earned %s" % [room.elapsed, room.stars])
 	var results := room.get_node("ResultsLayer/Results") as Results
-	_check(results.visible, name, "the results overlay is hidden after the escape")
+	# The escape beat first: the beret tipped, the slip out, the door shut; then the results.
+	await physics_frame
+	_check(room.escaping and not results.visible and room.mime.rig.fidget == CharacterRig.Fidget.TIP, name, "the escape went straight to the results without its beat (escaping %s, fidget %s)" % [room.escaping, room.mime.rig.fidget])
+	var shown := await _wait_until(func() -> bool: return results.visible, ceili(Room.escape_beat_time() * 60.0) + 10)
+	_check(shown and not room.escaping and room.exit_door.shut == 1.0 and not room.exit_door.glowing and room.mime.rig.modulate.a == 0.0, name, "after the beat the results are not shown over a shut door with the mime gone (shown %s, shut %.2f, mime alpha %.2f)" % [shown, room.exit_door.shut, room.mime.rig.modulate.a])
 	# Every star has popped in by 3 x (STAR_GAP + POP_TIME), each gold as earned.
 	for i in ceili(3.0 * (Results.STAR_GAP + Results.POP_TIME) * 60.0) + 6:
 		await physics_frame
@@ -2488,6 +2622,41 @@ func _test_room_swap_and_escape() -> void:
 	for i in 30:
 		await physics_frame
 	_check(room.elapsed == finished_at, name, "the timer kept running after the escape")
+
+
+## A tap (or E) during the escape beat skips it: the results show at once, the door shut (its
+## glow out) and the mime gone; the stars were already recorded. Skipped mid-swing, the door's
+## thud sounds once and nothing of the beat plays late.
+func _test_escape_beat_skips() -> void:
+	var name := "escape_beat_skips"
+	for by_key: bool in [false, true]:
+		var room := await _load_room()
+		if room == null:
+			return
+		room.guard.active = false
+		room.mime.carrying = true
+		room._escape()
+		var results := room.get_node("ResultsLayer/Results") as Results
+		await physics_frame
+		_check(room.escaping and not results.visible, name, "the escape beat did not start")
+		if by_key:
+			room._keys.interacted.emit()
+		else:
+			await _tap_at(Vector2(480, 400))
+		_check(not room.escaping and results.visible and room.exit_door.shut == 1.0 and room.mime.rig.modulate.a == 0.0, name, "a %s did not skip the escape beat to the results" % ("key" if by_key else "tap"))
+		_check(room.stars.size() == 3, name, "the skipped escape has no stars")
+	# Skipped mid-swing: the door's thud sounds once, then nothing of the beat plays late.
+	var swinging := await _load_room()
+	if swinging == null:
+		return
+	swinging.guard.active = false
+	swinging.mime.carrying = true
+	swinging._escape()
+	await _wait_until(func() -> bool: return swinging.exit_door.shut > 0.2, ceili(Room.escape_beat_time() * 60.0))
+	_game.audio.played.clear()
+	await _tap_at(Vector2(480, 400))
+	await create_timer(Door.SHUT_TIME + 0.1).timeout
+	_check(_game.audio.played.count(&"door") == 1 and swinging.exit_door.shut == 1.0 and not swinging.exit_door.glowing, name, "a skip mid-swing did not shut the door with one thud and its glow out (sounds %s)" % [_game.audio.played])
 
 
 ## Tapping away mid-swap cancels it; the exit does nothing without the original.
@@ -2712,6 +2881,44 @@ func _test_results_buttons() -> void:
 	await _tap_control(results.get_node("Panel/HomeButton") as Button)
 	await _wait_until(func() -> bool: return not _game.is_transitioning(), 120)
 	_check(current_scene is Hub and _game.state == GameState.Flow.HUB, name, "home did not return to the hub")
+
+
+## An escape beats a best only against a record: a first escape beats none; then more stars
+## beat the stars and a faster time the time, each on its own.
+func _test_new_best_detected() -> void:
+	var name := "new_best_detected"
+	var data := Save.defaults()
+	var two: Array[bool] = [true, true, false]
+	var three: Array[bool] = [true, true, true]
+	_check(Save.improvement(data, "wing_01", three, 30.0) == {"stars": false, "time": false}, name, "a first escape beat a record")
+	Save.record(data, "wing_01", two, 40.0)
+	_check(Save.improvement(data, "wing_01", three, 50.0) == {"stars": true, "time": false}, name, "more stars, slower, did not beat only the stars")
+	_check(Save.improvement(data, "wing_01", two, 30.0) == {"stars": false, "time": true}, name, "the same stars, faster, did not beat only the time")
+	_check(Save.improvement(data, "wing_01", two, 40.0) == {"stars": false, "time": false}, name, "a tie beat a best")
+
+
+## A three-star result bursts into confetti while the mime bows; a rosette pops in for each
+## best beaten (by the stars, on the clock); fewer stars and no best show neither.
+func _test_results_celebrate() -> void:
+	var name := "results_celebrate"
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.active = false
+	var results := room.get_node("ResultsLayer/Results") as Results
+	var wait := (Results.STAR_GAP + Results.POP_TIME) * 3.0 + Results.STAR_GAP * 3.0 + 0.2
+	results.present([true, true, false] as Array[bool])
+	await create_timer(wait).timeout
+	_check(not results.confetti.playing() and results.mime.fidget == CharacterRig.Fidget.NONE and not results.stars_best.visible and not results.time_best.visible, name, "two stars and no best still celebrated")
+	results.present([true, true, true] as Array[bool], {"stars": true, "time": false})
+	await create_timer(wait).timeout
+	_check(results.confetti.playing() and results.mime.fidget == CharacterRig.Fidget.BOW and _game.audio.played.has(&"confetti"), name, "three stars did not burst into confetti with a bow")
+	_check(results.stars_best.visible and results.stars_best.scale.is_equal_approx(Vector2.ONE) and not results.time_best.visible, name, "a new best star count did not pin its rosette by the stars alone")
+	results.present([true, true, true] as Array[bool], {"stars": false, "time": true})
+	await create_timer(wait).timeout
+	_check(results.time_best.visible and not results.stars_best.visible, name, "a new best time did not pin its rosette on the clock alone")
+	await create_timer(Confetti.LIFE).timeout
+	_check(not results.confetti.playing(), name, "the confetti outlived its %.1f s" % Confetti.LIFE)
 
 
 ## A route the guard cannot patrol (under 2 points) is reported through the error badge.
@@ -2991,6 +3198,25 @@ func _test_detection_light() -> void:
 	var bright := Detection.suspicion_after(0.0, true, 0.0, 180.0, 0.1, 2.0)
 	_check(is_equal_approx(bright, lit * 2.0), name, "light 2 filled %.3f, not twice %.3f" % [bright, lit])
 	_check(is_equal_approx(Detection.suspicion_after(0.5, true, 0.0, 180.0, 0.1, 0.0), 0.5 - Detection.DRAIN * 0.1), name, "a seen mime in shade did not drain like an unseen one")
+
+
+## The cone warms from calm toward the alert red with suspicion, step by small step (no
+## flash), and is red while alert; a guard's drawn cone follows its suspicion.
+func _test_cone_warms_with_suspicion() -> void:
+	var name := "cone_warms_with_suspicion"
+	_check(Guard.cone_color(0.0, false).is_equal_approx(Guard.CONE_COLOR), name, "a calm cone is not CONE_COLOR")
+	_check(Guard.cone_color(1.0, false).is_equal_approx(Guard.CONE_ALERT_COLOR) and Guard.cone_color(0.0, true) == Guard.CONE_ALERT_COLOR, name, "a full or alert cone is not CONE_ALERT_COLOR")
+	var before := Guard.cone_color(0.0, false)
+	for i in range(1, 21):
+		var color := Guard.cone_color(i / 20.0, false)
+		_check(color.g < before.g and absf(color.get_luminance() - before.get_luminance()) < 0.05, name, "the cone at suspicion %.2f did not warm a small step (%s after %s)" % [i / 20.0, color, before])
+		before = color
+	var room := await _load_room()
+	room.guard.suspicion = 0.5
+	await physics_frame
+	await physics_frame
+	var cone := room.guard.get_node("Cone") as Polygon2D
+	_check(cone.color.is_equal_approx(Guard.cone_color(room.guard.suspicion, false)), name, "the drawn cone %s does not follow suspicion %.2f" % [cone.color, room.guard.suspicion])
 
 
 ## The slice room with a TestGimmick (named Gimmick) added before it enters the tree.

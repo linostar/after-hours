@@ -53,10 +53,7 @@ func forget() -> void:
 ## Whether purely decorative motion is stilled (the Reduce Motion setting). Gameplay timing
 ## (lights moving, pipes gushing) never is; only flourishes drawn on top of it.
 func reduce_motion() -> bool:
-	if not is_inside_tree():
-		return false
-	var game := get_node_or_null(GameState.AUTOLOAD_PATH) as GameState
-	return game != null and game.setting("reduce_motion")
+	return GameState.reduce_motion_for(self)
 
 
 ## The clock decoration is drawn at: `time`, or 0 (still) under Reduce Motion.

@@ -16,8 +16,8 @@ const SFX_PATH := "res://audio/sfx/%s.wav"
 const SFX_IDS: Array[StringName] = [
 	&"tiptoe", &"splash", &"pipe_burst", &"tilt", &"straighten", &"hide", &"unhide", &"brush",
 	&"dab", &"stroke_done", &"grade_perfect", &"grade_good", &"grade_sloppy", &"swap", &"door",
-	&"chain_rattle", &"caught", &"toss", &"land", &"guard_hear", &"guard_suspect", &"guard_alert",
-	&"guard_lost", &"fake_found", &"searchlight", &"escape", &"shrug", &"star",
+	&"chain_rattle", &"chains_fall", &"caught", &"toss", &"splat", &"dust_hands", &"guard_hear", &"guard_suspect", &"guard_alert",
+	&"guard_lost", &"fake_found", &"searchlight", &"escape", &"shrug", &"mime_gag", &"confetti", &"new_best", &"star",
 	&"no_star", &"ui_tap", &"toggle_on", &"toggle_off", &"pause", &"resume", &"error",
 ]
 const SFX_BUS := &"SFX"

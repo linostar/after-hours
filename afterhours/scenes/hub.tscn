@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://scripts/hub.gd" id="1_hub"]
 [ext_resource type="PackedScene" path="res://scenes/mime.tscn" id="2_mime"]
@@ -7,6 +7,8 @@
 [ext_resource type="PackedScene" path="res://scenes/door.tscn" id="5_door"]
 [ext_resource type="Texture2D" path="res://art/svg/icon_gear.svg" id="6_gear"]
 [ext_resource type="PackedScene" path="res://scenes/settings_menu.tscn" id="7_settings"]
+[ext_resource type="Texture2D" path="res://art/svg/floor_lobby.svg" id="8_floor"]
+[ext_resource type="Script" path="res://scripts/hub_decor.gd" id="9_decor"]
 
 [sub_resource type="NavigationPolygon" id="NavigationPolygon_floor"]
 outlines = Array[PackedVector2Array]([PackedVector2Array(32, 172, 928, 172, 928, 508, 32, 508)])
@@ -30,13 +32,14 @@ polygon = PackedVector2Array(0, 130, 960, 130, 960, 170, 0, 170)
 
 [node name="Floor" type="Polygon2D" parent="."]
 z_index = -10
-color = Color(0.55, 0.5, 0.45, 1)
+color = Color(0.82, 0.8, 0.84, 1)
+texture_repeat = 2
+texture = ExtResource("8_floor")
 polygon = PackedVector2Array(0, 170, 960, 170, 960, 540, 0, 540)
 
-[node name="Runner" type="Polygon2D" parent="."]
+[node name="Decor" type="Node2D" parent="."]
 z_index = -9
-color = Color(0.45, 0.12, 0.14, 1)
-polygon = PackedVector2Array(420, 540, 540, 540, 540, 230, 420, 230)
+script = ExtResource("9_decor")
 
 [node name="Navigation" type="NavigationRegion2D" parent="."]
 navigation_polygon = SubResource("NavigationPolygon_floor")
@@ -50,6 +53,7 @@ position = Vector2(480, 470)
 position = Vector2(45, 400)
 opening = Rect2(-45, -40, 24, 80)
 arrival = Vector2(60, 0)
+secret = true
 
 [node name="Actors" type="Node2D" parent="."]
 y_sort_enabled = true

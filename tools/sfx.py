@@ -302,6 +302,18 @@ def fx_chain_rattle(rng):
     return buf
 
 
+def fx_chains_fall(rng):
+    """A wing unlocking: the chains slithering off in a falling jangle, the padlock's clunk on
+    the floor and its little bounce, then a bright note: open."""
+    buf = []
+    for k in range(10):
+        place(buf, ping(rng.uniform(2600, 1500) - k * 60.0, 0.12, 30.0, STEEL), k * 0.04 + rng.uniform(0, 0.012), rng.uniform(0.5, 1.0) * (1.0 - k * 0.05))
+    place(buf, knock(rng, 150.0, 0.1), 0.5, 1.2)
+    place(buf, knock(rng, 170.0, 0.08), 0.68, 0.6)
+    place(buf, ping(note_hz(F6), 0.6, 6.0, VIBES), 0.8, 0.5)
+    return buf
+
+
 def fx_caught(rng):
     """A guard grabbing the mime: a cartoon bonk with a springy boing."""
     n = int(0.45 * RATE)
@@ -316,9 +328,17 @@ def fx_toss(rng):
     return [s * e for s, e in zip(oscillate(lerp_curve([(0, 600), (0.55, 1500), (1, 700)], n), sine), envelope(n, 0.02, 0.1))]
 
 
-def fx_land(rng):
-    """The mime landing after the toss: a soft bump."""
-    return mix((thump(120.0, 0.14, 0.8, 26.0), 0, 1.0), (noise(0.06, rng, [(0, 1500), (1, 400)], decay=50.0), 0, 0.3))
+def fx_splat(rng):
+    """The mime landing flat after the toss: a wet squelch of falling noise over a soft bump,
+    then a little springy wobble as it peels itself up."""
+    return mix((thump(95.0, 0.18, 1.0, 16.0), 0, 1.0),
+               (noise(0.16, rng, [(0, 2400), (1, 300)], decay=14.0), 0.0, 0.5),
+               (sweep(330.0, 520.0, 0.22, sine, 0.01, 0.12), 0.16, 0.25))
+
+
+def fx_dust_hands(rng):
+    """A guard dusting off its hands after a catch: three dry brushes of noise, each quieter."""
+    return mix(*[(highpassed(noise(0.07, rng, [(0, 5000), (1, 2500)], decay=30.0)), 0.13 * k, 1.0 - 0.25 * k) for k in range(3)])
 
 
 def fx_guard_hear(rng):
@@ -368,6 +388,23 @@ def fx_escape(rng):
 def fx_shrug(rng):
     """The mime shrugging (E with nothing in reach): two muted plucks, down and back up."""
     return arpeggio([C5, A4, C5], 0.09, 0.14, 16.0, PIZZ)
+
+
+def fx_mime_gag(rng):
+    """The mime's invisible wall: two soft squeaks of palms rubbed on glass, the second higher."""
+    return mix((sweep(1500.0, 1900.0, 0.09, triangle, 0.01, 0.04), 0, 1.0),
+               (sweep(1700.0, 2200.0, 0.09, triangle, 0.01, 0.04), 0.22, 0.8))
+
+
+def fx_confetti(rng):
+    """A three-star burst: a party popper's pop, then a sparkle of bells running down."""
+    pop = mix((thump(160.0, 0.08, 0.5, 40.0), 0, 1.0), (highpassed(noise(0.05, rng, [(0, 7000), (1, 3000)], decay=60.0)), 0, 0.8))
+    return mix((pop, 0, 1.0), (arpeggio([27, 24, F6, C6, A5], 0.06, 0.25, 14.0, BELL), 0.06, 0.5))
+
+
+def fx_new_best(rng):
+    """A new best's rosette: a short vibraphone ta-da up a fourth."""
+    return arpeggio([C6, F6], 0.1, 0.5, 8.0, VIBES)
 
 
 def fx_star(rng):
@@ -435,9 +472,11 @@ EFFECTS = {
     "swap": (fx_swap, 0.51, "event"),
     "door": (fx_door, 0.44, "event"),
     "chain_rattle": (fx_chain_rattle, 0.39, "event"),
+    "chains_fall": (fx_chains_fall, 0.45, "event"),
     "caught": (fx_caught, 0.44, "stinger"),
     "toss": (fx_toss, 0.15, "event"),
-    "land": (fx_land, 0.41, "event"),
+    "splat": (fx_splat, 0.41, "event"),
+    "dust_hands": (fx_dust_hands, 0.3, "event"),
     "guard_hear": (fx_guard_hear, 0.25, "event"),
     "guard_suspect": (fx_guard_suspect, 0.37, "event"),
     "guard_alert": (fx_guard_alert, 0.49, "stinger"),
@@ -448,6 +487,9 @@ EFFECTS = {
     "star": (fx_star, 0.42, "stinger"),
     "no_star": (fx_no_star, 0.57, "event"),
     "shrug": (fx_shrug, 0.4, "ui"),
+    "mime_gag": (fx_mime_gag, 0.12, "quiet"),
+    "confetti": (fx_confetti, 0.55, "stinger"),
+    "new_best": (fx_new_best, 0.4, "stinger"),
     "ui_tap": (fx_ui_tap, 0.42, "ui"),
     "toggle_on": (fx_toggle_on, 0.26, "ui"),
     "toggle_off": (fx_toggle_off, 0.25, "ui"),

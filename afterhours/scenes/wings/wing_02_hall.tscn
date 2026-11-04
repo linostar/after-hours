@@ -37,12 +37,12 @@ painting = "earthly_delights"
 
 [node name="FrameB" parent="Frames" instance=ExtResource("frame")]
 position = Vector2(700, 75)
-painting = "mona_lisa"
+painting = "impression_sunrise"
 
 [node name="PortraitA" parent="Portraits" instance=ExtResource("portrait")]
 position = Vector2(470, 105)
-painting = "mona_lisa"
-face = Vector2(0, -24)
+painting = "van_gogh_self"
+face = Vector2(5, -12)
 
 [node name="Partition0" type="StaticBody2D" parent="Actors"]
 position = Vector2(300, 400)
@@ -75,3 +75,21 @@ arrival = Vector2(60, 0)
 [node name="ToLast" parent="Doors" instance=ExtResource("door")]
 position = Vector2(925, 330)
 to_room = 2
+
+[node name="Rope" type="StaticBody2D" parent="Actors"]
+position = Vector2(160, 500)
+script = ExtResource("partition")
+style = 2
+prop = 3
+width = 110.0
+depth = 10.0
+height = 34.0
+
+[node name="Plinth" type="StaticBody2D" parent="Actors"]
+position = Vector2(170, 280)
+script = ExtResource("partition")
+style = 2
+prop = 2
+width = 34.0
+depth = 28.0
+height = 56.0

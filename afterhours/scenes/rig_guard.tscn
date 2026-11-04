@@ -38,3 +38,7 @@ elbow_bend = 0.3
 lean = 0.04
 sway = 1.4
 elbow_lag = 0.3
+eyes_front = PackedVector2Array(23, 25.8, 33, 25.8)
+eyes_side = PackedVector2Array(35.6, 27.2)
+eye_radius = Vector2(1.6, 1.6)
+lid_color = Color(0.91, 0.725, 0.561, 1)

@@ -21,6 +21,19 @@ const RING_FILL := Color(0.95, 0.85, 0.4)
 ## twice, over SHRUG_TIME.
 const SHRUG_SCALE := Vector2(1.14, 0.88)
 const SHRUG_TIME := 0.4
+## Landing from a toss (splat): flattened to SPLAT_SCALE for SPLAT_HOLD, springing back over SPLAT_TIME,
+## with DIZZY_STARS small stars circling above its head at DIZZY_HZ for DIZZY_TIME (they hold
+## still under Reduce Motion).
+const SPLAT_SCALE := Vector2(1.45, 0.5)
+const SPLAT_HOLD := 0.2
+const SPLAT_TIME := 0.5
+const DIZZY_TIME := 1.6
+const DIZZY_HZ := 0.9
+const DIZZY_STARS := 3
+const DIZZY_CENTER := Vector2(0, -104)
+const DIZZY_ORBIT := Vector2(22, 7)
+const DIZZY_STAR_SIZE := 12.0
+const STAR := preload("res://art/svg/star.svg")
 ## The carried painting's tint while it is the fake.
 const FAKE_TINT := Color(1.0, 0.95, 0.85, 0.75)
 
@@ -28,6 +41,8 @@ const FAKE_TINT := Color(1.0, 0.95, 0.85, 0.75)
 signal arrived(at: Vector2)
 
 var walking := false
+## Busy using something (painting, swapping, tossed): it stands without the idle gag.
+var busy := false
 ## The room's gimmick (null for none): how fast it walks where it stands.
 var gimmick: Gimmick
 var swap_progress := 0.0:
@@ -61,13 +76,18 @@ var _tiptoes := 0
 ## Distance moved this physics frame (path walk and nudges), and whether a nudge moved it.
 var _moved := 0.0
 var _nudged := false
-var _shrug: Tween
+## The squash tween (shrug, splat): one at a time.
+var _squash: Tween
+## Seconds of dizzy stars left after a splat.
+var dizzy_left := 0.0
+var _dizzy_clock := 0.0
 
 
 func _ready() -> void:
 	_carried.painting = painting
 	_sync_carried()
 	rig.stepped.connect(_on_step)
+	rig.gag_started.connect(_on_gag)
 
 
 ## Walks to the navmesh point closest to `point`.
@@ -119,14 +139,55 @@ func face_toward(point: Vector2) -> void:
 
 ## Shrugs with a sound: E found nothing in reach to use.
 func shrug() -> void:
-	if _shrug != null:
-		_shrug.kill()
-	_shrug = create_tween()
+	_squash_tween()
 	for i in 2:
-		_shrug.tween_property(rig, "squash", SHRUG_SCALE, SHRUG_TIME / 4.0)
-		_shrug.tween_property(rig, "squash", Vector2.ONE, SHRUG_TIME / 4.0)
+		_squash.tween_property(rig, "squash", SHRUG_SCALE, SHRUG_TIME / 4.0)
+		_squash.tween_property(rig, "squash", Vector2.ONE, SHRUG_TIME / 4.0)
 	Audio.play_for(self, &"shrug")
 	print("[Mime] Shrugged: nothing in reach")
+
+
+## Walks straight to `point` over `time` (the escape's slip through the doorway, off the
+## navmesh): the walk cycle runs on the distance as on a path walk. Returns its tween.
+func glide(point: Vector2, time: float) -> Tween:
+	walking = false
+	face_toward(point)
+	var tween := create_tween()
+	tween.tween_method(_glide_step.bind(position, point), 0.0, 1.0, time)
+	return tween
+
+
+func _glide_step(t: float, from: Vector2, to: Vector2) -> void:
+	var at := from.lerp(to, t)
+	_moved += position.distance_to(at)
+	position = at
+
+
+## Fades the drawing out over `time` (out of sight through the doorway). Returns its tween.
+func fade_out(time: float) -> Tween:
+	var tween := create_tween()
+	tween.tween_property(rig, "modulate:a", 0.0, time)
+	return tween
+
+
+## Lands flat from a toss: squashed, springing back, dizzy stars circling for DIZZY_TIME.
+func splat() -> void:
+	_squash_tween()
+	rig.squash = SPLAT_SCALE
+	_squash.tween_interval(SPLAT_HOLD)
+	# Under Reduce Motion it eases back without the wobble.
+	_squash.tween_property(rig, "squash", Vector2.ONE, SPLAT_TIME).set_trans(Tween.TRANS_QUAD if rig.reduce_motion() else Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+	dizzy_left = DIZZY_TIME
+	_dizzy_clock = 0.0
+	queue_redraw()
+	print("[Mime] Splat: seeing stars")
+
+
+## A fresh squash tween, the last one stopped.
+func _squash_tween() -> void:
+	if _squash != null:
+		_squash.kill()
+	_squash = create_tween()
 
 
 func _sync_carried() -> void:
@@ -148,7 +209,11 @@ func _physics_process(delta: float) -> void:
 			_moved += position.distance_to(to)
 			face(to - position)
 			position = to
-	rig.walk(_moved, delta)
+	rig.walk(_moved, delta, not busy)
+	if dizzy_left > 0.0:
+		dizzy_left = maxf(dizzy_left - delta, 0.0)
+		_dizzy_clock += delta
+		queue_redraw()
 	_moved = 0.0
 	_nudged = false
 
@@ -164,8 +229,28 @@ func _on_step() -> void:
 	Audio.play_for(self, &"tiptoe", 0.92 if _tiptoes % 2 == 0 else 1.08)
 
 
+## Stood idle long enough: the invisible wall, with its squeak of palms on glass.
+func _on_gag() -> void:
+	Audio.play_for(self, &"mime_gag")
+	print("[Mime] Idle: the invisible wall")
+
+
 func _draw() -> void:
+	if dizzy_left > 0.0:
+		_draw_dizzy()
 	if swap_progress <= 0.0:
 		return
 	draw_circle(RING_CENTER, RING_RADIUS + 3.0, RING_TRACK)
 	draw_arc(RING_CENTER, RING_RADIUS, -PI / 2.0, -PI / 2.0 + TAU * swap_progress, 32, RING_FILL, 5.0, true)
+
+
+## The dizzy stars on their flattened orbit above the head, fading out at the end; the far
+## half of the orbit drawn smaller.
+func _draw_dizzy() -> void:
+	var turn := 0.0 if rig.reduce_motion() else TAU * DIZZY_HZ * _dizzy_clock
+	var fade := clampf(dizzy_left / 0.3, 0.0, 1.0)
+	for i in DIZZY_STARS:
+		var angle := turn + TAU * i / DIZZY_STARS
+		var at := DIZZY_CENTER + Vector2(cos(angle) * DIZZY_ORBIT.x, sin(angle) * DIZZY_ORBIT.y)
+		var size := DIZZY_STAR_SIZE * (0.8 + 0.2 * sin(angle))
+		draw_texture_rect(STAR, Rect2(at - Vector2.ONE * size / 2.0, Vector2.ONE * size), false, Color(1, 1, 1, fade))

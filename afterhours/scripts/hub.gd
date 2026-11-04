@@ -31,6 +31,10 @@ var _target: Node2D
 
 func _ready() -> void:
 	($Navigation as NavigationRegion2D).bake_navigation_polygon(false)
+	var decor := $Decor as HubDecor
+	decor.doors = Content.WINGS.size()
+	decor.first_x = FIRST_DOOR_X
+	decor.gap = DOOR_GAP
 	var ids := Content.wing_ids()
 	var came_from := -1
 	for i in Content.WINGS.size():
@@ -47,10 +51,15 @@ func _ready() -> void:
 		door.open = wing != null and Save.unlocked(_game.save, ids, i)
 		door.finished = Save.finished(_game.save, ids[i])
 		door.stars = Save.stars_of(_game.save, ids[i])
+		# A wing a first escape just opened plays its unlock here, once.
+		door.unlocking = door.open and i == _game.just_unlocked
 		$Doors.add_child(door)
+		if door.unlocking:
+			door.unlock()
 		wing_doors.append(door)
 		if _game.run != null and _game.run.wing.resource_path == Content.WINGS[i]:
 			came_from = i
+	_game.just_unlocked = -1
 	hideout_door.glowing = not _game.save["wings"].is_empty()
 	var start := ($Entrance as Node2D).position
 	if _game.state == GameState.Flow.HIDEOUT:

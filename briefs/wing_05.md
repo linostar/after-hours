@@ -46,3 +46,4 @@ Lengthening pass (more guards; the wing already had three rooms):
 Re-recorded without the creatures (step 9): 8 plays; the run takes 30.55 s, par 80 s.
 Re-recorded at a person's painting pace (step 10): 8 plays; the run takes 50.6 s, par 80 s.
 Re-recorded with every walker keeping a body's width off the display walls (art pass), the Garden's third guard pacing sideways: 36 plays; the run takes 57.8 s, par 90 s.
+Re-recorded with the floor props (polish pass): 36 plays; the run takes 57.75 s, par 90 s.

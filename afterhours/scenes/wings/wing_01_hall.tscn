@@ -35,7 +35,7 @@ width = 120.0
 
 [node name="FrameA" parent="Frames" instance=ExtResource("frame")]
 position = Vector2(250, 75)
-painting = "great_wave"
+painting = "fighting_temeraire"
 
 [node name="FrameB" parent="Frames" instance=ExtResource("frame")]
 position = Vector2(720, 75)
@@ -43,8 +43,8 @@ painting = "starry_night"
 
 [node name="PortraitA" parent="Portraits" instance=ExtResource("portrait")]
 position = Vector2(880, 105)
-painting = "mona_lisa"
-face = Vector2(0, -24)
+painting = "castiglione"
+face = Vector2(10, -22)
 
 [node name="Partition0" type="StaticBody2D" parent="Actors"]
 position = Vector2(330, 330)
@@ -77,3 +77,12 @@ arrival = Vector2(60, 0)
 [node name="ToLast" parent="Doors" instance=ExtResource("door")]
 position = Vector2(925, 330)
 to_room = 2
+
+[node name="Plinth" type="StaticBody2D" parent="Actors"]
+position = Vector2(110, 500)
+script = ExtResource("partition")
+style = 1
+prop = 2
+width = 34.0
+depth = 28.0
+height = 56.0

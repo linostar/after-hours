@@ -33,11 +33,11 @@ period = 10.0
 
 [node name="FrameA" parent="Frames" instance=ExtResource("frame")]
 position = Vector2(260, 75)
-painting = "mona_lisa"
+painting = "fighting_temeraire"
 
 [node name="FrameB" parent="Frames" instance=ExtResource("frame")]
 position = Vector2(700, 75)
-painting = "grande_jatte"
+painting = "impression_sunrise"
 
 [node name="PortraitA" parent="Portraits" instance=ExtResource("portrait")]
 position = Vector2(480, 105)
@@ -67,3 +67,21 @@ arrival = Vector2(60, 0)
 [node name="ToLast" parent="Doors" instance=ExtResource("door")]
 position = Vector2(925, 330)
 to_room = 2
+
+[node name="Rope" type="StaticBody2D" parent="Actors"]
+position = Vector2(160, 500)
+script = ExtResource("partition")
+style = 4
+prop = 3
+width = 110.0
+depth = 10.0
+height = 34.0
+
+[node name="Plinth" type="StaticBody2D" parent="Actors"]
+position = Vector2(770, 500)
+script = ExtResource("partition")
+style = 4
+prop = 2
+width = 34.0
+depth = 28.0
+height = 56.0

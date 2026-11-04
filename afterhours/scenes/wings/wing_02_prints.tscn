@@ -34,7 +34,7 @@ beats = PackedVector2Array(9, 0, 10, 0.5)
 
 [node name="FrameA" parent="Frames" instance=ExtResource("frame")]
 position = Vector2(300, 75)
-painting = "pearl_earring"
+painting = "starry_night"
 
 [node name="PortraitA" parent="Portraits" instance=ExtResource("portrait")]
 position = Vector2(520, 105)
@@ -67,3 +67,12 @@ position = Vector2(45, 470)
 to_room = -1
 opening = Rect2(-45, -40, 24, 80)
 arrival = Vector2(60, 0)
+
+[node name="Plinth" type="StaticBody2D" parent="Actors"]
+position = Vector2(130, 280)
+script = ExtResource("partition")
+style = 2
+prop = 2
+width = 34.0
+depth = 28.0
+height = 56.0

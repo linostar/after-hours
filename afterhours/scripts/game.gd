@@ -28,6 +28,7 @@ const TOOL_SAVE_PATH := "user://tool_save.json"
 
 ## A pressed button dips to this scale and springs back over PRESS_TIME.
 const PRESS_SCALE := 0.9
+const FOCUS_RING := preload("res://art/focus_ring.tres")
 const PRESS_TIME := 0.14
 
 ## Emitted when a goto's fade-in has finished.
@@ -45,6 +46,9 @@ var scene_paths: Dictionary[Flow, String] = {
 var state := Flow.TITLE
 ## The wing being played (null before any; a room loaded on its own makes a one-room run).
 var run: WingRun
+## The wing (index in Content.WINGS) a first escape just unlocked, until the hub plays its
+## unlock beat (-1: none).
+var just_unlocked := -1
 ## Every error reported this run, oldest first.
 var errors: Array[String] = []
 ## While true, report_error logs with print instead of push_error, so a test that
@@ -177,15 +181,24 @@ func setting(key: String) -> bool:
 
 
 ## Records the run's escape (its stars and time) for its wing and writes the save when it
-## is a best. A run of a room loaded on its own (no wing file) is not recorded.
-func record_escape(stars: Array[bool], time: float) -> void:
+## is a best; returns what it beat (Save.improvement). A first escape from a wing unlocks
+## the next one (just_unlocked, for the hub's unlock beat). A run of a room loaded on its own (no
+## wing file) is not recorded and beats nothing.
+func record_escape(stars: Array[bool], time: float) -> Dictionary:
 	if run == null or run.wing.resource_path.is_empty():
 		print("[Game] Escape not recorded: the run has no wing file")
-		return
+		return {"stars": false, "time": false}
 	var id := Content.wing_id(run.wing.resource_path)
+	var beaten := Save.improvement(save, id, stars, time)
+	var first := not Save.finished(save, id)
 	if Save.record(save, id, stars, time):
 		print("[Game] New best for %s: %d star(s), %.2f s" % [id, Save.stars_of(save, id), save["wings"][id]["time"]])
 		write_save()
+	var index := Content.WINGS.find(run.wing.resource_path)
+	if first and index >= 0 and index + 1 < Content.WINGS.size():
+		just_unlocked = index + 1
+		print("[Game] Wing %d unlocked" % (just_unlocked + 1))
+	return beaten
 
 
 ## Grows the desktop window to WINDOW_SCREEN_SHARE of the usable screen at 16:9 and centres
@@ -291,6 +304,15 @@ func punch(zoom: float, seconds: float) -> void:
 	_punch_left = seconds
 
 
+## Whether Reduce Motion is on, for a node that has no Game handle (a rig, a gimmick, a
+## decoration); a node outside the tree (a test's loose one) moves.
+static func reduce_motion_for(node: Node) -> bool:
+	if not node.is_inside_tree():
+		return false
+	var game := node.get_node_or_null(AUTOLOAD_PATH) as GameState
+	return game != null and game.setting("reduce_motion")
+
+
 ## Whether a shake or a punch is moving the world.
 func jolting() -> bool:
 	return _shake_left > 0.0 or _punch_left > 0.0
@@ -304,11 +326,14 @@ func _process(delta: float) -> void:
 	_place_world()
 
 
-## Every button dips when pressed (touch, click or key), whatever screen it is on.
+## Every button dips when pressed (touch, click or key), whatever screen it is on, and
+## shows keyboard focus as FOCUS_RING, a round gilt glow round its gilt-ringed icon (not
+## the engine's white box).
 func _on_node_added(node: Node) -> void:
 	var button := node as BaseButton
 	if button != null:
 		button.button_down.connect(_press.bind(button))
+		button.add_theme_stylebox_override(&"focus", FOCUS_RING)
 
 
 func _press(button: BaseButton) -> void:

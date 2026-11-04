@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://scripts/results.gd" id="1_results"]
 [ext_resource type="Texture2D" path="res://art/svg/icon_replay.svg" id="2_replay"]
@@ -7,6 +7,9 @@
 [ext_resource type="Texture2D" path="res://art/svg/icon_unseen.svg" id="5_unseen"]
 [ext_resource type="Texture2D" path="res://art/svg/icon_clock.svg" id="6_clock"]
 [ext_resource type="Texture2D" path="res://art/svg/icon_home.svg" id="7_home"]
+[ext_resource type="Texture2D" path="res://art/svg/rosette.svg" id="8_rosette"]
+[ext_resource type="PackedScene" path="res://scenes/rig_mime.tscn" id="9_mime"]
+[ext_resource type="Script" path="res://scripts/confetti.gd" id="10_confetti"]
 
 [node name="Results" type="Control"]
 layout_mode = 3
@@ -132,3 +135,38 @@ icon = ExtResource("7_home")
 flat = true
 icon_alignment = 1
 expand_icon = true
+
+[node name="Mime" parent="Panel" instance=ExtResource("9_mime")]
+position = Vector2(290, 412)
+
+[node name="StarsBest" type="TextureRect" parent="Panel"]
+visible = false
+layout_mode = 0
+offset_left = 232.0
+offset_top = 146.0
+offset_right = 280.0
+offset_bottom = 208.0
+pivot_offset = Vector2(24, 31)
+mouse_filter = 2
+texture = ExtResource("8_rosette")
+expand_mode = 1
+
+[node name="TimeBest" type="TextureRect" parent="Panel"]
+visible = false
+layout_mode = 0
+offset_left = 640.0
+offset_top = 222.0
+offset_right = 672.0
+offset_bottom = 263.0
+pivot_offset = Vector2(16, 20)
+mouse_filter = 2
+texture = ExtResource("8_rosette")
+expand_mode = 1
+
+[node name="Confetti" type="Control" parent="Panel"]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 960.0
+offset_bottom = 540.0
+mouse_filter = 2
+script = ExtResource("10_confetti")
