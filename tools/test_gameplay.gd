@@ -198,6 +198,7 @@ func _tests() -> Array[Callable]:
 		_test_guards_patrol_round_partitions,
 		_test_patrol_paths_clear_walls,
 		_test_rig_walk_cycle,
+		_test_rig_rest_life,
 		_test_rig_joints_bend,
 		_test_mime_faces_its_way,
 		_test_ghost_faces_travel,
@@ -1671,15 +1672,17 @@ func _test_juice_on_actions() -> void:
 	var ripple := room.get_node_or_null("TapRipple") as TapRipple
 	_check(ripple != null and ripple.position.is_equal_approx(target), name, "a floor tap left no ripple where it landed")
 	var bobbed := false
+	# Breathing at rest moves the body by at most this (its hips kept still): a bob is more.
+	var breath := -room.mime.rig.hip.y * CharacterRig.BREATH_DEPTH
 	for i in 20:
 		await physics_frame
 		await process_frame
-		bobbed = bobbed or room.get_node("Actors/Mime/Rig/Body").position.y != 0.0
+		bobbed = bobbed or absf(room.get_node("Actors/Mime/Rig/Body").position.y) > breath
 	_check(bobbed, name, "the walking mime does not bob")
 	await _walk_trace(room.mime, 300)
 	for i in 6:
 		await process_frame
-	_check(room.get_node("Actors/Mime/Rig/Body").position.y == 0.0, name, "the mime still bobs standing still")
+	_check(room.mime.rig.stride == 0.0 and absf(room.get_node("Actors/Mime/Rig/Body").position.y) <= breath + 0.001, name, "the mime still bobs standing still")
 	_check(room.get_node_or_null("TapRipple") == null, name, "the ripple outlived its %.2f s" % TapRipple.LIFE)
 	var pause_button := room.get_node("PauseButton") as Button
 	pause_button.button_down.emit()
@@ -1977,6 +1980,70 @@ func _test_rig_walk_cycle() -> void:
 	rig.free()
 
 
+## At rest a rig lives: the mime's starts its invisible-wall gag (once, with gag_started) only
+## after gag_after idle and drops it the moment it walks; busy (not idle) it never gags; the
+## body breathes (still under Reduce Motion) and the eyes blink now and then (never from
+## behind). A guard fidgets through its waypoint pause and stops when it walks on.
+func _test_rig_rest_life() -> void:
+	var name := "rig_rest_life"
+	const DT := 1.0 / 60.0
+	var rig := (load("res://scenes/rig_mime.tscn") as PackedScene).instantiate() as CharacterRig
+	root.add_child(rig)
+	var gags := [0]
+	rig.gag_started.connect(func() -> void: gags[0] += 1)
+	var arm := rig.get_node("Arm0") as Sprite2D
+	var body := rig.get_node("Body") as Sprite2D
+	var heights: Array[float] = []
+	var blinks := 0
+	# A full blink cycle, busy (no gag yet).
+	for i in ceili(60.0 / CharacterRig.BLINK_HZ) + 1:
+		rig.walk(0.0, DT, false)
+		heights.append(body.scale.y)
+		if rig.blinking():
+			blinks += 1
+	_check(heights.max() - heights.min() > CharacterRig.BREATH_DEPTH / CharacterRig.ART_SCALE, name, "the resting body did not breathe (scale %.4f..%.4f)" % [heights.min(), heights.max()])
+	var expected_blinks := roundi(CharacterRig.BLINK_TIME * 60.0)
+	_check(blinks >= expected_blinks - 1 and blinks <= expected_blinks + 1, name, "%d blinking frames in one %.1f s blink cycle, not about %d" % [blinks, 1.0 / CharacterRig.BLINK_HZ, expected_blinks])
+	for i in roundi((rig.gag_after - 0.1) * 60.0):
+		rig.walk(0.0, DT)
+	_check(not rig.gagging and gags[0] == 0, name, "the mime gagged before gag_after %.1f s idle" % rig.gag_after)
+	for i in 30:
+		rig.walk(0.0, DT)
+	_check(rig.gagging and gags[0] == 1 and arm.rotation > 0.3, name, "after gag_after idle the mime is not at the invisible wall (gagging %s, %d starts, arm %.2f)" % [rig.gagging, gags[0], arm.rotation])
+	rig.walk(rig.step_length / 10.0, DT)
+	_check(not rig.gagging and rig.rest == 0.0, name, "walking did not stop the gag at once")
+	for i in roundi((rig.gag_after + 1.0) * 60.0):
+		rig.walk(0.0, DT, false)
+	_check(not rig.gagging and gags[0] == 1, name, "a busy mime gagged")
+	rig.face(Vector2.UP)
+	var back_blinks := 0
+	for i in roundi(2.0 / CharacterRig.BLINK_HZ * 60.0):
+		rig.walk(0.0, DT, false)
+		if rig.blinking():
+			back_blinks += 1
+	_check(back_blinks == 0, name, "the back view blinked")
+	var was := _game.setting("reduce_motion")
+	_game.set_setting("reduce_motion", true)
+	heights.clear()
+	for i in 120:
+		rig.walk(0.0, DT, false)
+		heights.append(body.scale.y)
+	_check(is_equal_approx(heights.min(), heights.max()), name, "under Reduce Motion the body still breathes")
+	_game.set_setting("reduce_motion", was)
+	rig.free()
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.target = null
+	var corner := room.guard.route[1]
+	var reached := await _wait_until(func() -> bool: return room.guard.position == corner, 600)
+	var expected := Guard.FIDGETS[2 % Guard.FIDGETS.size()]
+	_check(reached and room.guard.rig.fidget == expected, name, "at its waypoint the guard does not fidget %s (reached %s, fidget %s)" % [expected, reached, room.guard.rig.fidget])
+	var walked_on := await _wait_until(func() -> bool: return room.guard.position != corner, 240)
+	await physics_frame
+	_check(walked_on and room.guard.rig.fidget == CharacterRig.Fidget.NONE, name, "the guard still fidgets after walking on (fidget %s)" % room.guard.rig.fidget)
+
+
 ## Every limb of both rigs is two parts at a joint (upper arm and forearm, thigh and shin),
 ## drawn from SVGs imported at ART_SCALE; walking bends (or, front and back, foreshortens)
 ## every knee and elbow in every view (front, back, side, mirrored left), and standing still
@@ -2101,18 +2168,19 @@ func _test_no_flash_rates() -> void:
 			shaders += 1
 			_check(float(found.get_string(2)) < LIMIT_HZ, name, "%s's %s is %s" % [file, found.get_string(1), found.get_string(2)])
 	_check(shaders >= 7, name, "found only %d shader speeds (the regex no longer matches?)" % shaders)
-	# Every gimmick's decorative rate (a *_HZ constant: drips, splashes, foam, flow, motes,
-	# the glass's glint).
+	# Every repeating rate in a script (a *_HZ constant: the gimmicks' drips, splashes, foam,
+	# flow, motes and glint; the rigs' breath, blink and pat; the logo's sway).
 	var rates := 0
-	for file in DirAccess.get_files_at("res://scripts/gimmicks"):
-		if not file.ends_with(".gd"):
-			continue
-		var constants := (load("res://scripts/gimmicks/" + file) as Script).get_script_constant_map()
-		for constant: String in constants:
-			if constant.ends_with("_HZ"):
-				rates += 1
-				_check(float(constants[constant]) < LIMIT_HZ, name, "%s's %s is %s Hz" % [file, constant, constants[constant]])
-	_check(rates >= 6, name, "found only %d gimmick decoration rates" % rates)
+	for folder: String in ["res://scripts", "res://scripts/gimmicks", "res://scripts/ui"]:
+		for file in DirAccess.get_files_at(folder):
+			if not file.ends_with(".gd"):
+				continue
+			var constants := (load(folder.path_join(file)) as Script).get_script_constant_map()
+			for constant: String in constants:
+				if constant.ends_with("_HZ"):
+					rates += 1
+					_check(float(constants[constant]) < LIMIT_HZ, name, "%s's %s is %s Hz" % [file, constant, constants[constant]])
+	_check(rates >= 10, name, "found only %d repeating rates" % rates)
 	var gimmicks := 0
 	for wing_path in Content.WINGS:
 		for room_path: String in (load(wing_path) as WingData).rooms:

@@ -28,6 +28,8 @@ const FAKE_TINT := Color(1.0, 0.95, 0.85, 0.75)
 signal arrived(at: Vector2)
 
 var walking := false
+## Busy using something (painting, swapping, tossed): it stands without the idle gag.
+var busy := false
 ## The room's gimmick (null for none): how fast it walks where it stands.
 var gimmick: Gimmick
 var swap_progress := 0.0:
@@ -68,6 +70,7 @@ func _ready() -> void:
 	_carried.painting = painting
 	_sync_carried()
 	rig.stepped.connect(_on_step)
+	rig.gag_started.connect(_on_gag)
 
 
 ## Walks to the navmesh point closest to `point`.
@@ -148,7 +151,7 @@ func _physics_process(delta: float) -> void:
 			_moved += position.distance_to(to)
 			face(to - position)
 			position = to
-	rig.walk(_moved, delta)
+	rig.walk(_moved, delta, not busy)
 	_moved = 0.0
 	_nudged = false
 
@@ -162,6 +165,12 @@ func _on_step() -> void:
 		return
 	_tiptoes += 1
 	Audio.play_for(self, &"tiptoe", 0.92 if _tiptoes % 2 == 0 else 1.08)
+
+
+## Stood idle long enough: the invisible wall, with its squeak of palms on glass.
+func _on_gag() -> void:
+	Audio.play_for(self, &"mime_gag")
+	print("[Mime] Idle: the invisible wall")
 
 
 func _draw() -> void:

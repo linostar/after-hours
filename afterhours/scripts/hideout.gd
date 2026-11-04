@@ -5,7 +5,8 @@ extends Node2D
 ## gilt frame when its best escape earned all three stars and in plain wood otherwise; a
 ## wing not yet robbed leaves its frame empty. Under each stolen original a replay button
 ## (Game.replay_ghost) shows the ghost mime's escape from its wing. The home button goes back
-## to the hub.
+## to the hub. The mime stands about, alive at rest (CharacterRig: breathing, blinking, its
+## invisible-wall gag).
 
 const FIRST_X := 120.0
 const GAP := 144.0
@@ -20,6 +21,7 @@ const REPLAY_DROP := 84.0
 var originals: Array[FramedPainting] = []
 
 @onready var _home: Button = $HomeButton
+@onready var _mime: CharacterRig = $Mime
 @onready var _game := get_node(GameState.AUTOLOAD_PATH) as GameState
 
 
@@ -47,6 +49,10 @@ func _ready() -> void:
 	_home.grab_focus()
 	_game.arrive(GameState.Flow.HIDEOUT)
 	print("[Hideout] %d original(s) hung, %d gilded" % [hung, originals.filter(func(each: FramedPainting) -> bool: return each != null and each.gilded).size()])
+
+
+func _physics_process(delta: float) -> void:
+	_mime.walk(0.0, delta)
 
 
 ## The button under wing `index`'s original at `at` that replays the bot's escape from it.

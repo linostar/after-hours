@@ -389,6 +389,7 @@ func _physics_process(delta: float) -> void:
 		mime.swap_progress = minf(mime.swap_progress + delta / SWAP_TIME, 1.0)
 		if mime.swap_progress >= 1.0:
 			_swap()
+	mime.busy = tossing or hidden_in != null or _canvas.visible or mime.swap_progress > 0.0
 	if mime.carrying and not tossing and exit_door != null and mime.position.distance_to(exit_door.position) <= Door.REACH:
 		_escape()
 		return

@@ -11,11 +11,20 @@ extends Node2D
 ## emitting stepped at every footfall (setting off from rest, then each step_length); with
 ## no distance the limbs settle straight. The SVG parts are imported at ART_SCALE and drawn
 ## back at 1 / ART_SCALE, so they stay crisp on a screen larger than the base viewport.
+## At rest it lives, on its own clock advanced by walk() (so runs repeat): the body breathes
+## (BREATH_HZ, stilled under Reduce Motion), the eyes blink (BLINK_HZ, lids drawn over the
+## face's eyes_front / eyes_side), a rig with gag_after does the mime's invisible wall once it
+## has stood idle that long (gagging; it stops the moment it walks or is busy), and
+## start_fidget plays a guard's waypoint fidget (Fidget) over a given time.
 
 ## Emitted at each footfall while walking.
 signal stepped
+## Emitted when the invisible-wall gag starts.
+signal gag_started
 
 enum View { FRONT, BACK, RIGHT, LEFT }
+## A guard's fidget while it stands at a waypoint.
+enum Fidget { NONE, STRETCH, WATCH, YAWN }
 
 ## A front or back view turns to the side once the heading's across exceeds this share of
 ## its along (about 35 degrees off vertical), so a diagonal walks side on; a side view turns
@@ -37,6 +46,21 @@ const JOINT_CAP := 3.0
 ## circle, the thigh's width across. The thigh ends in a half circle round the same point,
 ## unoutlined, and the shin is drawn behind it, so the leg bends as one at the knee.
 const KNEE_CAP := 5.6
+## Breathing at rest: the body (above the hips) stretches by up to BREATH_DEPTH of its height.
+const BREATH_HZ := 0.3
+const BREATH_DEPTH := 0.012
+## Blinks: the lids close for BLINK_TIME once every 1 / BLINK_HZ seconds.
+const BLINK_HZ := 0.28
+const BLINK_TIME := 0.12
+## The closed lid's crease.
+const LID_LINE := Color(0.08, 0.06, 0.12)
+## The gag's hands pat along the invisible wall (stilled under Reduce Motion).
+const PAT_HZ := 0.8
+const PAT_SWING := 0.12
+## How fast a gesture (the gag) blends in and out (weight per second).
+const GESTURE_RATE := 5.0
+## A yawn stretches the body this much more at its height.
+const YAWN_STRETCH := 0.04
 
 @export var body_front: Texture2D
 @export var body_back: Texture2D
@@ -79,8 +103,28 @@ const KNEE_CAP := 5.6
 @export var elbow_rest := 0.2
 @export var elbow_bend := 0.5
 @export var elbow_lag := 0.35
+## The eyes' centres in the front and side bodies (SVG units; none in the back view), the
+## eye's half size, and the lid's colour (the face's skin).
+@export var eyes_front: PackedVector2Array
+@export var eyes_side: PackedVector2Array
+@export var eye_radius := Vector2(1.8, 2.4)
+@export var lid_color := Color.WHITE
+## Seconds standing idle before the invisible-wall gag starts (0: never).
+@export var gag_after := 0.0
 
 var view := View.FRONT
+## Whether it is doing the invisible-wall gag now.
+var gagging := false
+## The fidget it is playing (NONE for none).
+var fidget := Fidget.NONE
+## The rig's own clock (seconds of walk() calls) and how long it has stood idle.
+var clock := 0.0
+var rest := 0.0
+var _gag := 0.0
+var _fidget_time := 0.0
+var _fidget_length := 0.0
+var _blink_offset := 0.0
+var _lids: Node2D
 ## A squash and stretch on top of the drawing (the mime's shrug), kept apart from the mirror.
 var squash := Vector2.ONE:
 	set(value):
@@ -128,6 +172,15 @@ func _ready() -> void:
 	_body.offset = -feet_at * ART_SCALE
 	_body.scale = Vector2.ONE / ART_SCALE
 	add_child(_body)
+	# The lids, over the body's face (body-local units are SVG units at ART_SCALE).
+	_lids = Node2D.new()
+	_lids.name = "Lids"
+	_lids.position = -feet_at * ART_SCALE
+	_lids.draw.connect(_draw_lids)
+	_body.add_child(_lids)
+	# Characters made together blink apart: each starts its blink cycle by its owner's name.
+	var owner_name := String(get_parent().name) if get_parent() != null else String(name)
+	_blink_offset = float(absi(owner_name.hash()) % 1000) / 1000.0 / BLINK_HZ
 	for i in 2:
 		_arms.append(_limb("Arm%d" % i, arm_upper))
 		_forearms.append(_lower(_arms[i], "Forearm", arm_lower, elbow, JOINT_CAP))
@@ -168,8 +221,10 @@ func face(heading: Vector2) -> void:
 
 
 ## Moves the walk cycle on by `distance` (base units walked this frame; 0 standing) over
-## `delta` seconds.
-func walk(distance: float, delta: float) -> void:
+## `delta` seconds, and the rest life with it; a character not `idle` (busy using
+## something) stands without the gag.
+func walk(distance: float, delta: float, idle := true) -> void:
+	clock += delta
 	if distance > 0.0:
 		var before := phase
 		phase = fmod(phase + distance / (2.0 * step_length), 1.0)
@@ -179,7 +234,33 @@ func walk(distance: float, delta: float) -> void:
 		stride = minf(stride + SETTLE_RATE * delta, 1.0)
 	else:
 		stride = maxf(stride - SETTLE_RATE * delta, 0.0)
+	rest = rest + delta if distance <= 0.0 and idle else 0.0
+	var gag := gag_after > 0.0 and rest >= gag_after
+	if gag and not gagging:
+		gag_started.emit()
+	gagging = gag
+	_gag = move_toward(_gag, 1.0 if gagging else 0.0, GESTURE_RATE * delta)
+	if fidget != Fidget.NONE:
+		_fidget_time += delta
+		if _fidget_time >= _fidget_length:
+			fidget = Fidget.NONE
 	_pose()
+	_lids.queue_redraw()
+
+
+## Plays `kind` over `length` seconds (a guard's waypoint pause; the guard cuts it short
+## when something else takes its attention); NONE or no length ends one.
+func start_fidget(kind: Fidget, length: float) -> void:
+	fidget = kind if length > 0.0 else Fidget.NONE
+	_fidget_time = 0.0
+	_fidget_length = length
+
+
+## Whether the eyes are shut in a blink now (never in the back view: no eyes there).
+func blinking() -> bool:
+	if view == View.BACK:
+		return false
+	return fposmod(clock + _blink_offset, 1.0 / BLINK_HZ) < BLINK_TIME
 
 
 func is_side() -> bool:
@@ -249,6 +330,61 @@ func _pose() -> void:
 		_pose_side(p, drop)
 	else:
 		_pose_front(p, drop)
+	_breathe()
+	for i in 2:
+		_gesture(i)
+
+
+## Stretches the body above the hips as it breathes at rest (and further in a yawn), the
+## hips kept where they are and the shoulders (the arms) carried with it.
+func _breathe() -> void:
+	var breath := 0.0 if _still() else BREATH_DEPTH * (1.0 - stride) * sin(TAU * BREATH_HZ * clock)
+	if fidget == Fidget.YAWN:
+		breath += YAWN_STRETCH * _fidget_weight()
+	_body.scale = Vector2(1.0, 1.0 + breath) / ART_SCALE
+	# Scaled about the feet: moving it down by the hips' rise keeps the hips still.
+	_body.position.y += -hip.y * breath
+	for arm in _arms:
+		arm.position.y += breath * (shoulder.y - hip.y)
+
+
+## How far into its fidget the guard is: rising from 0 and back over its length.
+func _fidget_weight() -> float:
+	if fidget == Fidget.NONE or _fidget_length <= 0.0:
+		return 0.0
+	return sin(PI * clampf(_fidget_time / _fidget_length, 0.0, 1.0))
+
+
+## Blends arm `i` from its walk pose toward the gag's or the fidget's pose. Front and back,
+## `out` turns a rotation outward (positive swings a hanging end to -x, outward for the
+## left arm); side on, negative rotation reaches forward (the mirror handles facing left).
+func _gesture(i: int) -> void:
+	var out := 1.0 if i == 0 else -1.0
+	var side := is_side()
+	var target := Vector2.ZERO
+	var weight := 0.0
+	if _gag > 0.0:
+		# The invisible wall: palms flat on it at chest height, patting along it in turn.
+		var pat := 0.0 if _still() else PAT_SWING * sin(TAU * PAT_HZ * clock + PI * i)
+		target = Vector2(-1.45 + pat, -0.9) if side else Vector2(out * (0.45 + pat), out * 2.55)
+		weight = _gag
+	elif fidget == Fidget.STRETCH:
+		target = Vector2(-2.9, -0.2) if side else Vector2(out * 2.75, out * 0.25)
+		weight = _fidget_weight()
+	elif (fidget == Fidget.WATCH or fidget == Fidget.YAWN) and i == 1:
+		# One hand: up to the chest for the pocket watch, to the mouth for the yawn.
+		var yawn := fidget == Fidget.YAWN
+		if side:
+			target = Vector2(-0.7, -2.2) if yawn else Vector2(-0.35, -1.7)
+		else:
+			target = Vector2(-out * 0.7, -out * 2.75) if yawn else Vector2(-out * 0.35, -out * 2.0)
+		weight = _fidget_weight()
+	if weight <= 0.0:
+		return
+	_arms[i].rotation = lerpf(_arms[i].rotation, target.x, weight)
+	_forearms[i].rotation = lerpf(_forearms[i].rotation, target.y, weight)
+	_arms[i].scale = _arms[i].scale.lerp(Vector2.ONE / ART_SCALE, weight)
+	_forearms[i].scale = _forearms[i].scale.lerp(Vector2.ONE, weight)
 
 
 func _pose_side(p: float, drop: float) -> void:
@@ -333,3 +469,24 @@ func _pose_front(p: float, drop: float) -> void:
 func _draw() -> void:
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.0, SHADOW_FLATTEN))
 	draw_circle(Vector2.ZERO, shadow_radius, SHADOW)
+
+
+## The closed lids during a blink: each eye covered in the skin colour with a crease across.
+func _draw_lids() -> void:
+	if not blinking():
+		return
+	var radius := eye_radius * ART_SCALE * 1.3
+	for eye in eyes_side if is_side() else eyes_front:
+		var centre := eye * ART_SCALE
+		_lids.draw_set_transform(centre, 0.0, Vector2(1.0, radius.y / radius.x))
+		_lids.draw_circle(Vector2.ZERO, radius.x, lid_color)
+		_lids.draw_set_transform(Vector2.ZERO)
+		_lids.draw_line(centre - Vector2(radius.x, 0.0), centre + Vector2(radius.x, 0.0), LID_LINE, 0.9 * ART_SCALE, true)
+
+
+## Whether Reduce Motion is on (no Game outside the tree: a test's loose rig moves).
+func _still() -> bool:
+	if not is_inside_tree():
+		return false
+	var game := get_node_or_null(GameState.AUTOLOAD_PATH) as GameState
+	return game != null and game.setting("reduce_motion")

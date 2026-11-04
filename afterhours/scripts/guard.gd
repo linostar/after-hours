@@ -48,8 +48,10 @@ const TURN_IN_PLACE := PI / 6.0
 ## A chase re-plans its path only once the mime has moved this far from the path's goal.
 const CHASE_REPATH := 8.0
 ## Seconds the guard stands at each waypoint, still facing the leg it walked, before it
-## turns to the next one (it always faces the way it walks).
+## turns to the next one (it always faces the way it walks); it fidgets through the pause,
+## FIDGETS in turn by waypoint (cut short when anything else takes its attention).
 const WAYPOINT_PAUSE := 0.8
+const FIDGETS: Array[CharacterRig.Fidget] = [CharacterRig.Fidget.STRETCH, CharacterRig.Fidget.WATCH, CharacterRig.Fidget.YAWN]
 const CONE_RANGE := 180.0
 ## 32 degrees either side of the facing.
 const CONE_HALF_ANGLE := PI * 32.0 / 180.0
@@ -167,6 +169,7 @@ func reset() -> void:
 	_straighten_frame = null
 	_straighten_left = 0.0
 	senses = GuardBrain.Senses.new()
+	rig.start_fidget(CharacterRig.Fidget.NONE, 0.0)
 	intent = GuardBrain.Intent.PATROL
 	_show_intent()
 	active = true
@@ -290,6 +293,7 @@ func _show_intent() -> void:
 func _leave(left: GuardBrain.Intent) -> void:
 	if left == GuardBrain.Intent.PATROL:
 		_returning = true
+		rig.start_fidget(CharacterRig.Fidget.NONE, 0.0)
 	if left == GuardBrain.Intent.INSPECT and inspecting:
 		# Cut short: it does not count, and the fake can be inspected again.
 		inspecting = false
@@ -367,6 +371,7 @@ func _patrol(delta: float) -> void:
 		print("[Guard] %s reaches waypoint %d at %s" % [name, _next, goal.round()])
 		_next = (_next + 1) % route.size()
 		_pause = WAYPOINT_PAUSE
+		rig.start_fidget(FIDGETS[_next % FIDGETS.size()], WAYPOINT_PAUSE)
 
 
 func _chase(delta: float) -> void:
