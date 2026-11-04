@@ -303,20 +303,92 @@ func _draw_plinth(trim: Color) -> void:
 	draw_rect(top, PLINTH_STONE)
 	draw_rect(Rect2(face.position.x, face.position.y + 6.0, face.size.x, 4.0), trim)
 	draw_rect(Rect2(face.position.x - 2.0, face.end.y - 6.0, face.size.x + 4.0, 6.0), PLINTH_STONE.darkened(0.25))
+	var panel := face.grow_individual(-4.0, -14.0, -4.0, -10.0)
+	draw_rect(panel, PLINTH_STONE.darkened(0.2))
+	draw_line(Vector2(panel.position.x, panel.end.y), panel.end, PLINTH_STONE.lightened(0.1), 1.0)
 	draw_rect(face, OUTLINE, false, 1.2)
 	draw_rect(top, OUTLINE, false, 1.0)
-	# The bust, standing on the top's middle: socle, shoulders, neck, head with a curl of hair.
-	var base := top.get_center() + Vector2(0.0, 4.0)
-	draw_rect(Rect2(base.x - 7.0, base.y - 6.0, 14.0, 6.0), BUST.darkened(0.1))
-	var shoulders := PackedVector2Array([base + Vector2(-13, -6), base + Vector2(13, -6), base + Vector2(9, -20), base + Vector2(-9, -20)])
-	draw_colored_polygon(shoulders, BUST)
-	draw_rect(Rect2(base.x - 3.5, base.y - 26.0, 7.0, 7.0), BUST.darkened(0.06))
-	draw_circle(base + Vector2(0, -33), 8.0, BUST)
-	draw_arc(base + Vector2(0, -35), 8.0, PI * 1.05, PI * 1.95, 8, BUST.darkened(0.18), 2.0, true)
-	draw_circle(base + Vector2(-3, -33), 0.9, BUST.darkened(0.35))
-	draw_circle(base + Vector2(3, -33), 0.9, BUST.darkened(0.35))
-	draw_polyline(_closed(shoulders), OUTLINE, 1.0, true)
-	draw_arc(base + Vector2(0, -33), 8.0, 0.0, TAU, 20, OUTLINE, 1.0, true)
+	_draw_bust(top.get_center() + Vector2(0.0, 4.0))
+
+
+## A classical marble bust in profile, facing left, on the plinth's top at `base` (its
+## socle's foot), lit from the upper left: a turned socle, a chest cut in a curve with a toga
+## slung over the left shoulder in folds and pinned by a brooch, a neck, and a head with
+## sculpted curls under a laurel wreath tied at the back, its ribbons trailing.
+func _draw_bust(base: Vector2) -> void:
+	const SHADE := Color(0.22, 0.2, 0.3, 0.3)
+	const LINE := Color(0.12, 0.1, 0.12, 0.7)
+	var deep := BUST.darkened(0.3)
+	draw_set_transform(base)
+	# The socle: a foot slab, a waisted stem and a tablet under the chest.
+	for slab: Rect2 in [Rect2(-7, -2.5, 14, 2.5), Rect2(-3, -6, 6, 3.5), Rect2(-6.5, -8, 13, 2)]:
+		draw_rect(slab, BUST.darkened(0.08))
+		draw_rect(Rect2(slab.end.x - slab.size.x * 0.35, slab.position.y, slab.size.x * 0.35, slab.size.y), SHADE)
+		draw_rect(slab, LINE, false, 0.8)
+	# The chest, its foot cut in a curve.
+	var chest := PackedVector2Array([Vector2(-11, -10), Vector2(-6, -8.6), Vector2(0, -8), Vector2(6, -8.6), Vector2(11, -10),
+		Vector2(13, -15), Vector2(12, -19), Vector2(8, -21), Vector2(3, -22), Vector2(-4, -22), Vector2(-9, -21),
+		Vector2(-13, -18), Vector2(-13, -13)])
+	draw_colored_polygon(chest, BUST)
+	draw_colored_polygon(PackedVector2Array([Vector2(6, -8.6), Vector2(11, -10), Vector2(13, -15), Vector2(12, -19), Vector2(8, -21), Vector2(7, -14)]), SHADE)
+	# The toga: slung from the left shoulder across to the right hip, in three folds.
+	var toga := PackedVector2Array([Vector2(-13, -18), Vector2(-9, -21), Vector2(-4, -22), Vector2(4, -14), Vector2(11, -10),
+		Vector2(6, -8.6), Vector2(0, -8), Vector2(-6, -8.6), Vector2(-11, -10), Vector2(-13, -13)])
+	draw_colored_polygon(toga, BUST.darkened(0.04))
+	for k in 3:
+		var lift := k * 3.2
+		draw_polyline(PackedVector2Array([Vector2(-12, -15 - lift * 0.5), Vector2(-6, -12 - lift), Vector2(1, -9.5 - lift * 0.6), Vector2(7, -9.2)]), deep, 0.9, true)
+		draw_polyline(PackedVector2Array([Vector2(-12, -14.2 - lift * 0.5), Vector2(-6, -11.2 - lift), Vector2(1, -8.8 - lift * 0.6)]), BUST.lightened(0.5), 0.6, true)
+	draw_polyline(PackedVector2Array([Vector2(-4, -22), Vector2(4, -14), Vector2(11, -10)]), deep, 1.0, true)
+	draw_circle(Vector2(-10, -18.5), 1.6, BUST.darkened(0.15))
+	draw_circle(Vector2(-10.4, -18.9), 0.6, BUST.lightened(0.5))
+	draw_polyline(_closed(chest), LINE, 0.9, true)
+	# The neck, shaded behind the jaw.
+	var neck := PackedVector2Array([Vector2(-4, -21.5), Vector2(4, -21.5), Vector2(5, -27), Vector2(-2.5, -26.5)])
+	draw_colored_polygon(neck, BUST.darkened(0.06))
+	draw_colored_polygon(PackedVector2Array([Vector2(1.5, -21.5), Vector2(4, -21.5), Vector2(5, -27), Vector2(2, -26)]), SHADE)
+	draw_line(Vector2(-4, -21.5), Vector2(-2.5, -26.5), LINE, 0.8, true)
+	draw_line(Vector2(4, -21.5), Vector2(5, -27), LINE, 0.8, true)
+	# The head in profile: skull, brow, nose, lips and chin.
+	draw_set_transform(base + Vector2(0, -33))
+	var head := PackedVector2Array([Vector2(0, -10), Vector2(5, -8), Vector2(7.5, -4), Vector2(7.5, 0), Vector2(5.5, 4),
+		Vector2(2.5, 6.5), Vector2(-1, 8.2), Vector2(-3.5, 8.5), Vector2(-5, 7.2), Vector2(-5.2, 5.8), Vector2(-4.8, 5),
+		Vector2(-5.8, 4.2), Vector2(-5.6, 3), Vector2(-7.6, 2.4), Vector2(-6.2, -1.2), Vector2(-6.4, -2.6),
+		Vector2(-6, -5.5), Vector2(-3.5, -8.8)])
+	draw_colored_polygon(head, BUST)
+	draw_colored_polygon(PackedVector2Array([Vector2(1, 2), Vector2(4, 0), Vector2(7.5, 0), Vector2(5.5, 4), Vector2(2.5, 6.5), Vector2(-1, 8.2)]), SHADE)
+	draw_line(Vector2(-6, -2.8), Vector2(-2.6, -2.3), deep, 0.9, true)
+	draw_line(Vector2(-4.9, -1.2), Vector2(-3, -0.8), LINE, 0.9, true)
+	draw_line(Vector2(-5.9, 2.7), Vector2(-5, 2.9), deep, 0.7, true)
+	draw_line(Vector2(-5.1, 5), Vector2(-3.9, 5.3), deep, 0.7, true)
+	draw_line(Vector2(-4.5, 3), Vector2(-2, 5.5), BUST.darkened(0.12), 0.8, true)
+	draw_arc(Vector2(2.2, 0.6), 1.7, -PI * 0.5, PI * 0.6, 8, deep, 0.9, true)
+	draw_polyline(_closed(head), LINE, 0.9, true)
+	# Curls over the crown and down to the nape.
+	var curls := [Vector2(-4.6, -7.4), Vector2(-2, -9.2), Vector2(1, -9.6), Vector2(4, -8.6), Vector2(6.2, -6.4),
+		Vector2(7.4, -3.6), Vector2(7.6, -0.6), Vector2(6.6, 2.2), Vector2(4.6, -5), Vector2(1.6, -6.6), Vector2(4.8, -2.6)]
+	for curl: Vector2 in curls:
+		draw_circle(curl, 2.8, LINE)
+	for curl: Vector2 in curls:
+		draw_circle(curl, 2.3, BUST.darkened(0.04))
+		draw_arc(curl, 1.2, 0.3, PI * 1.6, 6, deep, 0.7, true)
+	# The laurel: leaves paired along a band from the brow round to a tie at the back.
+	var tie := Vector2(7.6, -2.2)
+	var band := PackedVector2Array()
+	for k in 7:
+		band.append(Vector2(-5.4, -5.6).lerp(tie, k / 6.0) + Vector2(0, -sin(k / 6.0 * PI) * 1.8))
+	draw_polyline(band, deep, 1.0, true)
+	for k in 6:
+		for side: float in [-1.0, 1.0]:
+			draw_set_transform(base + Vector2(0, -33) + band[k], (band[k + 1] - band[k]).angle() + side * 0.6, Vector2(1.0, 0.45))
+			draw_circle(Vector2(1.9, 0), 2.1, BUST.darkened(0.16))
+			draw_arc(Vector2(1.9, 0), 2.1, 0.0, TAU, 10, LINE, 1.2, true)
+			draw_line(Vector2(0.4, 0), Vector2(3.4, 0), BUST.lightened(0.5), 0.8)
+	draw_set_transform(base + Vector2(0, -33))
+	draw_polyline(PackedVector2Array([tie, tie + Vector2(2.6, 4), tie + Vector2(2.2, 7.5)]), BUST.darkened(0.1), 1.3, true)
+	draw_polyline(PackedVector2Array([tie, tie + Vector2(1.2, 4.5), tie + Vector2(0.4, 8)]), BUST.darkened(0.18), 1.1, true)
+	draw_circle(tie, 1.3, BUST.darkened(0.15))
+	draw_set_transform(Vector2.ZERO)
 
 
 ## Two brass stanchions at the footprint's ends with a velvet rope slung between them.
