@@ -216,6 +216,10 @@ func _tests() -> Array[Callable]:
 		_test_no_flash_rates,
 		_test_ghost_replay_visits,
 		_test_ghost_mime_until_escape,
+		_test_tension_stems,
+		_test_tension_eases,
+		_test_chase_sting_once,
+		_test_room_drives_tension,
 	]
 
 
@@ -404,6 +408,10 @@ func _test_sfx_files() -> void:
 		if file.get_extension() == "mp3":
 			loops.append(file.get_basename())
 	var tracks := Audio.MUSIC_TRACKS.duplicate()
+	for track in Audio.MUSIC_TRACKS:
+		if Audio.stem_for(track) != "":
+			tracks.append(Audio.stem_for(track))
+	tracks.append(Audio.STING)
 	tracks.sort()
 	loops.sort()
 	_check(loops == tracks, name, "audio/music holds %s, Audio.MUSIC_TRACKS lists %s" % [loops, tracks])
@@ -4000,3 +4008,105 @@ func _test_rotate_overlay_pauses() -> void:
 	_game.fit_screen()
 	_check(paused, name, "a tree paused before the overlay was unpaused by it")
 	paused = false
+
+
+## Every wing loop has a tension stem (Audio.stem_for, tools/music.py STEMS) that loads as a
+## looping MP3 exactly as long as its loop (so they stay locked); the chase sting loads as a
+## one-shot; the caper and results have no stem. play_music starts a wing's stem on the
+## player paired with its loop.
+func _test_tension_stems() -> void:
+	var name := "tension_stems"
+	var stems := 0
+	for track in Audio.MUSIC_TRACKS:
+		var stem := Audio.stem_for(track)
+		_check((stem != "") == track.begins_with("wing_"), name, "%s has stem '%s'" % [track, stem])
+		if stem == "":
+			continue
+		stems += 1
+		var loop := load(Audio.MUSIC_PATH % track) as AudioStreamMP3
+		var layer := load(Audio.MUSIC_PATH % stem) as AudioStreamMP3
+		_check(layer != null and layer.loop and is_equal_approx(layer.get_length(), loop.get_length()), name, "stem %s is missing, not looping or not as long as %s" % [stem, track])
+	_check(stems == 6, name, "%d wing loops have stems, expected 6" % stems)
+	var sting := load(Audio.MUSIC_PATH % Audio.STING) as AudioStreamMP3
+	_check(sting != null and not sting.loop and sting.get_length() < 4.0, name, "the chase sting is missing, looping or long")
+	var audio := _game.audio
+	var was := audio.music
+	audio.play_music("wing_02")
+	_check(audio.current_stem().stream == load(Audio.MUSIC_PATH % "wing_02_tension") and audio.current_stem().bus == Audio.MUSIC_BUS, name, "wing_02 did not start its stem on the Music bus")
+	audio.play_music("caper")
+	_check(audio.current_stem().stream == null, name, "the caper started a stem")
+	audio.play_music(was)
+
+
+## set_tension eases the stem: up over TENSION_RISE, down over TENSION_FALL (half way after
+## half the time), clamped to 0..1; the stem plays at the tension times its loop's volume, so
+## a crossfade to a loop without a stem fades it out and calms the target.
+func _test_tension_eases() -> void:
+	var name := "tension_eases"
+	var audio := _game.audio
+	var was := audio.music
+	audio.play_music("wing_01")
+	audio.tension = 0.0
+	audio.set_tension(2.0)
+	_check(audio.tension_target == 1.0, name, "set_tension does not clamp to 1")
+	audio._process(Audio.TENSION_RISE / 2.0)
+	_check(is_equal_approx(audio.tension, 0.5), name, "half the rise time eased to %.2f, not 0.5" % audio.tension)
+	audio._process(Audio.TENSION_RISE)
+	_check(audio.tension == 1.0, name, "the stem did not reach full tension")
+	var music := audio.get_node("Music" + audio.current_stem().name.trim_prefix("Stem")) as AudioStreamPlayer
+	_check(is_equal_approx(audio.current_stem().volume_linear, music.volume_linear), name, "the stem plays at %.2f, its loop at %.2f" % [audio.current_stem().volume_linear, music.volume_linear])
+	audio.set_tension(0.0)
+	audio._process(Audio.TENSION_FALL / 2.0)
+	_check(is_equal_approx(audio.tension, 0.5), name, "half the fall time eased to %.2f, not 0.5" % audio.tension)
+	audio.set_tension(1.0)
+	audio.play_music("caper")
+	_check(audio.tension_target == 0.0, name, "a new loop did not calm the tension")
+	audio.tension = 0.0
+	audio.play_music(was)
+
+
+## A chase's start plays the sting once; it does not repeat while the chase goes on, and a
+## new chase plays it again.
+func _test_chase_sting_once() -> void:
+	var name := "chase_sting_once"
+	var audio := _game.audio
+	audio.set_chase(false)
+	var before := audio.stings
+	audio.set_chase(true)
+	audio.set_chase(true)
+	audio.set_chase(true)
+	_check(audio.stings == before + 1, name, "one chase played %d stings" % (audio.stings - before))
+	audio.set_chase(false)
+	audio.set_chase(true)
+	_check(audio.stings == before + 2, name, "a second chase did not play the sting")
+	audio.set_chase(false)
+
+
+## The room's danger is the peak suspicion of its active guards, full while one chases or
+## searches, 0 while tossing or once finished; each tick it sets the music's tension and a
+## chase plays the sting. Nothing in the room changes (audio only).
+func _test_room_drives_tension() -> void:
+	var name := "room_drives_tension"
+	var room: Room = await _load_room()
+	var guard := room.guard
+	guard.suspicion = 0.3
+	_check(is_equal_approx(room.peak_suspicion(), 0.3) and is_equal_approx(room.danger(), 0.3), name, "danger %.2f does not follow the peak suspicion 0.3" % room.danger())
+	guard.active = false
+	_check(room.peak_suspicion() == 0.0, name, "an inactive guard counts")
+	guard.active = true
+	guard.intent = GuardBrain.Intent.SEARCH
+	_check(room.danger() == 1.0 and not room.chasing(), name, "a search is not full danger, or counts as a chase")
+	guard.intent = GuardBrain.Intent.CHASE
+	_check(room.danger() == 1.0 and room.chasing(), name, "a chase is not full danger")
+	room.tossing = true
+	_check(room.danger() == 0.0 and not room.chasing(), name, "tossing is not calm")
+	room.tossing = false
+	var before := _game.audio.stings
+	_game.audio.set_chase(false)
+	await physics_frame
+	_check(_game.audio.tension_target == 1.0 and _game.audio.stings == before + 1, name, "the room's chase did not set full tension and play the sting")
+	room.finished = true
+	await physics_frame
+	_check(_game.audio.tension_target == 0.0, name, "a finished room did not calm the music")
+	room.finished = false
+	_game.audio.set_chase(false)
