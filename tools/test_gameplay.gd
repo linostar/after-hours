@@ -3519,6 +3519,11 @@ func _test_content_validates_wings() -> void:
 		"off the canvas": func(w: WingData) -> void: w.ghosts = [PackedVector2Array([Vector2(321, 10)])],
 		"bot_route is empty": func(w: WingData) -> void: w.bot_route = PackedVector2Array(),
 		"off the (960": func(w: WingData) -> void: w.bot_route = PackedVector2Array([Vector2(10, 541)]),
+		"speed_route tap": func(w: WingData) -> void: w.speed_route = PackedVector2Array([Vector2(-1, 10)]),
+		"bot_actions has": func(w: WingData) -> void: w.bot_actions = PackedInt32Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0].slice(0, w.bot_route.size() + 1)),
+		"sketch_actions[0]": func(w: WingData) -> void:
+			w.sketch_route = PackedVector2Array([Vector2(10, 10)])
+			w.sketch_actions = PackedInt32Array([WingData.BotAction.size()]),
 	}
 	for field in cases:
 		var wing := _test_wing()
@@ -3531,6 +3536,15 @@ func _test_content_validates_wings() -> void:
 	var problems: Array[String] = []
 	_check(Content.load_wing("res://data/wings/missing.tres", problems) == null and problems.size() == 1, name, "a missing wing file loaded or was not reported: %s" % [problems])
 	_check(Content.validate(null, "x.tres") == (["x.tres: is not a WingData"] as Array[String]), name, "a missing WingData was not reported")
+	# Bot actions: one per tap; a power only where the wing has it (wing 1 has none, a wing
+	# outside Content.WINGS every one).
+	var acting := _test_wing()
+	acting.speed_route = PackedVector2Array([Vector2(10, 10), Vector2(20, 10), Vector2(30, 10), Vector2(40, 10), Vector2(50, 10)])
+	acting.speed_actions = PackedInt32Array([WingData.BotAction.TAP, WingData.BotAction.DASH, WingData.BotAction.BALL, WingData.BotAction.ROPE, WingData.BotAction.BOX])
+	_check(Content.validate(acting, "acting.tres").is_empty(), name, "every action refused outside the play order: %s" % [Content.validate(acting, "acting.tres")])
+	var locked := Content.validate(acting, Content.WINGS[0])
+	_check(locked.size() == 3 and locked.all(func(problem: String) -> bool: return "not unlocked" in problem), name, "wing 1's powers were not refused: %s" % [locked])
+	_check(Content.power_of(WingData.BotAction.ROPE) == Powers.Power.ROPE and Content.power_of(WingData.BotAction.DASH) == -1, name, "a bot action's power is wrong")
 
 
 ## Every wing in Content.WINGS validates, and its rooms make a whole wing: each room loads
@@ -4140,7 +4154,7 @@ func _test_room_drives_tension() -> void:
 
 ## A double tap on the floor (within Room.DOUBLE_TAP and DOUBLE_TAP_REACH) dashes there at
 ## Mime.DASH_SPEED with the rig running, until it arrives; a first tap walks at once, and taps
-## apart in time or space only walk.
+## apart in time or space only walk. A double tap on a door dashes to it.
 func _test_dash_double_tap() -> void:
 	var name := "dash_double_tap"
 	var room := await _load_room()
@@ -4171,6 +4185,16 @@ func _test_dash_double_tap() -> void:
 	await _tap_at(Vector2(305 + Room.DOUBLE_TAP_REACH + 20.0, 480))
 	_check(room.mime.walking and not room.mime.dashing, name, "a second tap beyond DOUBLE_TAP_REACH dashes")
 	_check(Mime.DASH_SPEED > Mime.SPEED * 1.4 and Mime.DASH_SPEED < Mime.SPEED * 1.8, name, "DASH_SPEED %.0f is not about 1.6 times SPEED" % Mime.DASH_SPEED)
+	# A double tap on a door dashes to it (and through it); a single one walks.
+	_check(not room.doors.is_empty(), name, "the test room has no door")
+	if room.doors.is_empty():
+		return
+	var door := room.doors[0]
+	room.mime.place_at(Vector2(480, 330))
+	await _tap_at(door.position)
+	_check(room.mime.walking and not room.mime.dashing, name, "a single tap on a door does not walk to it")
+	await _tap_at(door.position)
+	_check(room.mime.dashing, name, "a double tap on a door does not dash to it")
 
 
 ## Shift held with the arrows runs the mime at DASH_SPEED; let go, it walks again.
@@ -4320,9 +4344,11 @@ func _test_near_miss() -> void:
 	_check(close.near_misses == 2, name, "the close call after a spotted one is no near miss")
 
 
-## No recorded bot route (main, sketch, or a trick ablation skipping its tap at any wait) can
-## make a double tap: two taps in one room visit within Room.DOUBLE_TAP_REACH, the second
-## within Room.DOUBLE_TAP (a wait under it). A dash would change a recorded run.
+## No recorded bot route (main, sketch, speed, or a trick ablation skipping its tap at any
+## wait) can make a double tap by accident: two taps in one room visit within
+## Room.DOUBLE_TAP_REACH, the second within Room.DOUBLE_TAP (a wait under it). A dash would
+## change a recorded run. A DASH action's own two taps are meant; a ball or rope tap aims
+## the power (the room forgets the last walk tap) and the box has no tap.
 func _test_routes_never_double_tap() -> void:
 	var name := "routes_never_double_tap"
 	var paths: Array[String] = []
@@ -4341,17 +4367,25 @@ func _test_routes_never_double_tap() -> void:
 					room_doors.append([(child as Door).rect(), (child as Door).to_room])
 			doors.append(room_doors)
 			room.free()
-		var runs: Array[Array] = [[wing.bot_route, wing.bot_waits, -1], [wing.sketch_route, wing.sketch_waits, -1]]
+		var runs: Array[Array] = [[wing.bot_route, wing.bot_waits, wing.bot_actions, -1], [wing.sketch_route, wing.sketch_waits, wing.sketch_actions, -1], [wing.speed_route, wing.speed_waits, wing.speed_actions, -1]]
 		for trick in wing.bot_tricks:
-			runs.append([wing.bot_route, wing.bot_waits, trick])
+			runs.append([wing.bot_route, wing.bot_waits, wing.bot_actions, trick])
 		for run in runs:
 			var route: PackedVector2Array = run[0]
 			var waits: PackedFloat32Array = run[1]
-			var skip: int = run[2]
+			var actions: PackedInt32Array = run[2]
+			var skip: int = run[3]
+			_check(waits.size() == route.size(), name, "%s: %d waits for %d taps (run --record)" % [path, waits.size(), route.size()])
+			if waits.size() != route.size():
+				continue
 			var at_room := 0
 			var previous := -1
 			for i in route.size():
-				if i == skip:
+				var action := actions[i] if not actions.is_empty() else WingData.BotAction.TAP
+				if i == skip or action == WingData.BotAction.BOX:
+					continue
+				if action == WingData.BotAction.BALL or action == WingData.BotAction.ROPE:
+					previous = -1
 					continue
 				# Ablating a trick tries every wait of the leg after it, 0 included.
 				var any_wait := skip >= 0 and i == skip + 1
@@ -4788,7 +4822,7 @@ func _test_power_bar_placement() -> void:
 		_check(not hud.any(func(each: Rect2) -> bool: return each.intersects(rect)), name, "%s is over the HUD or the pause button" % button.name)
 	for wing_path in Content.WINGS:
 		var wing := load(wing_path) as WingData
-		for tap: Vector2 in wing.bot_route + wing.sketch_route:
+		for tap: Vector2 in wing.bot_route + wing.sketch_route + wing.speed_route:
 			_check(not area.grow(4.0).has_point(tap), name, "%s: the bot taps %s, under the power bar" % [wing_path, tap])
 		for room_path: String in wing.rooms:
 			var scene := (load(room_path) as PackedScene).instantiate()

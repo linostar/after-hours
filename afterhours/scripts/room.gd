@@ -47,7 +47,8 @@ extends Node2D
 ## leading back (Door.arrival_point; the toss lands there too). The PauseButton (top left)
 ## or Space pauses the room under the pause menu (PauseMenu).
 ## A second floor tap within DOUBLE_TAP seconds and DOUBLE_TAP_REACH of the first (both plain
-## floor walks; the first walks at once) makes the mime dash there, as Shift does with the
+## floor walks or door taps; the first walks at once) makes the mime dash there (through the
+## door), as Shift does with the
 ## keys; each dashed footfall is a noise the nearest guard within Mime.DASH_NOISE of hearing
 ## range hears. Its CloseCall beats a heartbeat and darkens the screen edges while a guard
 ## grows suspicious, and lets the mime wipe its brow after a near miss.
@@ -709,7 +710,9 @@ func _on_floor_tapped(at: Vector2) -> void:
 		return
 	for door in doors:
 		if door.rect().has_point(at):
-			mime.walk_to(door.position)
+			_walk_tap = at
+			_walk_tap_time = elapsed
+			mime.walk_to(door.position, double)
 			return
 	_walk_tap = at
 	_walk_tap_time = elapsed
