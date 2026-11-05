@@ -1,23 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="21" viewBox="0 0 12 21">
   <defs>
-    <linearGradient id="tunic" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#3b4c86"/>
-      <stop offset="0.45" stop-color="#2c3a6b"/>
-      <stop offset="1" stop-color="#1c2650"/>
-    </linearGradient>
-    <radialGradient id="skin" cx="0.4" cy="0.35" r="0.7">
-      <stop offset="0" stop-color="#f6cda6"/>
-      <stop offset="1" stop-color="#c98f66"/>
-    </radialGradient>
     <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#f4d77a"/>
-      <stop offset="1" stop-color="#b8892e"/>
+      <stop offset="0" stop-color="#f6dc84"/>
+      <stop offset="1" stop-color="#b08530"/>
     </linearGradient>
+    <clipPath id="c"><rect x="1.2" y="0" width="9.6" height="13" rx="4.8"/></clipPath>
+    <clipPath id="hand"><circle cx="6" cy="16.4" r="4.2"/></clipPath>
   </defs>
-  <ellipse cx="2.8" cy="15.4" rx="1.7" ry="2.5" transform="rotate(-25 2.8 15.4)" fill="url(#skin)" stroke="#141022" stroke-width="0.9"/>
-  <circle cx="6" cy="16.4" r="4.2" fill="url(#skin)" stroke="#141022" stroke-width="1"/>
-  <path d="M4.8 17.6 L5 19.8 M7 17.6 L7.1 19.8" stroke="#b97850" stroke-width="0.6" stroke-linecap="round"/>
-  <rect x="1.2" y="0" width="9.6" height="13" rx="4.8" fill="url(#tunic)" stroke="#141022" stroke-width="1.1"/>
-  <path d="M3.6 3 L3.6 9" stroke="#46548a" stroke-width="0.9" stroke-linecap="round"/>
-  <rect x="1.2" y="9.6" width="9.6" height="1.6" fill="url(#gold)"/>
+  <!-- The bare hand: thumb, a cel shadow on the palm, knuckle creases. -->
+  <ellipse cx="2.8" cy="15.4" rx="1.7" ry="2.5" transform="rotate(-25 2.8 15.4)" fill="#edc29a" stroke="#141022" stroke-width="0.9"/>
+  <circle cx="6" cy="16.4" r="4.2" fill="#edc29a"/>
+  <g clip-path="url(#hand)">
+    <path d="M7 12 Q9.4 16.4 6.8 21 L11 21 L11 12 Z" fill="#c99470"/>
+    <ellipse cx="4.6" cy="14.8" rx="1.2" ry="0.7" fill="#fbe2c8"/>
+  </g>
+  <circle cx="6" cy="16.4" r="4.2" fill="none" stroke="#141022" stroke-width="1"/>
+  <path d="M4.8 17.6 L5 19.8 M7 17.6 L7.1 19.8" stroke="#a96c48" stroke-width="0.6" stroke-linecap="round"/>
+  <!-- The forearm's sleeve with its gold cuff band. -->
+  <rect x="1.2" y="0" width="9.6" height="13" rx="4.8" fill="#2f3d72"/>
+  <g clip-path="url(#c)">
+    <rect x="7.4" y="0" width="4" height="13" fill="#1c2652"/>
+    <path d="M3.6 3 L3.6 8.4" stroke="#5a6aa8" stroke-width="1" stroke-linecap="round"/>
+    <rect x="0" y="9.4" width="12" height="1.8" fill="url(#gold)"/>
+    <rect x="7.4" y="9.4" width="4" height="1.8" fill="#8a6624"/>
+  </g>
+  <rect x="1.2" y="0" width="9.6" height="13" rx="4.8" fill="none" stroke="#141022" stroke-width="1.1"/>
 </svg>

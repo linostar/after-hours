@@ -1,12 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="10" height="19" viewBox="0 0 10 19">
   <defs>
-    <linearGradient id="cloth" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#3a3546"/>
-      <stop offset="0.45" stop-color="#25212e"/>
-      <stop offset="1" stop-color="#16131c"/>
-    </linearGradient>
+    <clipPath id="c"><path d="M0.8 4.6 A4 4 0 0 1 4.8 0.6 L5.2 0.6 A4 4 0 0 1 9.2 4.6 L9.2 14 A4.2 4.2 0 0 1 0.8 14 Z"/></clipPath>
   </defs>
-  <path d="M0.8 4.6 A4 4 0 0 1 4.8 0.6 L5.2 0.6 A4 4 0 0 1 9.2 4.6 L9.2 14 A4.2 4.2 0 0 1 0.8 14 Z" fill="url(#cloth)"/>
+  <!-- The thigh in black trousers: a hard shadow down the right, a pressed crease in the light. -->
+  <path d="M0.8 4.6 A4 4 0 0 1 4.8 0.6 L5.2 0.6 A4 4 0 0 1 9.2 4.6 L9.2 14 A4.2 4.2 0 0 1 0.8 14 Z" fill="#2a2633"/>
+  <g clip-path="url(#c)">
+    <rect x="6" y="0" width="4" height="19" fill="#14111a"/>
+    <path d="M3 3 L3 14" stroke="#555066" stroke-width="0.8" stroke-linecap="round"/>
+  </g>
   <path d="M0.8 14 L0.8 4.6 A4 4 0 0 1 4.8 0.6 L5.2 0.6 A4 4 0 0 1 9.2 4.6 L9.2 14" fill="none" stroke="#1b1622" stroke-width="1.1"/>
-  <path d="M3 3 L3 14" stroke="#4a4458" stroke-width="0.8" stroke-linecap="round"/>
 </svg>

@@ -499,6 +499,7 @@ func add_debug_overlay() -> DebugOverlay:
 func _physics_process(delta: float) -> void:
 	_game.audio.set_tension(danger())
 	_game.audio.set_chase(chasing())
+	mime.rig.mood = CharacterRig.mime_mood(peak_suspicion(), tossing, mime.rig.fidget)
 	if finished or leaving or _game.is_transitioning():
 		return
 	if run.replaying:
