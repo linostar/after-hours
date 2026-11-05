@@ -9,8 +9,8 @@
 [ext_resource type="Texture2D" path="res://art/svg/floor_cobble.svg" id="floor_tile"]
 
 [node name="Room" instance=ExtResource("base")]
-hint_in = [NodePath("Portraits/PortraitB")]
-hint_out = [NodePath("Portraits/PortraitB")]
+hint_in = [Vector2(600, 210)]
+hint_out = [Vector2(700, 210)]
 sketch_in = NodePath("Portraits/PortraitA")
 
 [node name="Entrance" parent="."]
@@ -37,11 +37,6 @@ period = 10
 position = Vector2(480, 105)
 painting = "castiglione"
 face = Vector2(10, -22)
-
-[node name="PortraitB" parent="Portraits" instance=ExtResource("portrait")]
-position = Vector2(820, 105)
-painting = "pearl_earring"
-face = Vector2(-5, -10)
 
 [node name="Screen0" type="StaticBody2D" parent="Actors"]
 position = Vector2(110, 290)
@@ -84,7 +79,7 @@ depth = 20
 height = 30
 
 [node name="Guard" parent="Actors" instance=ExtResource("guard")]
-route = PackedVector2Array(500, 210, 905, 210, 65, 210)
+route = PackedVector2Array(300, 210, 905, 210, 65, 210)
 
 [node name="ToFirst" parent="Doors" instance=ExtResource("door")]
 position = Vector2(45, 210)
