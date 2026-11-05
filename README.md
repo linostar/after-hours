@@ -8,9 +8,14 @@ masterpieces, swaps it for the original and escapes. Jam entry for Jamference: A
 
 ## Controls
 
-- **Touch or mouse:** tap the floor to walk; tap the easel to paint, then trace the glowing strokes; tap a
-  frame to tilt it, a portrait to hide in it, the masterpiece to swap it, a door to go through.
-- **Keyboard:** WASD or arrows to move, `E` to interact, `Space` to pause; menus work with arrows and Enter.
+- **Touch or mouse:** tap the floor to walk, double-tap to dash (a door too); tap the easel to paint, then
+  trace the glowing strokes; tap a frame to tilt it, a portrait to hide in it, the masterpiece to swap it, a
+  door to go through.
+- **Powers** (bottom right, once per room): the invisible ball (from wing 2: pick it, tap a floor spot to
+  make a noise there), rope (wing 3: pick it, tap a frame to tilt it from afar) and box (wing 4: hide where
+  you stand).
+- **Keyboard:** WASD or arrows to move, Shift to dash, `E` to interact, `1` `2` `3` for the powers, `Space`
+  to pause; menus work with arrows and Enter.
 - **Settings (gear / pause):** music, sound, motion effects, Assist (one press paints a Good forgery).
 
 ## Development
@@ -22,7 +27,8 @@ Google Chrome. Run from the repo root.
 - Validate (import, asset checks, project check, gameplay tests, bot replays): `tools/validate.sh`
 - Play one wing directly: `"$GODOT" --path afterhours -- --wing N`
 - Re-record every wing's bot run: `tools/record_wings.sh`
-- Replay and prove one wing's puzzles (every trick needed, the sketch route): `"$GODOT" --headless --path afterhours --fixed-fps 60 --script "$PWD/tools/bot.gd" -- --check res://data/wings/wing_NN.tres`
+- Re-record only a wing's dashing speed route: `"$GODOT" --headless --path afterhours --fixed-fps 60 --script "$PWD/tools/bot.gd" -- --speed res://data/wings/wing_NN.tres`
+- Replay and prove one wing's puzzles (every trick needed, the sketch route, the speed route): `"$GODOT" --headless --path afterhours --fixed-fps 60 --script "$PWD/tools/bot.gd" -- --check res://data/wings/wing_NN.tres`
 - Regenerate audio: `python3 tools/sfx.py`, `python3 tools/music.py`, `python3 tools/voices.py`
   (VoiceStudio running), then `"$GODOT" --headless --path afterhours --import`
 - Release build (validate, web export, smoke test, zip): `tools/build_web.sh` → `build/afterhours.zip`

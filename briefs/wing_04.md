@@ -1,5 +1,24 @@
 # Wing 4 brief: The Starry Night (Van Gogh)
 
+## Fun pass (feat/fun-polish)
+- The box's wing: the hall's corridor has no portrait to hide in on the main route any more. The far
+  portrait (PortraitB, (820, 105)) was removed and the corridor guard now restarts at x 300 heading for
+  the far door (was 500), so the mime always has room behind him. On the way in the mime follows him
+  to (600, 210) and mimes the box there as he turns at the far door; he walks back past it and the mime
+  steps out behind him. On the way back he is coming straight at the returning mime, too close for any
+  portrait: it walks to (700, 210) and boxes at once, lets him pass to the far door and out of sight,
+  and leaves by the near door. Both box taps are trick taps; the hints are the two floor spots. The
+  middle portrait (PortraitA) stays: the sketch route hides in it on the way in, as he passes.
+- What the bot taught: the box opens by itself after `BOX_TIME` 6 s, so the earliest box (greedy)
+  opened before the guard had even turned; the recorder now retries a leg later when the next leg
+  cannot get through. The way in boxes 6 s after reaching the spot and steps out 3.75 s later; the
+  sketch route stays in PortraitA about 13 s.
+- Speed route: the doors and the terrace's floor walks dashed, the boxes kept. Best 71.07 s against half
+  par 70: `speed_target` 75.
+- Bot result: 521 plays (the box search); 97.48 s, par 140; tricks 1, 5 (box), 7, 10, 14, 18, 21, 25 (box)
+  and 27 proved needed; the sketch route escapes with the sketch in 99.83 s; the speed route escapes in
+  71.07 s (target 75).
+
 ## Constraints
 - Four rooms (the ramp: the second half of the museum is longer); 8 guards; 4 to 7 minutes; every star
   reachable (bot-proved).
