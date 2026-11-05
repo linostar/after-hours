@@ -48,6 +48,8 @@ static func validate(wing: WingData, path: String) -> Array[String]:
 			problems.append("%s: rooms[%d] '%s' is not a scene that exists" % [path, i, room])
 	if wing.par_time <= 0.0:
 		problems.append("%s: par_time %.1f is not above 0" % [path, wing.par_time])
+	if wing.speed_target < 0.0:
+		problems.append("%s: speed_target %.1f is below 0" % [path, wing.speed_target])
 	if wing.ghosts.is_empty():
 		problems.append("%s: ghosts is empty" % path)
 	for i in wing.ghosts.size():

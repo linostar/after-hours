@@ -24,6 +24,7 @@ const SFX_IDS: Array[StringName] = [
 	&"guard_lost", &"fake_found", &"searchlight", &"escape", &"shrug", &"mime_gag", &"confetti", &"new_best", &"star",
 	&"no_star", &"ui_tap", &"toggle_on", &"toggle_off", &"pause", &"resume", &"error", &"sketch_drop", &"sketch_found",
 	&"dash", &"heartbeat", &"relief",
+	&"challenge", &"challenge_new",
 ]
 const SFX_BUS := &"SFX"
 const MUSIC_PATH := "res://audio/music/%s.mp3"

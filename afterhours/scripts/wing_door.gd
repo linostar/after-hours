@@ -3,7 +3,9 @@ extends Node2D
 ## A wing's door in the hub's back wall, wordless: the wing's painting hangs above an
 ## archway (its origin is the floor spot in front of it, where the mime goes through within
 ## Door.REACH), the best stars of the wing (Save) sit between them once it was escaped
-## from, and a locked door is chained shut (a tap rattles the chain) with its painting dimmed.
+## from, with a pip for each challenge it ever had completed (Challenges) in a little grid
+## at their left (the found sketch sits at their right), and a locked door is chained shut
+## (a tap rattles the chain) with its painting dimmed.
 ## A wing whose data is broken shows the error badge on its door and never opens.
 ## unlock() plays the moment a wing opens (the hub, once): the chains slide off and fade, the
 ## padlock drops to the floor with a bounce, and the painting brightens.
@@ -15,6 +17,11 @@ const STAR_SIZE := 18.0
 const STAR_ROW_Y := -114.0
 ## The wing's sketch, once found, beside the star row (door-local).
 const SKETCH_RECT := Rect2(38, -128, 16, 20)
+## The completed challenges' pips, a 2x2 grid (Challenge order, row by row) left of the star
+## row, beside the archway (door-local): the grid's top left, a pip's side and the step to the next.
+const PIPS_FROM := Vector2(-58, -117)
+const PIP_SIZE := 11.0
+const PIP_STEP := 12.0
 ## How far around the door, its painting and its spot a tap still means the door.
 const TAP_RECT := Rect2(-58, -190, 116, 214)
 const DARK := Color(0.1, 0.07, 0.09)
@@ -43,6 +50,8 @@ var finished := false
 var stars := 0
 ## Whether the wing's hidden sketch was found (Save.has_sketch).
 var sketch := false
+## The challenges the wing ever had completed (Save.challenges_of, Challenge order).
+var challenges: Array[bool] = Challenges.none()
 var broken := false
 ## Whether the unlock beat plays (open, its chains still falling).
 var unlocking := false
@@ -76,6 +85,11 @@ func rect() -> Rect2:
 	return Rect2(position + TAP_RECT.position, TAP_RECT.size)
 
 
+## Where challenge `challenge`'s pip sits (door-local).
+static func pip_rect(challenge: int) -> Rect2:
+	return Rect2(PIPS_FROM + Vector2(challenge % 2, floori(challenge / 2.0)) * PIP_STEP, Vector2.ONE * PIP_SIZE)
+
+
 ## Plays the unlock beat after UNLOCK_DELAY: chains falling, padlock dropping, the painting
 ## brightening (the hub sets `unlocking` before the door enters the tree, so it starts chained).
 func unlock() -> void:
@@ -107,6 +121,10 @@ func _draw() -> void:
 		for i in 3:
 			var at := Vector2((i - 1) * (STAR_SIZE + 4.0) - STAR_SIZE / 2.0, STAR_ROW_Y - STAR_SIZE / 2.0)
 			draw_texture_rect(STAR if i < stars else STAR_EMPTY, Rect2(at, Vector2(STAR_SIZE, STAR_SIZE)), false)
+	if not broken:
+		for i in challenges.size():
+			if challenges[i]:
+				draw_texture_rect(Challenges.ICONS[i], pip_rect(i), false)
 	var found: Texture2D = Paintings.SKETCHES.get(StringName(painting))
 	if sketch and found != null and not broken:
 		draw_texture_rect(found, SKETCH_RECT, false)

@@ -11,6 +11,8 @@ extends Resource
 @export var rooms: Array[String] = []
 ## Seconds, for the third star.
 @export var par_time := 120.0
+## Seconds, for the SPEED challenge (Challenges.speed_target); 0 means half of par_time.
+@export var speed_target := 0.0
 ## The forgery's ghost strokes, in canvas units (ForgeryCanvas.ghosts).
 @export var ghosts: Array[PackedVector2Array] = []
 ## The playtest bot's taps (tools/bot.gd; base units), in order, and the seconds it waits

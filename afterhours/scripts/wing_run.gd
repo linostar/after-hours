@@ -15,6 +15,7 @@ var came_from := START
 var elapsed := 0.0
 var ever_seen := false
 var catches := 0
+var powers_used := 0
 var fake_quality := 0.0
 var has_fake := false
 var carrying := false
