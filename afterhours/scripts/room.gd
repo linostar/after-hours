@@ -46,6 +46,11 @@ extends Node2D
 ## visit) and Game.enter_room changes to that room, where the mime comes in at the door
 ## leading back (Door.arrival_point; the toss lands there too). The PauseButton (top left)
 ## or Space pauses the room under the pause menu (PauseMenu).
+## A second floor tap within DOUBLE_TAP seconds and DOUBLE_TAP_REACH of the first (both plain
+## floor walks; the first walks at once) makes the mime dash there, as Shift does with the
+## keys; each dashed footfall is a noise the nearest guard within Mime.DASH_NOISE of hearing
+## range hears. Its CloseCall beats a heartbeat and darkens the screen edges while a guard
+## grows suspicious, and lets the mime wipe its brow after a near miss.
 
 ## Where the mime stands to swap the masterpiece (below it), and where a guard looks to
 ## inspect the hung fake: the floor at the painting's foot (sight rays to the painting
@@ -104,6 +109,13 @@ const SKETCH_REACH := 12.0
 ## round their edges) and under everything that walks.
 const HINT_AFTER := 3
 const HINT_Z := -4
+## A double tap (a dash): the second floor tap within this many seconds of room time and
+## this many base units of the first.
+const DOUBLE_TAP := 0.3
+const DOUBLE_TAP_REACH := 40.0
+## The close calls' edge darkening sits over the room and under the HUD (Hud and PauseButton
+## draw at z 50).
+const CLOSE_CALL_Z := 40
 
 ## The par time for the third star, in seconds.
 @export var par_time := 45.0
@@ -178,6 +190,11 @@ var _rig_night: ShaderMaterial
 var _escape_parts: Array[Tween] = []
 ## Seconds until the mime's next footstep on noisy floor can make a noise.
 var _step_noise_wait := 0.0
+## The last plain floor tap (a walk) and when it came (room time), for the double tap.
+var _walk_tap := Vector2.INF
+var _walk_tap_time := -INF
+## The heartbeat and edge darkening of a guard's growing suspicion (CloseCall).
+var close_call: CloseCall
 
 @onready var mime: Mime = $Actors/Mime
 ## The room's guards (the Guard children of Actors), and the first of them.
@@ -264,6 +281,12 @@ func _ready() -> void:
 		each.caught.connect(_on_caught)
 		each.inspected.connect(_on_inspected.bind(each))
 	_floor.tapped.connect(_on_floor_tapped)
+	mime.dash_stepped.connect(_on_dash_step)
+	close_call = CloseCall.new()
+	close_call.name = "CloseCall"
+	close_call.z_index = CLOSE_CALL_Z
+	close_call.room = self
+	add_child(close_call)
 	_keys.interacted.connect(_on_interacted)
 	_keys.pause_pressed.connect(pause)
 	($PauseButton as Button).pressed.connect(pause)
@@ -495,7 +518,7 @@ func _physics_process(delta: float) -> void:
 		tilt_target = null
 		hide_target = null
 		sketch_intent = false
-		mime.nudge(walk, delta)
+		mime.nudge(walk, delta, _keys.running())
 	if paint_intent and not tossing and not mime.walking and mime.position.distance_to(easel.spot()) <= SWAP_REACH:
 		paint_intent = false
 		mime.face_toward(easel.position)
@@ -559,6 +582,17 @@ func _step_noise(delta: float) -> void:
 		print("[Room] A loud footstep at %s at t %.2f, heard by %s" % [mime.position.round(), elapsed, heard.name])
 
 
+## A dashed footfall: a noise the nearest active guard within Mime.DASH_NOISE of hearing range
+## hears.
+func _on_dash_step() -> void:
+	if tossing or finished or leaving:
+		return
+	var heard := nearest_in_earshot(mime.position, GuardBrain.HEARING_RANGE * Mime.DASH_NOISE)
+	if heard != null:
+		heard.hear(mime.position)
+		print("[Room] A dashed footfall at %s at t %.2f, heard by %s" % [mime.position.round(), elapsed, heard.name])
+
+
 ## Each active guard not chasing looks for a clue the gimmick shows it (Gimmick.clue_seen_by)
 ## and goes to investigate it as if it heard a noise there.
 func _follow_clues() -> void:
@@ -597,6 +631,8 @@ func _on_floor_tapped(at: Vector2) -> void:
 		_end_replay()
 		return
 	TapRipple.spawn(self, at)
+	var double := elapsed - _walk_tap_time <= DOUBLE_TAP and at.distance_to(_walk_tap) <= DOUBLE_TAP_REACH
+	_walk_tap_time = -INF
 	if hidden_in != null:
 		if hidden_in.rect().has_point(at):
 			return
@@ -636,7 +672,9 @@ func _on_floor_tapped(at: Vector2) -> void:
 		if door.rect().has_point(at):
 			mime.walk_to(door.position)
 			return
-	mime.walk_to(at)
+	_walk_tap = at
+	_walk_tap_time = elapsed
+	mime.walk_to(at, double)
 
 
 ## Whether the player can act in the room now (not tossed, painting or finished).
