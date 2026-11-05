@@ -33,6 +33,7 @@ var room_catches: Dictionary[int, int] = {}
 ## A replay of the bot's run (the hideout's): the rooms follow the ghost mime, the only thing
 ## that moves; nothing is recorded.
 var replaying := false
+var powers_used := 0
 
 
 func _init(of: WingData) -> void:

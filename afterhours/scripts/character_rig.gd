@@ -25,8 +25,9 @@ signal gag_started
 enum View { FRONT, BACK, RIGHT, LEFT }
 ## A gesture played over a time: a guard's fidget at a waypoint (STRETCH, WATCH, YAWN),
 ## dusting off its hands after a catch (DUST), the mime tipping its beret (TIP, the escape)
-## and bowing (BOW, a three-star result).
-enum Fidget { NONE, STRETCH, WATCH, YAWN, DUST, TIP, BOW }
+## and bowing (BOW, a three-star result), and its powers' pantomime (Powers): throwing the
+## invisible ball (THROW) and hauling on the invisible rope (PULL).
+enum Fidget { NONE, STRETCH, WATCH, YAWN, DUST, TIP, BOW, THROW, PULL }
 
 ## A front or back view turns to the side once the heading's across exceeds this share of
 ## its along (about 35 degrees off vertical), so a diagonal walks side on; a side view turns
@@ -404,6 +405,16 @@ func _gesture(i: int) -> void:
 		# The near hand up to the beret's brim and back down.
 		target = Vector2(-2.6, -0.8) if side else Vector2(out * 2.4, -out * 1.3)
 		weight = _fidget_weight()
+	elif fidget == Fidget.THROW and i == 1:
+		# The near arm winds back, then swings up and over to let the ball go.
+		var release := smoothstep(0.3, 0.65, _fidget_time / _fidget_length)
+		target = Vector2(lerpf(1.0, -2.6, release), -0.6) if side else Vector2(out * lerpf(0.5, 2.7, release), -out * lerpf(1.6, 0.2, release))
+		weight = minf(_fidget_weight() * 2.0, 1.0)
+	elif fidget == Fidget.PULL:
+		# Both hands reach out along the rope, then haul it in to the chest.
+		var haul := smoothstep(0.2, 0.7, _fidget_time / _fidget_length)
+		target = Vector2(lerpf(-1.6, -0.5, haul), lerpf(-0.3, -1.8, haul)) if side else Vector2(-out * lerpf(0.1, 0.3, haul), -out * lerpf(1.0, 1.95, haul))
+		weight = minf(_fidget_weight() * 2.0, 1.0)
 	elif fidget == Fidget.STRETCH:
 		target = Vector2(-2.9, -0.2) if side else Vector2(out * 2.75, out * 0.25)
 		weight = _fidget_weight()

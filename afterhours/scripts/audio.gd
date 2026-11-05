@@ -19,6 +19,7 @@ const SFX_IDS: Array[StringName] = [
 	&"chain_rattle", &"chains_fall", &"caught", &"toss", &"splat", &"dust_hands", &"guard_hear", &"guard_suspect", &"guard_alert",
 	&"guard_lost", &"fake_found", &"searchlight", &"escape", &"shrug", &"mime_gag", &"confetti", &"new_best", &"star",
 	&"no_star", &"ui_tap", &"toggle_on", &"toggle_off", &"pause", &"resume", &"error", &"sketch_drop", &"sketch_found",
+	&"ball_throw", &"ball_land", &"rope_pull", &"box_up", &"power_unlock",
 ]
 const SFX_BUS := &"SFX"
 const MUSIC_PATH := "res://audio/music/%s.mp3"

@@ -216,6 +216,14 @@ func _tests() -> Array[Callable]:
 		_test_no_flash_rates,
 		_test_ghost_replay_visits,
 		_test_ghost_mime_until_escape,
+		_test_powers_locked_per_wing,
+		_test_power_bar_placement,
+		_test_power_ball,
+		_test_power_rope,
+		_test_power_box,
+		_test_power_refill,
+		_test_power_cancel,
+		_test_power_unlock_beat,
 	]
 
 
@@ -4000,3 +4008,269 @@ func _test_rotate_overlay_pauses() -> void:
 	_game.fit_screen()
 	_check(paused, name, "a tree paused before the overlay was unpaused by it")
 	paused = false
+
+
+## Each power unlocks with its wing (the ball from wing 2, the rope from 3, the box from 4; a
+## wing outside Content.WINGS, such as a room on its own, has all three); a room's bar shows
+## only its wing's powers (none: no bar), and a locked power's key does nothing.
+func _test_powers_locked_per_wing() -> void:
+	var name := "powers_locked_per_wing"
+	var expected: Array[Array] = [[], [Powers.Power.BALL], [Powers.Power.BALL, Powers.Power.ROPE], Powers.Power.values(), Powers.Power.values(), Powers.Power.values()]
+	_check(Powers.unlocked("") == Powers.Power.values() and Powers.unlocked("res://scenes/test/slice_wing.tres") == Powers.Power.values(), name, "a wing outside the play order does not have every power")
+	_check(Powers.unlocked_by(Content.WINGS[0]) == -1 and Powers.unlocked_by(Content.WINGS[1]) == Powers.Power.BALL and Powers.unlocked_by(Content.WINGS[2]) == Powers.Power.ROPE
+			and Powers.unlocked_by(Content.WINGS[3]) == Powers.Power.BOX and Powers.unlocked_by(Content.WINGS[4]) == -1 and Powers.unlocked_by("") == -1, name, "the unlocking wings are not 2, 3 and 4")
+	var saved := _game.save.duplicate(true)
+	_game.save = Save.defaults()
+	for i in Content.WINGS.size():
+		_check(Powers.unlocked(Content.WINGS[i]) == expected[i], name, "wing %d has powers %s, not %s" % [i + 1, Powers.unlocked(Content.WINGS[i]), expected[i]])
+		var wing := load(Content.WINGS[i]) as WingData
+		_game.run = WingRun.new(wing)
+		change_scene_to_file(wing.rooms[0])
+		var room := await _wait_for_room(wing.rooms[0], 120)
+		if room == null:
+			_check(false, name, "wing %d's first room did not load" % (i + 1))
+			continue
+		for guard in room.guards:
+			guard.active = false
+		var shown: Array = []
+		for power in room.power_bar.buttons.size():
+			if room.power_bar.buttons[power].visible:
+				shown.append(power)
+		_check(shown == expected[i] and room.power_bar.visible == not expected[i].is_empty(), name, "wing %d's bar shows %s (bar shown: %s), not %s" % [i + 1, shown, room.power_bar.visible, expected[i]])
+		if i == 1:
+			await _press_key(KEY_2)
+			await _press_key(KEY_3)
+			_check(room.chosen_power == -1 and room.box == null, name, "a locked power's key chose it in wing 2")
+	_game.save = saved
+	_game.run = null
+
+
+## The bar: a 44x44 (or larger) icon button per power with an accessibility name and its key
+## label art, inside the world (so the safe area), clear of the pause button and the HUD; in
+## every wing room clear of the paintings and doors, and of every recorded bot tap (main and
+## sketch routes), so recorded runs never press it.
+func _test_power_bar_placement() -> void:
+	var name := "power_bar_placement"
+	_game.run = null
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.active = false
+	var bar := room.power_bar
+	var area := bar.get_rect()
+	var world := Rect2(Vector2.ZERO, Vector2(960, 540))
+	var hud: Array[Rect2] = [RoomHud.clock_rect(), RoomHud.plate_rect(), RoomHud.sketch_rect(), (room.get_node("PauseButton") as Control).get_rect()]
+	for button in bar.buttons:
+		var rect := button.get_global_rect()
+		_check(button.visible and rect.size.x >= 44.0 and rect.size.y >= 44.0 and world.encloses(rect) and area.encloses(rect), name, "%s is hidden, under 44x44 or off the world: %s" % [button.name, rect])
+		_check(button.accessibility_name != "" and button.icon != null and (button.get_node("Key") as TextureRect).texture != null, name, "%s has no accessibility name, icon or key label" % button.name)
+		_check(not hud.any(func(each: Rect2) -> bool: return each.intersects(rect)), name, "%s is over the HUD or the pause button" % button.name)
+	for wing_path in Content.WINGS:
+		var wing := load(wing_path) as WingData
+		for tap: Vector2 in wing.bot_route + wing.sketch_route:
+			_check(not area.grow(4.0).has_point(tap), name, "%s: the bot taps %s, under the power bar" % [wing_path, tap])
+		for room_path: String in wing.rooms:
+			var scene := (load(room_path) as PackedScene).instantiate()
+			var covered: Dictionary[String, Rect2] = {}
+			for frame: TiltFrame in scene.get_node("Frames").get_children():
+				covered["frame " + frame.name] = frame.rect()
+			for portrait: HidingPortrait in scene.get_node("Portraits").get_children():
+				covered["portrait " + portrait.name] = portrait.rect()
+			for door: Door in scene.get_node("Doors").get_children():
+				covered["door " + door.name] = door.rect()
+			var picture := scene.get_node_or_null("Masterpiece") as FramedPainting
+			if picture != null:
+				covered["the masterpiece"] = Rect2(picture.position - picture.size / 2.0, picture.size)
+			for what in covered:
+				_check(not area.intersects(covered[what]), name, "%s: the power bar covers %s" % [room_path, what])
+			scene.free()
+
+
+## The ball: key 1 chooses it (its reach ringed round the mime); out of reach the mime shrugs
+## and it stays ready; in reach the mime throws it (the THROW gesture, counted, spent) and
+## where it lands the guard hears it, as he would a tilted frame; spent, it cannot be chosen.
+func _test_power_ball() -> void:
+	var name := "power_ball"
+	_game.run = null
+	var room := await _load_room()
+	if room == null:
+		return
+	_stand(room.guard, Vector2(600, 430), Vector2.RIGHT)
+	room.mime.place_at(Vector2(200, 260))
+	var played := _game.audio.played
+	await _press_key(KEY_1)
+	_check(room.chosen_power == Powers.Power.BALL and room.power_bar.chosen == Powers.Power.BALL and room._reach_ring.visible and room._reach_ring.radius == Powers.BALL_RANGE, name, "key 1 did not choose the ball and ring its reach")
+	played.clear()
+	await _tap_at(room.mime.position + Vector2(Powers.BALL_RANGE + 20.0, 0.0))
+	_check(&"shrug" in played and room.chosen_power == -1 and not room.powers_spent[Powers.Power.BALL] and room.run.powers_used == 0 and not room.mime.walking, name, "a throw out of reach did not shrug with the ball still ready (sounds %s)" % [played])
+	var spot := Vector2(380, 420)
+	await _tap_control(room.power_bar.buttons[Powers.Power.BALL])
+	await _tap_at(spot)
+	_check(room.powers_spent[Powers.Power.BALL] and room.run.powers_used == 1 and room.power_bar.buttons[Powers.Power.BALL].disabled and not room._reach_ring.visible, name, "the throw did not spend the ball and count it")
+	_check(room.mime.rig.fidget == CharacterRig.Fidget.THROW and &"ball_throw" in played and room.mime.position == Vector2(200, 260) and not room.mime.walking, name, "the mime did not throw from where it stood")
+	_check(room.guard.noise_point != spot, name, "the guard heard the ball before it landed")
+	var landed := await _wait_until(func() -> bool: return room.guard.noise_point == spot, ceili(PowerFx.BALL_FLIGHT * 60.0) + 5)
+	_check(landed and &"ball_land" in played, name, "the guard did not hear the ball land at %s (sounds %s)" % [spot, played])
+	await _press_key(KEY_1)
+	_check(room.chosen_power == -1, name, "a spent ball was chosen again")
+
+
+## The rope: key 2 chooses it; a frame out of reach or already tilted gets a shrug, the rope
+## still ready; a straight frame in reach tilts from afar (the PULL gesture, spent, counted),
+## and the nearest guard hears the frame as for a tilt.
+func _test_power_rope() -> void:
+	var name := "power_rope"
+	_game.run = null
+	var room := await _load_room()
+	if room == null:
+		return
+	_stand(room.guard, Vector2(300, 430), Vector2.DOWN)
+	var near := room.get_node("Frames/FrameA") as TiltFrame
+	var crooked := room.get_node("Frames/FrameB") as TiltFrame
+	room.mime.place_at(Vector2(700, 300))
+	var played := _game.audio.played
+	await _press_key(KEY_2)
+	_check(room.chosen_power == Powers.Power.ROPE and room._reach_ring.radius == Powers.ROPE_RANGE, name, "key 2 did not choose the rope and ring its reach")
+	played.clear()
+	await _tap_at(near.position)
+	_check(&"shrug" in played and not near.tilted and not room.powers_spent[Powers.Power.ROPE], name, "a frame out of reach did not get a shrug with the rope still ready")
+	room.mime.place_at(Vector2(450, 260))
+	crooked.tilt()
+	await _press_key(KEY_2)
+	played.clear()
+	await _tap_at(crooked.position)
+	_check(&"shrug" in played and not room.powers_spent[Powers.Power.ROPE], name, "a tilted frame did not get a shrug with the rope still ready")
+	await _press_key(KEY_2)
+	await _tap_at(near.position)
+	_check(near.tilted and room.powers_spent[Powers.Power.ROPE] and room.run.powers_used == 1 and &"rope_pull" in played and &"tilt" in played, name, "the rope did not tilt the frame in reach (sounds %s)" % [played])
+	_check(room.mime.rig.fidget == CharacterRig.Fidget.PULL and room.mime.position == Vector2(450, 260) and not room.mime.walking, name, "the mime did not pull from where it stood")
+	_check(room.guard.noise_point == near.view_point(), name, "the guard did not hear the frame the rope tilted")
+
+
+## The box: key 3 hides the mime where it stands (spent, counted); a guard looking straight at
+## it then sees nothing; the next tap steps it out and walks on; BOX_TIME steps it out by
+## itself; a guard who sees it step in chases it there, and the catch steps it out.
+func _test_power_box() -> void:
+	var name := "power_box"
+	_game.run = null
+	var room := await _load_room()
+	if room == null:
+		return
+	_stand(room.guard, Vector2(700, 430), Vector2.RIGHT)
+	room.mime.place_at(Vector2(200, 300))
+	var played := _game.audio.played
+	played.clear()
+	await _press_key(KEY_3)
+	_check(room.box != null and room.is_hidden() and not room.mime.visible and room.powers_spent[Powers.Power.BOX] and room.run.powers_used == 1 and &"box_up" in played and not room.ever_seen, name, "key 3 did not hide the mime in the box unseen")
+	_stand(room.guard, Vector2(290, 300), Vector2.LEFT)
+	for i in 30:
+		await physics_frame
+	_check(room.guard.suspicion == 0.0 and not room.guard.senses.chasing and not room.ever_seen, name, "a guard looking at the box saw the mime")
+	_stand(room.guard, Vector2(700, 430), Vector2.RIGHT)
+	await _tap_at(Vector2(260, 420))
+	_check(room.box == null and room.mime.visible and room.mime.walking and &"unhide" in played, name, "the next tap did not step out of the box and walk on")
+	# A new visit (the run kept): the box is ready again, and BOX_TIME steps out by itself.
+	room = await _load_room()
+	_stand(room.guard, Vector2(700, 430), Vector2.RIGHT)
+	room.mime.place_at(Vector2(200, 300))
+	await _press_key(KEY_3)
+	_check(room.box != null and room.run.powers_used == 2, name, "the box was not ready on the next visit")
+	var out := await _wait_until(func() -> bool: return room.box == null, ceili(Powers.BOX_TIME * 60.0) + 10)
+	_check(out and room.mime.visible, name, "BOX_TIME did not step the mime out")
+	# Seen stepping in: chased there, and the catch steps it out.
+	room = await _load_room()
+	room.mime.place_at(Vector2(200, 300))
+	_stand(room.guard, Vector2(300, 300), Vector2.LEFT)
+	room._on_power_picked(Powers.Power.BOX)
+	_check(room.box != null and room.guard.senses.chasing and room.ever_seen, name, "a guard who saw the mime step into the box does not chase it")
+	room.guard.patrolling = true
+	var caught := await _wait_until(func() -> bool: return room.tossing, 180)
+	_check(caught and room.box == null and room.mime.visible, name, "the chase did not catch the boxed mime and step it out")
+
+
+## A power is spent for the visit: a toss does not refill it, entering the room again does
+## (the run counts every use across visits).
+func _test_power_refill() -> void:
+	var name := "power_refill"
+	_game.run = null
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.active = false
+	room.mime.place_at(Vector2(200, 300))
+	await _press_key(KEY_1)
+	await _tap_at(Vector2(300, 300))
+	_check(room.powers_spent[Powers.Power.BALL] and room.run.powers_used == 1, name, "the ball was not spent")
+	room._on_caught()
+	await _wait_until(func() -> bool: return not room.tossing, 180)
+	_check(room.powers_spent[Powers.Power.BALL] and room.power_bar.buttons[Powers.Power.BALL].disabled, name, "a toss refilled the ball")
+	await _press_key(KEY_1)
+	_check(room.chosen_power == -1, name, "the spent ball could be chosen after the toss")
+	var run := room.run
+	var again := await _load_room()
+	_check(again.run == run and again.powers_spent == [false, false, false] and not again.power_bar.buttons[Powers.Power.BALL].disabled and run.powers_used == 1, name, "entering the room again did not refill the powers (spent %s, used %d)" % [again.powers_spent, run.powers_used])
+
+
+## Cancelling a chosen power: the same button again, Escape, or a rope tap on no frame (the
+## mime stays put, nothing spent); another power's key switches to it.
+func _test_power_cancel() -> void:
+	var name := "power_cancel"
+	_game.run = null
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.active = false
+	room.mime.place_at(Vector2(200, 300))
+	var ball := room.power_bar.buttons[Powers.Power.BALL]
+	await _tap_control(ball)
+	_check(room.chosen_power == Powers.Power.BALL, name, "the ball button did not choose the ball")
+	await _tap_control(ball)
+	_check(room.chosen_power == -1 and room.power_bar.chosen == -1 and not room._reach_ring.visible, name, "the same button again did not cancel the ball")
+	await _press_key(KEY_1)
+	await _press_key(KEY_ESCAPE)
+	_check(room.chosen_power == -1, name, "Escape did not cancel the ball")
+	await _press_key(KEY_1)
+	await _press_key(KEY_2)
+	_check(room.chosen_power == Powers.Power.ROPE, name, "key 2 did not switch from the ball to the rope")
+	await _tap_at(Vector2(300, 420))
+	_check(room.chosen_power == -1 and not room.mime.walking and not room.powers_spent.has(true) and room.run.powers_used == 0, name, "a rope tap on no frame did not just cancel it")
+	await _tap_at(Vector2(300, 420))
+	_check(room.mime.walking, name, "after a cancel a tap does not walk the mime")
+
+
+## The unlock beat: the first entry of a play of the wing that unlocks a power, never escaped
+## from, pops it into the bar with its sound, once; not in the next room, nor once the wing
+## has been escaped from.
+func _test_power_unlock_beat() -> void:
+	var name := "power_unlock_beat"
+	var saved := _game.save.duplicate(true)
+	_game.save = Save.defaults()
+	var played := _game.audio.played
+	played.clear()
+	var wing := load(Content.WINGS[1]) as WingData
+	_game.play_wing_file(Content.WINGS[1])
+	var room := await _wait_for_room(wing.rooms[0], 300)
+	if room == null:
+		_check(false, name, "wing 2 did not start")
+		_game.save = saved
+		return
+	for guard in room.guards:
+		guard.active = false
+	await create_timer(PowerBar.POP_DELAY + PowerBar.POP_TIME + PowerBar.GLINT_TIME).timeout
+	_check(played.count(&"power_unlock") == 1 and room.power_bar.buttons[Powers.Power.BALL].scale == Vector2.ONE, name, "wing 2's first entry did not pop the ball in once (sounds %s)" % [played])
+	_game.enter_room(1)
+	room = await _wait_for_room(wing.rooms[1], 300)
+	for guard in room.guards:
+		guard.active = false
+	await create_timer(PowerBar.POP_DELAY + PowerBar.POP_TIME).timeout
+	_check(played.count(&"power_unlock") == 1 and room.power_bar.buttons[Powers.Power.BALL].visible, name, "the next room popped the ball in again")
+	Save.record(_game.save, Content.wing_id(Content.WINGS[1]), [true, false, false] as Array[bool], 99.0)
+	_game.replay()
+	await _wait_until(func() -> bool: return current_scene != room, 120)
+	room = await _wait_for_room(wing.rooms[0], 300)
+	for guard in room.guards:
+		guard.active = false
+	await create_timer(PowerBar.POP_DELAY + PowerBar.POP_TIME).timeout
+	_check(played.count(&"power_unlock") == 1, name, "the ball popped in after the wing was escaped from")
+	_game.save = saved
+	_game.run = null
