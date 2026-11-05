@@ -15,7 +15,9 @@ extends Node2D
 ## (BREATH_HZ, stilled under Reduce Motion), the eyes blink (BLINK_HZ, lids drawn over the
 ## face's eyes_front / eyes_side), a rig with gag_after does the mime's invisible wall once it
 ## has stood idle that long (gagging; it stops the moment it walks or is busy), and
-## start_fidget plays a guard's waypoint fidget (Fidget) over a given time.
+## start_fidget plays a guard's waypoint fidget (Fidget) over a given time. While `running`
+## (the mime's dash) the gait blends into a run: steps run_step times longer, the legs and
+## arms swing run_swing times wider and the body leans run_lean into it.
 
 ## Emitted at each footfall while walking.
 signal stepped
@@ -25,8 +27,8 @@ signal gag_started
 enum View { FRONT, BACK, RIGHT, LEFT }
 ## A gesture played over a time: a guard's fidget at a waypoint (STRETCH, WATCH, YAWN),
 ## dusting off its hands after a catch (DUST), the mime tipping its beret (TIP, the escape)
-## and bowing (BOW, a three-star result).
-enum Fidget { NONE, STRETCH, WATCH, YAWN, DUST, TIP, BOW }
+## and bowing (BOW, a three-star result), and wiping its brow (BROW, a near miss).
+enum Fidget { NONE, STRETCH, WATCH, YAWN, DUST, TIP, BOW, BROW }
 
 ## A front or back view turns to the side once the heading's across exceeds this share of
 ## its along (about 35 degrees off vertical), so a diagonal walks side on; a side view turns
@@ -91,6 +93,11 @@ const BOW_DIP := 0.14
 @export var side_spread := 3.0
 ## Base units walked per step (two steps a cycle).
 @export var step_length := 50.0
+## Running: the step this many times longer, the legs and arms swinging this many times
+## wider, the body leaning this far (radians) at full stride.
+@export var run_step := 1.4
+@export var run_swing := 1.35
+@export var run_lean := 0.16
 ## At full stride (side view): how far the legs reach fore and aft at a footfall (radians
 ## off vertical) and the arms swing; how high the swinging foot clears the floor (side) or
 ## the lifted foot rises (front and back); how far the body sinks at each footfall (lowest
@@ -119,6 +126,10 @@ const BOW_DIP := 0.14
 @export var gag_after := 0.0
 
 var view := View.FRONT
+## Running (the mime's dash) rather than walking; the gait blends between them.
+var running := false
+## How far into a run the gait is: 0 walking, 1 running.
+var run := 0.0
 ## Whether it is doing the invisible-wall gag now.
 var gagging := false
 ## The fidget it is playing (NONE for none).
@@ -243,9 +254,10 @@ func face(heading: Vector2) -> void:
 ## something) stands without the gag.
 func walk(distance: float, delta: float, idle := true) -> void:
 	clock += delta
+	run = move_toward(run, 1.0 if running else 0.0, SETTLE_RATE * delta)
 	if distance > 0.0:
 		var before := phase
-		phase = fmod(phase + distance / (2.0 * step_length), 1.0)
+		phase = fmod(phase + distance / (2.0 * step_length * lerpf(1.0, run_step, run)), 1.0)
 		# The first foot leaving the floor is a footfall too, then one every step.
 		if stride == 0.0 or floori(before * 2.0) != floori(phase * 2.0):
 			stepped.emit()
@@ -400,6 +412,11 @@ func _gesture(i: int) -> void:
 		else:
 			target = Vector2(0.9, 0.2) if side else Vector2(out * 1.1, out * 0.3)
 		weight = _fidget_weight()
+	elif fidget == Fidget.BROW and i == 1:
+		# The near hand up to the brow, swept across it once (the forearm turning) and down.
+		var across := clampf(_fidget_time / _fidget_length, 0.0, 1.0)
+		target = Vector2(-2.5, lerpf(-1.3, -0.5, across)) if side else Vector2(out * 2.3, -out * lerpf(1.1, 1.9, across))
+		weight = minf(_fidget_weight() * 2.0, 1.0)
 	elif fidget == Fidget.TIP and i == 1:
 		# The near hand up to the beret's brim and back down.
 		target = Vector2(-2.6, -0.8) if side else Vector2(out * 2.4, -out * 1.3)
@@ -424,11 +441,12 @@ func _gesture(i: int) -> void:
 
 
 func _pose_side(p: float, drop: float) -> void:
-	var tilt := lean * stride
+	var tilt := lerpf(lean, run_lean, run) * stride
+	var swing := lerpf(1.0, run_swing, run)
 	_body.rotation = tilt
 	_body.position = Vector2(0.0, drop)
 	var leg := -hip.y
-	var reach := leg * sin(leg_swing) * stride
+	var reach := leg * sin(leg_swing * swing) * stride
 	for i in 2:
 		var near := i == 1
 		var at := Vector2(side_spread * (1.0 if near else -1.0) / 2.0, hip.y).rotated(tilt) + Vector2(0.0, drop)
@@ -445,7 +463,7 @@ func _pose_side(p: float, drop: float) -> void:
 			foot = Vector2(reach * (2.0 * s * s * (3.0 - 2.0 * s) - 1.0), -lift * stride * sin(PI * pow(s, 0.8)))
 		_reach(_legs[i], _shins[i], foot + Vector2(at.x, 0.0) - at)
 		# The near arm swings against the near leg: back as it reaches forward.
-		var arm := (1.0 if near else -1.0) * arm_swing * stride
+		var arm := (1.0 if near else -1.0) * arm_swing * swing * stride
 		_arms[i].position = Vector2(0.0, shoulder.y).rotated(tilt) + Vector2(0.0, drop)
 		_arms[i].rotation = arm * cos(p)
 		_arms[i].scale = Vector2.ONE / ART_SCALE

@@ -1,7 +1,7 @@
 class_name KeyboardInput
 extends Node
 ## The room's keyboard (accessibility, CLAUDE.md): the arrows (the built-in ui_* actions)
-## or WASD (physical keys) walk the mime, E interacts with whatever is nearest, Space
+## or WASD (physical keys) walk the mime (running with Shift held), E interacts with whatever is nearest, Space
 ## pauses (read before the GUI, so a focused button does not take it as ui_accept). Raw
 ## input is read here only (scripts/ui).
 
@@ -17,6 +17,11 @@ func direction() -> Vector2:
 		float(Input.is_physical_key_pressed(KEY_D)) - float(Input.is_physical_key_pressed(KEY_A)),
 		float(Input.is_physical_key_pressed(KEY_S)) - float(Input.is_physical_key_pressed(KEY_W)))
 	return (Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down") + keys).limit_length(1.0)
+
+
+## Whether Shift is held: the keys run the mime (a dash).
+func running() -> bool:
+	return Input.is_physical_key_pressed(KEY_SHIFT)
 
 
 func _input(event: InputEvent) -> void:

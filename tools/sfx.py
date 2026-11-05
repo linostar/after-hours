@@ -461,6 +461,23 @@ def fx_error(rng):
     return mix((knock(rng, 110.0, 0.1), 0, 1.0), (highpassed(noise(0.12, rng, [(0, 6000), (1, 2500)], decay=30.0)), 0.01, 0.6))
 
 
+def fx_dash(rng):
+    """A dashed footfall: a slapped heel, a low knock with a scuff of grit under it."""
+    return mix((knock(rng, 140.0, 0.08), 0, 1.0),
+               (noise(0.09, rng, [(0, 3000), (1, 900)], decay=35.0), 0.005, 0.6))
+
+
+def fx_heartbeat(rng):
+    """A close call's heartbeat: lub-dub, two soft low thumps, the second a little quieter."""
+    return mix((thump(62.0, 0.14, 0.5, 22.0), 0, 1.0), (thump(56.0, 0.14, 0.5, 24.0), 0.16, 0.75))
+
+
+def fx_relief(rng):
+    """A near miss's relief: a vibraphone sigh down a fourth and back to rest, under a breath."""
+    return mix((arpeggio([F5, C5, Eb5], 0.13, 0.5, 7.0, VIBES), 0, 0.9),
+               (bandpass(noise(0.35, rng, [(0, 2000), (1, 600)], attack=0.08, release=0.2), 900.0, 1.2), 0.0, 0.25))
+
+
 # How loud each kind of sound may be as heard (loudness_of: K-weighted, the loudest 0.1 s,
 # LUFS), (floor, ceiling): a peak level alone does not set loudness (a sustained buzz is far
 # louder than a click of the same peak), so --check holds every file to its kind's band.
@@ -512,6 +529,9 @@ EFFECTS = {
     "pause": (fx_pause, 0.21, "ui"),
     "resume": (fx_resume, 0.21, "ui"),
     "error": (fx_error, 0.54, "event"),
+    "dash": (fx_dash, 0.3, "quiet"),
+    "heartbeat": (fx_heartbeat, 0.25, "quiet"),
+    "relief": (fx_relief, 0.4, "stinger"),
 }
 
 

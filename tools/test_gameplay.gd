@@ -216,6 +216,12 @@ func _tests() -> Array[Callable]:
 		_test_no_flash_rates,
 		_test_ghost_replay_visits,
 		_test_ghost_mime_until_escape,
+		_test_dash_double_tap,
+		_test_dash_shift,
+		_test_dash_footfalls_heard,
+		_test_close_call_heartbeat,
+		_test_near_miss,
+		_test_routes_never_double_tap,
 	]
 
 
@@ -4000,3 +4006,236 @@ func _test_rotate_overlay_pauses() -> void:
 	_game.fit_screen()
 	_check(paused, name, "a tree paused before the overlay was unpaused by it")
 	paused = false
+
+
+## A double tap on the floor (within Room.DOUBLE_TAP and DOUBLE_TAP_REACH) dashes there at
+## Mime.DASH_SPEED with the rig running, until it arrives; a first tap walks at once, and taps
+## apart in time or space only walk.
+func _test_dash_double_tap() -> void:
+	var name := "dash_double_tap"
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.active = false
+	room.mime.place_at(Vector2(200, 450))
+	await _tap_at(Vector2(600, 480))
+	_check(room.mime.walking and not room.mime.dashing and room.mime.speed() == Mime.SPEED, name, "a first tap does not walk at once at SPEED")
+	await _tap_at(Vector2(615, 480))
+	_check(room.mime.dashing and room.mime.speed() == Mime.DASH_SPEED, name, "a second tap 15 away at once does not dash (speed %.0f)" % room.mime.speed())
+	await physics_frame
+	await physics_frame
+	_check(room.mime.rig.running, name, "the dashing mime's rig does not run")
+	var from := room.mime.position
+	for i in 30:
+		await physics_frame
+	var moved := room.mime.position.distance_to(from)
+	_check(absf(moved - Mime.DASH_SPEED * 0.5) < 8.0, name, "the dash covered %.0f in 0.5 s, not %.0f" % [moved, Mime.DASH_SPEED * 0.5])
+	await _wait_until(func() -> bool: return not room.mime.walking, 240)
+	await physics_frame
+	_check(not room.mime.dashing and not room.mime.rig.running, name, "the dash goes on after arriving")
+	await _tap_at(Vector2(300, 480))
+	for i in ceili(Room.DOUBLE_TAP * 60.0) + 2:
+		await physics_frame
+	await _tap_at(Vector2(305, 480))
+	_check(room.mime.walking and not room.mime.dashing, name, "a second tap after DOUBLE_TAP dashes")
+	await _tap_at(Vector2(305 + Room.DOUBLE_TAP_REACH + 20.0, 480))
+	_check(room.mime.walking and not room.mime.dashing, name, "a second tap beyond DOUBLE_TAP_REACH dashes")
+	_check(Mime.DASH_SPEED > Mime.SPEED * 1.4 and Mime.DASH_SPEED < Mime.SPEED * 1.8, name, "DASH_SPEED %.0f is not about 1.6 times SPEED" % Mime.DASH_SPEED)
+
+
+## Shift held with the arrows runs the mime at DASH_SPEED; let go, it walks again.
+func _test_dash_shift() -> void:
+	var name := "dash_shift"
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.active = false
+	room.mime.place_at(Vector2(200, 480))
+	await _key(KEY_SHIFT, true)
+	var from := room.mime.position
+	Input.action_press("ui_right")
+	for i in 30:
+		await physics_frame
+	_check(room.mime.dashing and room.mime.rig.running, name, "Shift with an arrow does not run")
+	Input.action_release("ui_right")
+	var moved := room.mime.position - from
+	_check(absf(moved.x - Mime.DASH_SPEED * 0.5) < 6.0, name, "Shift and right for 0.5 s moved the mime %s, not %.0f right" % [moved, Mime.DASH_SPEED * 0.5])
+	await physics_frame
+	await physics_frame
+	_check(not room.mime.dashing, name, "the run goes on with no key held")
+	await _key(KEY_SHIFT, false)
+	from = room.mime.position
+	Input.action_press("ui_right")
+	for i in 30:
+		await physics_frame
+	Input.action_release("ui_right")
+	_check(absf(room.mime.position.x - from.x - Mime.SPEED * 0.5) < 6.0, name, "without Shift the arrow does not walk at SPEED")
+
+
+## The DustPuff children of the room's Actors now.
+func _dust_puffs(room: Room) -> int:
+	return room.get_node("Actors").get_children().filter(func(child: Node) -> bool: return child is DustPuff).size()
+
+
+## Every dashed footfall is a noise (the dash sound and a dust puff) the guard within
+## Mime.DASH_NOISE of hearing range hears; the same walk tiptoed is heard by nobody, and
+## Reduce Motion kicks up no dust.
+func _test_dash_footfalls_heard() -> void:
+	var name := "dash_footfalls_heard"
+	var room := await _load_room()
+	if room == null:
+		return
+	var guard := room.guard
+	guard.target = null
+	_game.audio.played.clear()
+	for dash: bool in [false, true]:
+		guard.reset()
+		guard.position = Vector2(720, 480)
+		room.mime.place_at(Vector2(420, 480))
+		await _tap_at(Vector2(560, 480))
+		if dash:
+			await _tap_at(Vector2(560, 480))
+		var puffs := 0
+		for i in 120:
+			guard.position = Vector2(720, 480)
+			puffs = maxi(puffs, _dust_puffs(room))
+			await physics_frame
+		var kind := "dash" if dash else "tiptoe"
+		_check(guard.senses.noise_heard == dash, name, "a %s near the guard was heard: %s" % [kind, guard.senses.noise_heard])
+		_check((puffs > 0) == dash, name, "a %s kicked up %d dust puff(s)" % [kind, puffs])
+		# The double tap's first tap sets off walking: one tiptoe before the dash.
+		var sounds := _game.audio.played
+		_check((sounds.count(&"dash") >= 2 and sounds.count(&"tiptoe") <= 1) if dash else (sounds.count(&"dash") == 0 and sounds.count(&"tiptoe") >= 2), name, "a %s played %s" % [kind, sounds])
+		_game.audio.played.clear()
+	_check(Mime.DASH_NOISE > 0.0 and Mime.DASH_NOISE < 1.0, name, "DASH_NOISE %.2f is not a share of hearing range" % Mime.DASH_NOISE)
+	_game.set_setting("reduce_motion", true)
+	room.mime.place_at(Vector2(420, 480))
+	await _tap_at(Vector2(560, 480))
+	await _tap_at(Vector2(560, 480))
+	var stilled := 0
+	for i in 60:
+		stilled += _dust_puffs(room)
+		await physics_frame
+	_game.set_setting("reduce_motion", false)
+	_check(stilled == 0, name, "a dash under Reduce Motion kicked up dust")
+
+
+## Between CloseCall.CLOSE_CALL and full suspicion (no chase) a heartbeat beats, faster as it
+## rises but under 2 Hz, and the edges darken with it (under the HUD); a chase or a calm
+## stops both, and Reduce Motion keeps the edges clear.
+func _test_close_call_heartbeat() -> void:
+	var name := "close_call_heartbeat"
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.active = false
+	var close := room.close_call
+	_check(close != null and close.z_index < room.hud.z_index and close.z_index < (room.get_node("PauseButton") as CanvasItem).z_index, name, "the close call is missing or not under the HUD")
+	close.set_physics_process(false)
+	_check(CloseCall.beat_hz(CloseCall.CLOSE_CALL) < CloseCall.beat_hz(0.7) and CloseCall.beat_hz(0.7) < CloseCall.beat_hz(0.999) and CloseCall.beat_hz(0.999) < 2.0, name, "the heartbeat does not quicken under 2 Hz")
+	_check(CloseCall.strength(0.2) == 0.0 and CloseCall.strength(0.5) < CloseCall.strength(0.9) and CloseCall.strength(1.0) == 0.0, name, "the edge strength does not follow suspicion between CLOSE_CALL and full")
+	_game.audio.played.clear()
+	for i in 30:
+		close.step(0.2, false, 1.0 / 60.0)
+	_check(not &"heartbeat" in _game.audio.played and close.edge_alpha() == 0.0, name, "suspicion under CLOSE_CALL beats or darkens")
+	var beats := 0
+	for i in 120:
+		var before := _game.audio.played.count(&"heartbeat")
+		close.step(0.9, false, 1.0 / 60.0)
+		beats += _game.audio.played.count(&"heartbeat") - before
+	_check(beats >= 2 and beats <= 4, name, "2 s at suspicion 0.9 beat %d times (expected 2 to 4, under 2 Hz)" % beats)
+	_check(is_equal_approx(close.shown, CloseCall.strength(0.9)) and close.edge_alpha() > 0.0, name, "the edges did not darken to the suspicion (shown %.2f)" % close.shown)
+	var alphas: Array[float] = []
+	for i in 60:
+		close.step(0.9, false, 1.0 / 60.0)
+		alphas.append(close.edge_alpha())
+	_check(alphas.max() - alphas.min() <= CloseCall.EDGE_ALPHA * CloseCall.BEAT_SWELL + 0.01, name, "the beat swings the edges by %.2f (a flash, not a swell)" % (alphas.max() - alphas.min()))
+	_game.set_setting("reduce_motion", true)
+	_check(close.edge_alpha() == 0.0, name, "Reduce Motion leaves the edges dark")
+	_game.set_setting("reduce_motion", false)
+	_game.audio.played.clear()
+	for i in 60:
+		close.step(1.0, true, 1.0 / 60.0)
+	_check(not &"heartbeat" in _game.audio.played and close.shown == 0.0, name, "a chase beats or keeps the edges dark (shown %.2f)" % close.shown)
+
+
+## Suspicion that peaks at NEAR_MISS or more and drains to nothing unseen plays the relief
+## sting and the mime wipes its brow; a lower peak, or a guard spotting it meanwhile, does not.
+func _test_near_miss() -> void:
+	var name := "near_miss"
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.active = false
+	var close := room.close_call
+	close.set_physics_process(false)
+	_game.audio.played.clear()
+	close.step(CloseCall.NEAR_MISS + 0.05, false, 0.1)
+	close.step(0.2, false, 0.1)
+	_check(close.near_misses == 0, name, "a near miss before the suspicion drained")
+	close.step(0.0, false, 0.1)
+	_check(close.near_misses == 1 and &"relief" in _game.audio.played and room.mime.rig.fidget == CharacterRig.Fidget.BROW, name, "a drained near miss played no relief or brow wipe (fidget %s)" % room.mime.rig.fidget)
+	for i in ceili(CloseCall.BROW_TIME * 60.0) + 2:
+		await physics_frame
+	_check(room.mime.rig.fidget == CharacterRig.Fidget.NONE, name, "the brow wipe does not end")
+	close.step(CloseCall.NEAR_MISS - 0.05, false, 0.1)
+	close.step(0.0, false, 0.1)
+	_check(close.near_misses == 1, name, "a peak under NEAR_MISS counted as a near miss")
+	close.step(CloseCall.NEAR_MISS + 0.05, false, 0.1)
+	room.guard.spotted.emit()
+	close.step(0.0, false, 0.1)
+	_check(close.near_misses == 1 and not close.spoiled, name, "a close call the guard spotted counted as a near miss")
+	close.step(CloseCall.NEAR_MISS + 0.05, false, 0.1)
+	close.step(0.0, false, 0.1)
+	_check(close.near_misses == 2, name, "the close call after a spotted one is no near miss")
+
+
+## No recorded bot route (main, sketch, or a trick ablation skipping its tap at any wait) can
+## make a double tap: two taps in one room visit within Room.DOUBLE_TAP_REACH, the second
+## within Room.DOUBLE_TAP (a wait under it). A dash would change a recorded run.
+func _test_routes_never_double_tap() -> void:
+	var name := "routes_never_double_tap"
+	var paths: Array[String] = []
+	paths.assign(Content.WINGS)
+	paths.append("res://scenes/test/slice_wing.tres")
+	var pairs := 0
+	for path in paths:
+		var wing := load(path) as WingData
+		# Each room's doors, as [tap rect, room it leads to].
+		var doors: Array[Array] = []
+		for room_path in wing.rooms:
+			var room := (load(room_path) as PackedScene).instantiate()
+			var room_doors: Array = []
+			for child in room.get_node("Doors").get_children():
+				if child is Door:
+					room_doors.append([(child as Door).rect(), (child as Door).to_room])
+			doors.append(room_doors)
+			room.free()
+		var runs: Array[Array] = [[wing.bot_route, wing.bot_waits, -1], [wing.sketch_route, wing.sketch_waits, -1]]
+		for trick in wing.bot_tricks:
+			runs.append([wing.bot_route, wing.bot_waits, trick])
+		for run in runs:
+			var route: PackedVector2Array = run[0]
+			var waits: PackedFloat32Array = run[1]
+			var skip: int = run[2]
+			var at_room := 0
+			var previous := -1
+			for i in route.size():
+				if i == skip:
+					continue
+				# Ablating a trick tries every wait of the leg after it, 0 included.
+				var any_wait := skip >= 0 and i == skip + 1
+				if previous >= 0:
+					pairs += 1
+					var close := route[i].distance_to(route[previous]) <= Room.DOUBLE_TAP_REACH
+					_check(not close or (waits[i] >= Room.DOUBLE_TAP and not any_wait), name, "%s: taps %d and %d (%s, %s) could double tap%s" % [path, previous, i, route[previous], route[i], " (ablating tap %d)" % skip if skip >= 0 else ""])
+				previous = i
+				for door: Array in doors[at_room]:
+					if (door[0] as Rect2).has_point(route[i]):
+						# Through a door: a new room visit, a fresh tap memory.
+						previous = -1
+						at_room = door[1]
+						break
+				if at_room < 0:
+					break
+	_check(pairs > 100, name, "only %d tap pairs checked" % pairs)
