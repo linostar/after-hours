@@ -472,6 +472,8 @@ func add_debug_overlay() -> DebugOverlay:
 
 
 func _physics_process(delta: float) -> void:
+	_game.audio.set_tension(danger())
+	_game.audio.set_chase(chasing())
 	if finished or leaving or _game.is_transitioning():
 		return
 	if run.replaying:
@@ -849,6 +851,33 @@ func nearest_in_earshot(point: Vector2, reach := GuardBrain.HEARING_RANGE) -> Gu
 			nearest = each
 			nearest_distance = distance
 	return nearest
+
+
+## The highest suspicion among the room's active guards (0 with none).
+func peak_suspicion() -> float:
+	var peak := 0.0
+	for each in guards:
+		if each.active:
+			peak = maxf(peak, each.suspicion)
+	return peak
+
+
+## How tense the music is (Audio.set_tension): the peak suspicion, full while an active
+## guard chases or searches, 0 once the room is over, while tossing or in a replay.
+func danger() -> float:
+	if finished or leaving or tossing or run.replaying:
+		return 0.0
+	if guards.any(func(each: Guard) -> bool: return each.active and each.intent == GuardBrain.Intent.SEARCH) or chasing():
+		return 1.0
+	return peak_suspicion()
+
+
+## Whether an active guard is chasing the mime (not while tossing, once over or in a replay):
+## its start plays the chase sting (Audio.set_chase).
+func chasing() -> bool:
+	if finished or leaving or tossing or run.replaying:
+		return false
+	return guards.any(func(each: Guard) -> bool: return each.active and each.intent == GuardBrain.Intent.CHASE)
 
 
 func _on_painted(quality: float) -> void:

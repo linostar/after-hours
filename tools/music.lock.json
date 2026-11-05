@@ -54,5 +54,54 @@
     "sha256": "1ff3acb9800a8c6742f1d29ff419138720d492232f0635790b4bbcba8d0ed31c",
     "mp3_sha256": "7418bcf641adb2805e6e7942f0a233c26c394a4a20e25f9b758825300c295397",
     "mp3_bytes": 229320
+  },
+  "wing_01_tension": {
+    "samples": 1228800,
+    "seconds": 38.4,
+    "sha256": "f76053713327619c07c44d6950a68a1914bf4dcd333a4f8a26a963f8f9807814",
+    "mp3_sha256": "389dcc8d20d903a21cae7814baedd244d6685e48e397f24cfcfae1e4c16f7c7c",
+    "mp3_bytes": 230904
+  },
+  "wing_02_tension": {
+    "samples": 1462857,
+    "seconds": 45.714,
+    "sha256": "c313ba4d9ad99c78763bd317be8906def08d80d0a69f86148b38152099d5882b",
+    "mp3_sha256": "d5736ccf11c1fbf881ac28eaf51de04045cbb90ca3e2b25c57720b5946ed7256",
+    "mp3_bytes": 274752
+  },
+  "wing_03_tension": {
+    "samples": 930909,
+    "seconds": 29.091,
+    "sha256": "8aad2e3cbe7b1f401f3ced431da54566c2d1fc9280731d6002004fdbd25a0b97",
+    "mp3_sha256": "a9112c47c7ba387ed4b521ea02180f861dcfd8ebb540a664b9c2b7cf300a91a1",
+    "mp3_bytes": 175176
+  },
+  "wing_04_tension": {
+    "samples": 1280000,
+    "seconds": 40.0,
+    "sha256": "4d107cd9b0a02e9d3a47cb64c629092c5c5fda3bc585407b9e83bb92eb1a5704",
+    "mp3_sha256": "fa72148bcb419c8f95c7edcea2cc05070a1a12b51fa9027cce86eb1530be05bc",
+    "mp3_bytes": 240624
+  },
+  "wing_05_tension": {
+    "samples": 1097143,
+    "seconds": 34.286,
+    "sha256": "34713950505e429c4f4688179be34ba8dbd53e493cd459aadee594ec2ad3756c",
+    "mp3_sha256": "eb3313876184262ced09a1b3fe2924ded64e1d67cef867fea1a8e5fd6664a610",
+    "mp3_bytes": 206280
+  },
+  "wing_06_tension": {
+    "samples": 1335652,
+    "seconds": 41.739,
+    "sha256": "e9ad24728e042ad2c236dfb59da17fcc107ab4e15c9e09448ead13f3056dcf72",
+    "mp3_sha256": "c951c98452ed46373554309a8644d2a61468905cacd15e14ea12e09411350b65",
+    "mp3_bytes": 250992
+  },
+  "chase_sting": {
+    "samples": 85333,
+    "seconds": 2.667,
+    "sha256": "2d5e2ca3d4ffead12ed0aaa630613e61191311fd0ada36f36d8e9bb7dae853e6",
+    "mp3_sha256": "c409c333dd209647e1a2f23cde116714bf6ca53d729ea3efa481e106e0d19914",
+    "mp3_bytes": 27720
   }
 }
