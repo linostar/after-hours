@@ -1,51 +1,53 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="56" height="100" viewBox="0 0 56 100">
+  <!-- The watchman from behind: grey hair under the cap, a broad back. -->
   <defs>
-    <linearGradient id="tunic" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#3b4c86"/>
-      <stop offset="0.45" stop-color="#2c3a6b"/>
-      <stop offset="1" stop-color="#1c2650"/>
-    </linearGradient>
-    <linearGradient id="cloth" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#2a3358"/>
-      <stop offset="0.5" stop-color="#1c2340"/>
-      <stop offset="1" stop-color="#121830"/>
-    </linearGradient>
-    <radialGradient id="skin" cx="0.42" cy="0.5" r="0.66">
-      <stop offset="0" stop-color="#f0c49c"/>
-      <stop offset="1" stop-color="#c98f66"/>
-    </radialGradient>
-    <linearGradient id="cap" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#2c3766"/>
-      <stop offset="1" stop-color="#161c38"/>
-    </linearGradient>
     <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#f4d77a"/>
-      <stop offset="1" stop-color="#b8892e"/>
+      <stop offset="0" stop-color="#f6dc84"/>
+      <stop offset="1" stop-color="#b08530"/>
     </linearGradient>
-    <linearGradient id="hair" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#4a3020"/>
-      <stop offset="1" stop-color="#6b4a30"/>
-    </linearGradient>
+    <clipPath id="jacket">
+      <path d="M10.6 43.6 Q11.4 37.4 18 36.4 L38 36.4 Q44.6 37.4 45.4 43.6 Q47.8 55 46.6 67.6 Q28 72 9.4 67.6 Q8.2 55 10.6 43.6 Z"/>
+    </clipPath>
+    <clipPath id="head"><circle cx="28" cy="24" r="12.6"/></clipPath>
+    <clipPath id="cap"><path d="M13.4 18.4 Q14 5.6 28 5.2 Q42 5.6 42.6 18.4 Z"/></clipPath>
   </defs>
-  <path d="M14 63 L42 63 L42.6 72.4 Q35 74 28.6 72.4 L28 68.6 L27.4 72.4 Q21 74 13.4 72.4 Z" fill="url(#cloth)" stroke="#141022" stroke-width="1.2" stroke-linejoin="round"/>
-  <path d="M10.6 43.6 Q11.4 37.4 18 36.4 L38 36.4 Q44.6 37.4 45.4 43.6 L46.4 67.6 Q28 72 9.6 67.6 Z" fill="url(#tunic)" stroke="#141022" stroke-width="1.2" stroke-linejoin="round"/>
-  <path d="M28 40 L28 61 M28 65.6 L28 69.6" stroke="#1a2350" stroke-width="1"/>
-  <path d="M17 40 Q20 50 18.6 60 M39 40 Q36 50 37.4 60" stroke="#24305e" stroke-width="0.9" fill="none"/>
-  <rect x="10.2" y="61" width="35.6" height="4.8" rx="0.8" fill="#1a1520" stroke="#141022" stroke-width="0.8"/>
+  <path d="M14 63 L42 63 L42.6 72.4 Q35 74 28.6 72.4 L28 68.6 L27.4 72.4 Q21 74 13.4 72.4 Z" fill="#202846" stroke="#141022" stroke-width="1.2" stroke-linejoin="round"/>
+  <path d="M33 63.6 L42 63.6 L42.4 72 Q37 73.2 33 72.4 Z" fill="#121830"/>
+  <!-- The jacket's back: centre seam and vent, side seams, the cel shadow. -->
+  <path d="M10.6 43.6 Q11.4 37.4 18 36.4 L38 36.4 Q44.6 37.4 45.4 43.6 Q47.8 55 46.6 67.6 Q28 72 9.4 67.6 Q8.2 55 10.6 43.6 Z" fill="#2f3d72"/>
+  <g clip-path="url(#jacket)">
+    <path d="M33.6 36 Q40.6 52 36.4 71 L49 71 L49 36 Z" fill="#1c2652"/>
+    <path d="M12.8 45 Q11.4 55 12 63" stroke="#5a6aa8" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+    <path d="M17 40 Q20 50 18.6 60 M39 40 Q36 50 37.4 60" stroke="#253065" stroke-width="0.9" fill="none"/>
+  </g>
+  <path d="M28 40 L28 60.6 M28 65.6 L28 69.6" stroke="#141c40" stroke-width="1"/>
+  <path d="M10.6 43.6 Q11.4 37.4 18 36.4 L38 36.4 Q44.6 37.4 45.4 43.6 Q47.8 55 46.6 67.6 Q28 72 9.4 67.6 Q8.2 55 10.6 43.6 Z" fill="none" stroke="#141022" stroke-width="1.2" stroke-linejoin="round"/>
+  <path d="M9.6 60.4 Q28 63.4 46.4 60.4 L46.6 65.2 Q28 68.2 9.6 65.2 Z" fill="#1d1824" stroke="#141022" stroke-width="0.8" stroke-linejoin="round"/>
   <g fill="url(#gold)" stroke="#7d5a1c" stroke-width="0.5">
-    <circle cx="23" cy="63.4" r="1.1"/>
-    <circle cx="33" cy="63.4" r="1.1"/>
+    <circle cx="23" cy="63.6" r="1.1"/>
+    <circle cx="33" cy="63.6" r="1.1"/>
   </g>
   <path d="M10 41 Q11 37 17.6 36.6 L17.2 40.2 Q13 40.4 10 41 Z M46 41 Q45 37 38.4 36.6 L38.8 40.2 Q43 40.4 46 41 Z" fill="url(#gold)" stroke="#7d5a1c" stroke-width="0.6"/>
-  <rect x="23" y="31" width="10" height="6" fill="#d9a074"/>
-  <path d="M20.6 36.6 Q28 33.6 35.4 36.6 L35.4 38.4 Q28 36.4 20.6 38.4 Z" fill="#24305e" stroke="#141022" stroke-width="1" stroke-linejoin="round"/>
-  <circle cx="15.4" cy="25" r="2.6" fill="#e2ab80" stroke="#141022" stroke-width="0.9"/>
-  <circle cx="40.6" cy="25" r="2.6" fill="#e2ab80" stroke="#141022" stroke-width="0.9"/>
-  <circle cx="28" cy="24" r="12.6" fill="url(#skin)" stroke="#141022" stroke-width="1.2"/>
-  <path d="M15.6 19 Q15.8 30 21 33.6 Q28 36 35 33.6 Q40.2 30 40.4 19 Z" fill="url(#hair)"/>
-  <path d="M20 28 Q28 30.6 36 28 M18.6 23.6 Q28 26 37.4 23.6" stroke="#7d5a3a" stroke-width="0.7" fill="none"/>
-  <path d="M15.6 19 Q15.8 30 21 33.6 Q28 36 35 33.6 Q40.2 30 40.4 19" fill="none" stroke="#141022" stroke-width="0.9"/>
-  <path d="M13.4 18.4 Q14 5.6 28 5.2 Q42 5.6 42.6 18.4 Z" fill="url(#cap)" stroke="#141022" stroke-width="1" stroke-linejoin="round"/>
-  <path d="M17 12 Q21 7.6 28 7.4" stroke="#46548a" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+  <rect x="23" y="31" width="10" height="6" fill="#d79f73"/>
+  <path d="M20.6 36.6 Q28 33.6 35.4 36.6 L35.4 38.4 Q28 36.4 20.6 38.4 Z" fill="#253065" stroke="#141022" stroke-width="1" stroke-linejoin="round"/>
+  <!-- Ears and the back of the head: short grey hair, a pink neck below it. -->
+  <circle cx="15.4" cy="25" r="2.6" fill="#e6b285" stroke="#141022" stroke-width="0.9"/>
+  <circle cx="40.6" cy="25" r="2.6" fill="#c99470" stroke="#141022" stroke-width="0.9"/>
+  <circle cx="28" cy="24" r="12.6" fill="#edc29a"/>
+  <g clip-path="url(#head)">
+    <path d="M15 18 Q15.2 28 19.4 31.4 Q24 30.4 28 32.2 Q32 30.4 36.6 31.4 Q40.8 28 41 18 Z" fill="#a39d97"/>
+    <path d="M32 18 Q37 26 33.4 36 L42 36 L42 18 Z" fill="#7f7974"/>
+    <path d="M20 20 Q19.4 25 20.6 29.4 M24.4 20 Q24 25.4 24.8 30.4 M31.6 20 Q32 25.4 31.2 30.4 M36 20 Q36.6 25 35.4 29.4" stroke="#77716b" stroke-width="0.7" fill="none" stroke-linecap="round"/>
+  </g>
+  <path d="M15.4 19 Q15.6 28 19.4 31.4 Q24 30.4 28 32.2 Q32 30.4 36.6 31.4 Q40.4 28 40.6 19" fill="none" stroke="#141022" stroke-width="0.9"/>
+  <circle cx="28" cy="24" r="12.6" fill="none" stroke="#141022" stroke-width="1.2"/>
+  <!-- The cap from behind. -->
+  <path d="M13.4 18.4 Q14 5.6 28 5.2 Q42 5.6 42.6 18.4 Z" fill="#2a3566"/>
+  <g clip-path="url(#cap)">
+    <path d="M32 4 Q39 10 37.6 19 L44 19 L44 4 Z" fill="#18204a"/>
+  </g>
+  <path d="M17 12 Q21 7.6 28 7.4" stroke="#5262a0" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+  <path d="M13.4 18.4 Q14 5.6 28 5.2 Q42 5.6 42.6 18.4 Z" fill="none" stroke="#141022" stroke-width="1" stroke-linejoin="round"/>
   <rect x="13" y="15.6" width="30" height="4.6" fill="#141a30" stroke="#141022" stroke-width="0.8"/>
+  <path d="M13.6 17.9 L42.4 17.9" stroke="#d9b452" stroke-width="0.8"/>
 </svg>

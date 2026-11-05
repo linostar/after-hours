@@ -472,6 +472,7 @@ func add_debug_overlay() -> DebugOverlay:
 
 
 func _physics_process(delta: float) -> void:
+	mime.rig.mood = CharacterRig.mime_mood(peak_suspicion(), tossing, mime.rig.fidget)
 	if finished or leaving or _game.is_transitioning():
 		return
 	if run.replaying:
@@ -849,6 +850,15 @@ func nearest_in_earshot(point: Vector2, reach := GuardBrain.HEARING_RANGE) -> Gu
 			nearest = each
 			nearest_distance = distance
 	return nearest
+
+
+## The highest suspicion among the active guards (0 with none).
+func peak_suspicion() -> float:
+	var peak := 0.0
+	for each in guards:
+		if each.active:
+			peak = maxf(peak, each.suspicion)
+	return peak
 
 
 func _on_painted(quality: float) -> void:

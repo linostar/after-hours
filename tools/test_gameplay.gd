@@ -216,6 +216,9 @@ func _tests() -> Array[Callable]:
 		_test_no_flash_rates,
 		_test_ghost_replay_visits,
 		_test_ghost_mime_until_escape,
+		_test_mood_rules,
+		_test_guard_looks,
+		_test_room_drives_moods,
 	]
 
 
@@ -4000,3 +4003,92 @@ func _test_rotate_overlay_pauses() -> void:
 	_game.fit_screen()
 	_check(paused, name, "a tree paused before the overlay was unpaused by it")
 	paused = false
+
+
+## The faces' moods: a guard is smug dusting its hands, alarmed chasing, searching or at
+## ALARM_AT suspicion, else calm; the mime is alarmed tossed or with a guard at ALARM_AT,
+## smug tipping its beret or bowing (even with a guard alarmed), else calm.
+func _test_mood_rules() -> void:
+	var name := "mood_rules"
+	var calm := CharacterRig.Mood.CALM
+	var alarmed := CharacterRig.Mood.ALARMED
+	var smug := CharacterRig.Mood.SMUG
+	var none := CharacterRig.Fidget.NONE
+	var at := CharacterRig.ALARM_AT
+	_check(at == Detection.SEEN_AT, name, "faces turn alarmed at %.2f, not where a guard spots the mime (%.2f)" % [at, Detection.SEEN_AT])
+	var guard_cases: Array[Array] = [
+		[0.0, false, none, calm], [at - 0.01, false, none, calm], [at, false, none, alarmed],
+		[0.0, true, none, alarmed], [1.0, true, CharacterRig.Fidget.DUST, smug],
+		[0.0, false, CharacterRig.Fidget.YAWN, calm], [0.9, false, CharacterRig.Fidget.STRETCH, alarmed],
+	]
+	for each in guard_cases:
+		var mood := CharacterRig.guard_mood(each[0], each[1], each[2])
+		_check(mood == each[3], name, "a guard at suspicion %.2f, alert %s, fidget %s is %s, not %s" % [each[0], each[1], CharacterRig.Fidget.keys()[each[2]], CharacterRig.Mood.keys()[mood], CharacterRig.Mood.keys()[each[3]]])
+	var mime_cases: Array[Array] = [
+		[0.0, false, none, calm], [at - 0.01, false, none, calm], [at, false, none, alarmed],
+		[0.0, true, none, alarmed], [0.0, true, CharacterRig.Fidget.TIP, alarmed],
+		[0.0, false, CharacterRig.Fidget.TIP, smug], [0.9, false, CharacterRig.Fidget.BOW, smug],
+	]
+	for each in mime_cases:
+		var mood := CharacterRig.mime_mood(each[0], each[1], each[2])
+		_check(mood == each[3], name, "the mime with peak suspicion %.2f, tossed %s, fidget %s is %s, not %s" % [each[0], each[1], CharacterRig.Fidget.keys()[each[2]], CharacterRig.Mood.keys()[mood], CharacterRig.Mood.keys()[each[3]]])
+
+
+## Every guard voice has a look (and every look a voice), each naming only rig properties;
+## a guard wears its voice's look (set before or after it is ready), drawn at once, and an
+## unknown voice is reported, keeping the look it had.
+func _test_guard_looks() -> void:
+	var name := "guard_looks"
+	var voices: Array[StringName] = []
+	voices.assign(Guard.LOOKS.keys())
+	voices.sort()
+	var expected := Audio.GUARD_VOICES.duplicate()
+	expected.sort()
+	_check(voices == expected, name, "Guard.LOOKS has %s, Audio.GUARD_VOICES %s" % [voices, expected])
+	var rig := (load("res://scenes/rig_guard.tscn") as PackedScene).instantiate() as CharacterRig
+	for voice in Guard.LOOKS:
+		for key: String in Guard.LOOKS[voice]:
+			_check(key in rig, name, "look '%s' sets '%s', not a CharacterRig property" % [voice, key])
+	rig.free()
+	var guard := (load("res://scenes/guard.tscn") as PackedScene).instantiate() as Guard
+	guard.route = PackedVector2Array([Vector2(100, 100), Vector2(200, 100)])
+	guard.voice = &"rookie"
+	root.add_child(guard)
+	var body := guard.rig.get_node("Body") as Sprite2D
+	_check(guard.rig.body_front == Guard.LOOKS[&"rookie"]["body_front"] and body.texture == guard.rig.body_front, name, "a rookie set before it was ready does not wear the rookie's look")
+	guard.voice = &"watchman"
+	_check(body.texture == Guard.LOOKS[&"watchman"]["body_front"] and guard.rig.mouth_front == Guard.LOOKS[&"watchman"]["mouth_front"], name, "a guard turned watchman does not wear the watchman's look")
+	var errors_before := _game.errors.size()
+	_game.quiet_errors = true
+	guard.voice = &"nobody"
+	_game.quiet_errors = false
+	_check(_game.errors.size() == errors_before + 1 and "nobody" in _game.errors[-1], name, "an unknown voice was not reported (errors: %s)" % [_game.errors.slice(errors_before)])
+	_check(body.texture == Guard.LOOKS[&"watchman"]["body_front"], name, "an unknown voice changed the look")
+	_game.errors.resize(errors_before)
+	(_game.get_node("ErrorLayer/ErrorBadge") as TextureRect).visible = false
+	guard.queue_free()
+	await process_frame
+
+
+## In a room the faces follow the state: a guard's high suspicion alarms it and the mime
+## (Room.peak_suspicion, active guards only), a catching guard dusting its hands is smug, and
+## both calm down again.
+func _test_room_drives_moods() -> void:
+	var name := "room_drives_moods"
+	var room := await _load_room()
+	var guard := room.guard
+	_check(room.peak_suspicion() == 0.0, name, "a fresh room's peak suspicion is %.2f, not 0" % room.peak_suspicion())
+	guard.suspicion = 0.9
+	_check(is_equal_approx(room.peak_suspicion(), 0.9), name, "the peak suspicion is %.2f with the guard at 0.9" % room.peak_suspicion())
+	await physics_frame
+	_check(guard.rig.mood == CharacterRig.Mood.ALARMED, name, "a guard at suspicion 0.9 is %s, not alarmed" % CharacterRig.Mood.keys()[guard.rig.mood])
+	_check(room.mime.rig.mood == CharacterRig.Mood.ALARMED, name, "the mime with a guard at 0.9 is %s, not alarmed" % CharacterRig.Mood.keys()[room.mime.rig.mood])
+	guard.active = false
+	_check(room.peak_suspicion() == 0.0, name, "an inactive guard's suspicion counts toward the peak")
+	guard.rig.start_fidget(CharacterRig.Fidget.DUST, Guard.DUST_TIME)
+	await physics_frame
+	_check(guard.rig.mood == CharacterRig.Mood.SMUG, name, "a guard dusting its hands is %s, not smug" % CharacterRig.Mood.keys()[guard.rig.mood])
+	_check(room.mime.rig.mood == CharacterRig.Mood.CALM, name, "the mime with no active guard suspicious is %s, not calm" % CharacterRig.Mood.keys()[room.mime.rig.mood])
+	guard.reset()
+	await physics_frame
+	_check(guard.rig.mood == CharacterRig.Mood.CALM, name, "a reset guard is %s, not calm" % CharacterRig.Mood.keys()[guard.rig.mood])

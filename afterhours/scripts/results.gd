@@ -42,9 +42,11 @@ func _fit(game: GameState) -> void:
 	($Panel as Control).position = game.world_offset()
 
 
-## The mime stands alive at the panel's side (busy: no idle gag over the results).
+## The mime stands alive at the panel's side (busy: no idle gag over the results), smug
+## while it bows.
 func _process(delta: float) -> void:
 	if visible:
+		mime.mood = CharacterRig.mime_mood(0.0, false, mime.fidget)
 		mime.walk(0.0, delta, false)
 
 

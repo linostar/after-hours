@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="56" height="100" viewBox="0 0 56 100">
+  <!-- The rookie from behind: ginger hair, big ears, the big cap, a slim back. -->
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f6dc84"/>
+      <stop offset="1" stop-color="#b08530"/>
+    </linearGradient>
+    <clipPath id="jacket">
+      <path d="M11.6 43.6 Q12.4 37.4 18.6 36.4 L37.4 36.4 Q43.6 37.4 44.4 43.6 L45 67.6 Q28 71 11 67.6 Z"/>
+    </clipPath>
+    <clipPath id="head"><circle cx="28" cy="24" r="12.6"/></clipPath>
+    <clipPath id="cap"><path d="M11.8 18.6 Q12.4 3.2 28 2.8 Q43.6 3.2 44.2 18.6 Z"/></clipPath>
+  </defs>
+  <path d="M14 63 L42 63 L42.6 72.4 Q35 74 28.6 72.4 L28 68.6 L27.4 72.4 Q21 74 13.4 72.4 Z" fill="#202846" stroke="#141022" stroke-width="1.2" stroke-linejoin="round"/>
+  <path d="M33 63.6 L42 63.6 L42.4 72 Q37 73.2 33 72.4 Z" fill="#121830"/>
+  <path d="M11.6 43.6 Q12.4 37.4 18.6 36.4 L37.4 36.4 Q43.6 37.4 44.4 43.6 L45 67.6 Q28 71 11 67.6 Z" fill="#2f3d72"/>
+  <g clip-path="url(#jacket)">
+    <path d="M33 36 Q38 52 35.6 71 L47 71 L47 36 Z" fill="#1c2652"/>
+    <path d="M13.8 45 Q13 55 13.4 63" stroke="#5a6aa8" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+    <path d="M18 40 Q20 50 18.8 60 M38 40 Q36 50 37.2 60" stroke="#253065" stroke-width="0.9" fill="none"/>
+  </g>
+  <path d="M28 40 L28 61 M28 65.6 L28 69.6" stroke="#141c40" stroke-width="1"/>
+  <path d="M11.6 43.6 Q12.4 37.4 18.6 36.4 L37.4 36.4 Q43.6 37.4 44.4 43.6 L45 67.6 Q28 71 11 67.6 Z" fill="none" stroke="#141022" stroke-width="1.2" stroke-linejoin="round"/>
+  <rect x="11" y="61" width="34" height="4.8" rx="0.8" fill="#1d1824" stroke="#141022" stroke-width="0.8"/>
+  <g fill="url(#gold)" stroke="#7d5a1c" stroke-width="0.5">
+    <circle cx="23" cy="63.4" r="1.1"/>
+    <circle cx="33" cy="63.4" r="1.1"/>
+  </g>
+  <path d="M11 41 Q12 37 18.2 36.6 L17.8 40.2 Q14 40.4 11 41 Z M45 41 Q44 37 37.8 36.6 L38.2 40.2 Q42 40.4 45 41 Z" fill="url(#gold)" stroke="#7d5a1c" stroke-width="0.6"/>
+  <rect x="24.4" y="31" width="7.2" height="6" fill="#e3ad84"/>
+  <path d="M20.6 36.6 Q28 33.6 35.4 36.6 L35.4 38.4 Q28 36.4 20.6 38.4 Z" fill="#253065" stroke="#141022" stroke-width="1" stroke-linejoin="round"/>
+  <circle cx="15" cy="25.4" r="3" fill="#f1bf98" stroke="#141022" stroke-width="0.9"/>
+  <circle cx="41" cy="25.4" r="3" fill="#d29d78" stroke="#141022" stroke-width="0.9"/>
+  <circle cx="28" cy="24" r="12.6" fill="#f3cba6"/>
+  <g clip-path="url(#head)">
+    <path d="M15 18 Q15.2 28 19.4 31.4 Q24 30.4 28 32.2 Q32 30.4 36.6 31.4 Q40.8 28 41 18 Z" fill="#c4612a"/>
+    <path d="M32 18 Q37 26 33.4 36 L42 36 L42 18 Z" fill="#9a4519"/>
+    <path d="M20 20 Q19.4 25 20.6 29.4 M24.4 20 Q24 25.4 24.8 30.4 M31.6 20 Q32 25.4 31.2 30.4 M36 20 Q36.6 25 35.4 29.4" stroke="#8e4318" stroke-width="0.7" fill="none" stroke-linecap="round"/>
+    <path d="M17.4 21 Q17 25 18.6 28" stroke="#e08a4e" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+  </g>
+  <path d="M15.4 19 Q15.6 28 19.4 31.4 Q24 30.4 28 32.2 Q32 30.4 36.6 31.4 Q40.4 28 40.6 19" fill="none" stroke="#141022" stroke-width="0.9"/>
+  <circle cx="28" cy="24" r="12.6" fill="none" stroke="#141022" stroke-width="1.2"/>
+  <path d="M11.8 18.6 Q12.4 3.2 28 2.8 Q43.6 3.2 44.2 18.6 Z" fill="#2a3566"/>
+  <g clip-path="url(#cap)">
+    <path d="M32.6 2 Q40.6 9 39 19.4 L46 19.4 L46 2 Z" fill="#18204a"/>
+  </g>
+  <path d="M16 11.6 Q20.4 6 28 5.4" stroke="#5262a0" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+  <path d="M11.8 18.6 Q12.4 3.2 28 2.8 Q43.6 3.2 44.2 18.6 Z" fill="none" stroke="#141022" stroke-width="1" stroke-linejoin="round"/>
+  <rect x="11.4" y="15.6" width="33.2" height="4.8" fill="#141a30" stroke="#141022" stroke-width="0.8"/>
+  <path d="M12 18 L44 18" stroke="#d9b452" stroke-width="0.8"/>
+</svg>

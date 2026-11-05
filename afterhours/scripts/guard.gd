@@ -110,6 +110,33 @@ const INTENT_SOUNDS: Dictionary[GuardBrain.Intent, StringName] = {
 }
 const ICON_SCALE := 0.6
 const ICON_POP := 0.2
+## Each voice's look (Audio.GUARD_VOICES), worn by the rig (CharacterRig.wear) on the same
+## joints: the watchman older, heavier and moustached, the rookie young and clean-shaven
+## under a cap a size too big.
+const LOOKS: Dictionary[StringName, Dictionary] = {
+	&"watchman": {
+		"body_front": preload("res://art/svg/guard_body_front.svg"),
+		"body_back": preload("res://art/svg/guard_body_back.svg"),
+		"body_side": preload("res://art/svg/guard_body_side.svg"),
+		"brow_lift": 3.0,
+		"brow_width": 1.6,
+		"brow_color": Color(0.62, 0.6, 0.58),
+		"mouth_front": Vector2(28, 35.2),
+		"mouth_side": Vector2(35.6, 35),
+		"mouth_half": 2.4,
+	},
+	&"rookie": {
+		"body_front": preload("res://art/svg/guard_rookie_body_front.svg"),
+		"body_back": preload("res://art/svg/guard_rookie_body_back.svg"),
+		"body_side": preload("res://art/svg/guard_rookie_body_side.svg"),
+		"brow_lift": 2.4,
+		"brow_width": 1.1,
+		"brow_color": Color(0.6, 0.32, 0.16),
+		"mouth_front": Vector2(28, 32.8),
+		"mouth_side": Vector2(38.4, 32.8),
+		"mouth_half": 2.2,
+	},
+}
 
 ## Emitted when the guard starts seeing its target (suspicion leaves 0).
 signal spotted
@@ -122,8 +149,13 @@ signal inspected
 @export var route: PackedVector2Array
 ## Whom the guard looks for (set by the room).
 var target: Node2D
-## Its voice (Audio.GUARD_VOICES; the room hands them out in turn).
-var voice: StringName = &"watchman"
+## Its voice (Audio.GUARD_VOICES; the room hands them out in turn), which picks its look
+## (LOOKS).
+var voice: StringName = &"watchman":
+	set(value):
+		voice = value
+		if is_node_ready():
+			_dress()
 ## Whether it walks its route (tests stand it still; other intents still move it).
 var patrolling := true
 ## Whether it moves and looks at all (off from a catch until the room resets it).
@@ -195,6 +227,20 @@ func _ready() -> void:
 	halo.show_behind_parent = true
 	lantern.add_child(halo)
 	rig.hold(lantern)
+	_dress()
+
+
+## Dresses the rig in its voice's look; an unknown voice is reported (log and error badge)
+## and keeps the look it has.
+func _dress() -> void:
+	if not LOOKS.has(voice):
+		var message := "Guard '%s' has voice '%s', which has no look (Guard.LOOKS: %s)" % [name, voice, LOOKS.keys()]
+		if is_inside_tree():
+			(get_node(GameState.AUTOLOAD_PATH) as GameState).report_error(message)
+		else:
+			push_error(message)
+		return
+	rig.wear(LOOKS[voice])
 
 
 ## Back to the start of the route, calm, facing its first leg, its senses cleared. A
@@ -277,6 +323,7 @@ func _clear_to(point: Vector2) -> bool:
 
 
 func _physics_process(delta: float) -> void:
+	rig.mood = CharacterRig.guard_mood(suspicion, intent == GuardBrain.Intent.CHASE or intent == GuardBrain.Intent.SEARCH, rig.fidget)
 	if not active:
 		rig.walk(0.0, delta)
 		return

@@ -1,22 +1,25 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="11" height="20" viewBox="0 0 11 20">
   <defs>
     <clipPath id="c"><rect x="1.8" y="0" width="7.4" height="12" rx="3.7"/></clipPath>
-    <linearGradient id="s" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#3a3050" stop-opacity="0.05"/>
-      <stop offset="0.5" stop-color="#3a3050" stop-opacity="0"/>
-      <stop offset="1" stop-color="#3a3050" stop-opacity="0.3"/>
-    </linearGradient>
-    <radialGradient id="glove" cx="0.4" cy="0.35" r="0.7">
-      <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="1" stop-color="#d6d1da"/>
-    </radialGradient>
+    <clipPath id="palm"><circle cx="5.6" cy="15.4" r="3.9"/></clipPath>
   </defs>
-  <rect x="1.8" y="0" width="7.4" height="12" rx="3.7" fill="#f7f4ee"/>
-  <g clip-path="url(#c)" fill="#22202c"><rect x="0" y="5.2" width="11" height="2.6"/></g>
-  <rect x="1.8" y="0" width="7.4" height="12" rx="3.7" fill="url(#s)"/>
+  <!-- The forearm's striped sleeve. -->
+  <rect x="1.8" y="0" width="7.4" height="12" rx="3.7" fill="#f8f5ef"/>
+  <g clip-path="url(#c)">
+    <path d="M0 5.2 Q5.5 6 11 5.2 L11 7.8 Q5.5 8.6 0 7.8 Z" fill="#23202d"/>
+    <rect x="6.6" y="0" width="4" height="12" fill="#2b2246" opacity="0.34"/>
+    <path d="M3.2 2 L3.2 9" stroke="#ffffff" stroke-width="0.9" stroke-linecap="round" opacity="0.6"/>
+  </g>
   <rect x="1.8" y="0" width="7.4" height="12" rx="3.7" fill="none" stroke="#1b1622" stroke-width="1.1"/>
-  <ellipse cx="2.6" cy="14.2" rx="1.6" ry="2.4" transform="rotate(-25 2.6 14.2)" fill="url(#glove)" stroke="#1b1622" stroke-width="0.9"/>
-  <circle cx="5.6" cy="15.4" r="3.9" fill="url(#glove)" stroke="#1b1622" stroke-width="1"/>
-  <path d="M4.6 16.4 L4.8 18.4 M6.6 16.4 L6.6 18.6" stroke="#b6b0bc" stroke-width="0.6" stroke-linecap="round"/>
+  <!-- The white glove: thumb, a cel-shaded palm, stitched fingers and a turned-back cuff. -->
+  <ellipse cx="2.6" cy="14.2" rx="1.6" ry="2.4" transform="rotate(-25 2.6 14.2)" fill="#fbfafc" stroke="#1b1622" stroke-width="0.9"/>
+  <circle cx="5.6" cy="15.4" r="3.9" fill="#fbfafc"/>
+  <g clip-path="url(#palm)">
+    <path d="M6.4 11 Q8.6 15 6.2 20 L10 20 L10 11 Z" fill="#d2ccdc"/>
+    <ellipse cx="4.4" cy="13.8" rx="1.3" ry="0.8" fill="#ffffff"/>
+  </g>
+  <circle cx="5.6" cy="15.4" r="3.9" fill="none" stroke="#1b1622" stroke-width="1"/>
+  <path d="M4.6 16.4 L4.8 18.4 M6.6 16.4 L6.6 18.6" stroke="#a9a2b4" stroke-width="0.6" stroke-linecap="round"/>
   <rect x="2.2" y="10.2" width="6.6" height="2.4" rx="1" fill="#ffffff" stroke="#1b1622" stroke-width="0.9"/>
+  <path d="M6.6 10.6 L8.2 10.6 L8.2 12.2 L6.6 12.2 Z" fill="#d2ccdc"/>
 </svg>
