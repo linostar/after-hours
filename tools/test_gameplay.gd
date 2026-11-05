@@ -134,6 +134,7 @@ func _tests() -> Array[Callable]:
 		_test_guard_chase_search_return,
 		_test_tilt_decoy_investigated,
 		_test_tilted_frame_seen_and_straightened,
+		_test_tilted_frame_straightened_after_catch,
 		_test_decoy_pulls_nearest_guard,
 		_test_hiding_checks_every_guard,
 		_test_second_guard_catches_and_resets_all,
@@ -150,6 +151,7 @@ func _tests() -> Array[Callable]:
 		_test_off_mesh_noise_and_chase_repath,
 		_test_intent_icons_and_overlay,
 		_test_keyboard_walks_and_interacts,
+		_test_keyboard_stays_on_its_floor,
 		_test_guard_pauses_facing_its_leg,
 		_test_guard_turns_smoothly,
 		_test_catches_during_swap_and_while_carrying,
@@ -1596,6 +1598,22 @@ func _test_tilted_frame_seen_and_straightened() -> void:
 	_check(straightened and not room.guard.senses.tilted_frame_known, name, "the seen frame was not straightened")
 
 
+## A frame tilted just before a catch is still straightened: the toss resets the guards
+## (wiping the noise they heard), so the room has the nearest in earshot hear it again.
+func _test_tilted_frame_straightened_after_catch() -> void:
+	var name := "tilted_frame_straightened_after_catch"
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.target = null
+	var frame := room.get_node("Frames/FrameB") as TiltFrame
+	room._tilt(frame)
+	room._on_caught()
+	await create_timer(Room.TOSS_SHAKE + Room.TOSS_FLIGHT + 0.2).timeout
+	_check(frame.tilted and room.guard.intent == GuardBrain.Intent.INVESTIGATE, name, "after the toss the guard does not go to the tilted frame (intent %s)" % _intent_name(room.guard.intent))
+	_check(await _wait_until(func() -> bool: return not frame.tilted, 1200), name, "the frame tilted before the catch was never straightened (guard %s at %s)" % [_intent_name(room.guard.intent), room.guard.position])
+
+
 ## Hiding unseen: the mime steps into the portrait (gone, its face on the sitter) and a
 ## guard staring at it from close by builds no suspicion; a floor tap steps it out.
 func _test_hide_unseen_and_step_out() -> void:
@@ -2185,6 +2203,28 @@ func _load_wing_room(name: String, path: String) -> Room:
 		_check(false, name, "%s's navigation map never synced" % path.get_file())
 		return null
 	return room
+
+
+## Keyboard steps keep the mime on the floor it stands on: in wing 4's hall a south nudge
+## from the corridor stops at the low screens, never jumping through their gaps onto the
+## unconnected floor below (the navmesh's closest point answered it there).
+func _test_keyboard_stays_on_its_floor() -> void:
+	var name := "keyboard_stays_on_its_floor"
+	var room := await _load_wing_room(name, "res://scenes/wings/wing_04_hall.tscn")
+	if room == null:
+		return
+	for each in room.guards:
+		each.active = false
+	for x: float in [100.0, 200.0, 300.0, 480.0, 560.0, 740.0, 900.0]:
+		for heading: Vector2 in [Vector2.DOWN, Vector2(1, 1).normalized(), Vector2(-1, 1).normalized()]:
+			room.mime.place_at(Vector2(x, 210))
+			for i in 60:
+				room.mime.nudge(heading, 1.0 / 60.0)
+			_check(room.mime.position.y <= 241.0, name, "nudging %s from (%.0f, 210) took the mime through the screens to %s" % [heading.round(), x, room.mime.position.round()])
+	room.mime.place_at(Vector2(300, 210))
+	for i in 30:
+		room.mime.nudge(Vector2(1, 1).normalized(), 1.0 / 60.0)
+	_check(room.mime.position.x > 320.0, name, "a diagonal nudge into the screens did not slide the mime along them (at %s)" % room.mime.position.round())
 
 
 ## The floor footprints of `room`'s display walls (Partition).

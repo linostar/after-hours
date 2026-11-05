@@ -731,11 +731,18 @@ func _tilt(frame: TiltFrame) -> void:
 	mime.face_toward(frame.position)
 	frame.tilt()
 	_game.audio.play(&"tilt")
+	var heard := _sound_frame(frame)
+	print("[Room] Tilted the frame at %s at t %.2f (heard by: %s)" % [frame.position.round(), elapsed, str(heard.name) if heard != null else "nobody"])
+	_reveal_sketch(frame)
+
+
+## The nearest active guard in earshot of a tilted frame hears it (he walks over, sees it
+## and straightens it); returns him, or null.
+func _sound_frame(frame: TiltFrame) -> Guard:
 	var heard := nearest_in_earshot(frame.view_point())
 	if heard != null:
 		heard.hear(frame.view_point())
-	print("[Room] Tilted the frame at %s at t %.2f (heard by: %s)" % [frame.position.round(), elapsed, str(heard.name) if heard != null else "nobody"])
-	_reveal_sketch(frame)
+	return heard
 
 
 ## The wing's sketch (if this room hides it, sketch_in): lying where it fell if it already
@@ -987,6 +994,11 @@ func _end_toss() -> void:
 	for each in guards:
 		each.reset()
 		each.watches_fake = fake_hung and not found_out
+	# The reset wiped the noise of any frame still tilted: hear it again, or it hangs crooked
+	# for good where no patrol looks at it.
+	for frame in _frames:
+		if frame.tilted:
+			_sound_frame(frame)
 	tossing = false
 	if gimmick != null:
 		gimmick.forget()

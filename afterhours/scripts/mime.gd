@@ -114,7 +114,14 @@ func nudge(direction: Vector2, delta: float) -> void:
 	var step := position + direction * speed() * delta
 	if not NavigationServer2D.map_get_closest_point_owner(map, step).is_valid():
 		return
-	var to := NavigationServer2D.map_get_closest_point(map, step)
+	# Not map_get_closest_point: inside a navmesh polygon with collinear vertices on an
+	# edge (a corridor walled by display screens) it answers a point on another, unconnected
+	# polygon, and the mime jumped through the walls. A path stays on the floor it stands on;
+	# a straight one (two points) only, so a step never goes round a wall.
+	var line := NavigationServer2D.map_get_path(map, position, step, true)
+	if line.size() != 2:
+		return
+	var to := line[1]
 	_moved += position.distance_to(to)
 	_nudged = true
 	face(direction)
