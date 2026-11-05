@@ -180,19 +180,27 @@ func setting(key: String) -> bool:
 	return save["settings"].get(key, false)
 
 
-## Records the run's escape (its stars and time) for its wing and writes the save when it
-## is a best; returns what it beat (Save.improvement). A first escape from a wing unlocks
-## the next one (just_unlocked, for the hub's unlock beat). A run of a room loaded on its own (no
-## wing file) is not recorded and beats nothing.
-func record_escape(stars: Array[bool], time: float) -> Dictionary:
+## Records the run's escape (its stars, time and `challenges`, Challenge order) for its wing
+## and writes the save when it is a best or completes a challenge for the first time; returns
+## what it beat (Save.improvement) and, under "challenges", the challenges completed for the
+## first time (Save.record_challenges). A first escape from a wing unlocks the next one
+## (just_unlocked, for the hub's unlock beat). A run of a room loaded on its own (no wing file)
+## is not recorded and beats nothing.
+func record_escape(stars: Array[bool], time: float, challenges: Array[bool]) -> Dictionary:
 	if run == null or run.wing.resource_path.is_empty():
 		print("[Game] Escape not recorded: the run has no wing file")
-		return {"stars": false, "time": false}
+		return {"stars": false, "time": false, "challenges": Challenges.none()}
 	var id := Content.wing_id(run.wing.resource_path)
 	var beaten := Save.improvement(save, id, stars, time)
 	var first := not Save.finished(save, id)
-	if Save.record(save, id, stars, time):
+	var best := Save.record(save, id, stars, time)
+	if best:
 		print("[Game] New best for %s: %d star(s), %.2f s" % [id, Save.stars_of(save, id), save["wings"][id]["time"]])
+	var fresh := Save.record_challenges(save, id, challenges)
+	beaten["challenges"] = fresh
+	if fresh.has(true):
+		print("[Game] Challenges first completed for %s: %s" % [id, fresh])
+	if best or fresh.has(true):
 		write_save()
 	var index := Content.WINGS.find(run.wing.resource_path)
 	if first and index >= 0 and index + 1 < Content.WINGS.size():

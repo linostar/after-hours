@@ -2,7 +2,8 @@ class_name HideoutDecor
 extends Node2D
 ## The mime's lair, drawn under the stolen originals and the mime: rough brick walls and a
 ## ceiling beam, a brass plaque under every frame (Hideout's layout; its replay button sits
-## on it, an unrobbed frame's plaque left blank), a lamp hanging over the room on its cord
+## on it between the wing's four challenge badges (Challenges), bright where ever completed and
+## faint where not; an unrobbed frame's plaque left blank), a lamp hanging over the room on its cord
 ## (swaying at SWAY_HZ, held still under Reduce Motion) and its pool of warm light, a round
 ## patterned rug, the forger's easel with paint pots, and stacked crates.
 
@@ -16,6 +17,9 @@ const WOOD_DARK := Color(0.25, 0.16, 0.09)
 const BRASS := Color(0.78, 0.62, 0.3)
 const BRASS_DARK := Color(0.45, 0.33, 0.14)
 const INK := Color(0.08, 0.06, 0.08)
+## A challenge badge's side on a plaque, and a missed one's fading.
+const BADGE_SIZE := 16.0
+const BADGE_MISSED := Color(0.25, 0.2, 0.15, 0.45)
 ## The lamp: where it hangs from, how long its cord, its swing.
 const LAMP_FROM := Vector2(480, 0)
 const LAMP_CORD := 236.0
@@ -29,6 +33,8 @@ const PAINTS: Array[Color] = [Color(0.2, 0.35, 0.7), Color(0.9, 0.75, 0.25), Col
 
 ## Which frames hold a stolen original (per wing, from the hideout).
 var stolen: Array[bool] = []
+## Per wing: the challenges it ever had completed (Save.challenges_of, Challenge order).
+var challenges: Array = []
 var _clock := 0.0
 
 
@@ -40,7 +46,17 @@ func _process(delta: float) -> void:
 ## Where the plaque under frame `index` sits (centred on its replay button).
 static func plaque_rect(index: int) -> Rect2:
 	var centre := Vector2(Hideout.FIRST_X + index * Hideout.GAP, Hideout.FRAME_Y + Hideout.REPLAY_DROP)
-	return Rect2(centre - Vector2(38, 30), Vector2(76, 60))
+	return Rect2(centre - Vector2(54, 30), Vector2(108, 60))
+
+
+## Where challenge `challenge`'s badge sits on frame `index`'s plaque: the first two stacked
+## left of the replay button, the last two right of it.
+static func badge_rect(index: int, challenge: int) -> Rect2:
+	var plate := plaque_rect(index)
+	var side := (plate.size.x - Hideout.REPLAY_SIZE) / 2.0
+	var x := plate.position.x + side / 2.0 if challenge < 2 else plate.end.x - side / 2.0
+	var y := plate.get_center().y + (-10.0 if challenge % 2 == 0 else 10.0)
+	return Rect2(Vector2(x, y) - Vector2.ONE * BADGE_SIZE / 2.0, Vector2.ONE * BADGE_SIZE)
 
 
 func _draw() -> void:
@@ -76,6 +92,11 @@ func _draw_plaque(index: int, robbed: bool) -> void:
 	draw_rect(plate, INK, false, 1.5)
 	for corner: Vector2 in [Vector2(6, 6), Vector2(plate.size.x - 6, 6), Vector2(6, plate.size.y - 6), plate.size - Vector2(6, 6)]:
 		draw_circle(plate.position + corner, 2.0, BRASS_DARK.darkened(0.3))
+	if not robbed or index >= challenges.size():
+		return
+	var done: Array = challenges[index]
+	for i in done.size():
+		draw_texture_rect(Challenges.ICONS[i], badge_rect(index, i), false, Color.WHITE if done[i] else BADGE_MISSED)
 
 
 func _draw_rug() -> void:

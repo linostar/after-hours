@@ -153,6 +153,8 @@ var escaping := false
 var stars: Array[bool] = []
 ## The bests the escape beat (Save.improvement), for the results' rosettes.
 var beaten := {}
+## The escape's challenges (Challenges, Challenge order).
+var challenges: Array[bool] = []
 ## The wing play this room belongs to.
 var run: WingRun
 ## Whether the mime is going through a door to another room (the room stops).
@@ -901,9 +903,10 @@ func _escape() -> void:
 	mime.place_at(mime.position)
 	mime.busy = true
 	stars = Stars.earned(ever_seen, elapsed, par_time)
-	print("[Room] Escaped with the original at t %.2f (par %.0f, seen %s)" % [elapsed, par_time, ever_seen])
+	challenges = Challenges.earned(run.powers_used, fake_quality, catches, elapsed, Challenges.speed_target(run.wing))
+	print("[Room] Escaped with the original at t %.2f (par %.0f, seen %s, challenges %s)" % [elapsed, par_time, ever_seen, challenges])
 	_game.audio.play(&"escape")
-	beaten = _game.record_escape(stars, elapsed)
+	beaten = _game.record_escape(stars, elapsed, challenges)
 	_play_escape_beat()
 
 
@@ -949,7 +952,7 @@ func _end_escape() -> void:
 	if not escaping:
 		return
 	escaping = false
-	_results.present(stars, beaten, Paintings.SKETCHES.get(StringName(run.wing.painting)) if run.has_sketch else null)
+	_results.present(stars, beaten, Paintings.SKETCHES.get(StringName(run.wing.painting)) if run.has_sketch else null, challenges)
 
 
 func _on_spotted() -> void:

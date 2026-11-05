@@ -216,6 +216,12 @@ func _tests() -> Array[Callable]:
 		_test_no_flash_rates,
 		_test_ghost_replay_visits,
 		_test_ghost_mime_until_escape,
+		_test_challenges_judged,
+		_test_save_challenges,
+		_test_record_escape_challenges,
+		_test_results_challenge_badges,
+		_test_hub_challenge_pips,
+		_test_hideout_challenge_badges,
 	]
 
 
@@ -550,7 +556,7 @@ func _test_save_shape() -> void:
 	_check(Save.record_sketch(data, "wing_02") and not Save.record_sketch(data, "wing_02") and Save.has_sketch(data, "wing_02") and not Save.has_sketch(data, "wing_01"), name, "a found sketch is not kept once: %s" % [data["sketches"]])
 	back = Save.parse(Save.to_json(data), problems)
 	_check(problems.is_empty() and back == data, name, "a save with a sketch does not read back as written: %s, %s" % [back, problems])
-	for bad: String in ["{", "[]", '{"version": 3, "wings": {}}', '{"version": 1, "wings": []}', '{"version": 1, "wings": {"wing_01": {"stars": 4, "time": 1}}}',
+	for bad: String in ["{", "[]", '{"version": 4, "wings": {}}', '{"version": 1, "wings": []}', '{"version": 1, "wings": {"wing_01": {"stars": 4, "time": 1}}}',
 			'{"version": 1, "wings": {"wing_01": {"stars": 1.5, "time": 1}}}', '{"version": 1, "wings": {}, "settings": {"music": 1}}',
 			'{"version": 2, "wings": {}, "sketches": []}', '{"version": 2, "wings": {}, "sketches": {"wing_01": 1}}']:
 		problems.clear()
@@ -4000,3 +4006,164 @@ func _test_rotate_overlay_pauses() -> void:
 	_game.fit_screen()
 	_check(paused, name, "a tree paused before the overlay was unpaused by it")
 	paused = false
+
+
+## Each challenge is judged on its own: no power used, a PERFECT fake (Good is not), never
+## caught (being seen is allowed), and under the speed target, which is half of par unless
+## the wing sets one; a negative target is refused.
+func _test_challenges_judged() -> void:
+	var name := "challenges_judged"
+	_check(Challenges.earned(0, 0.9, 0, 20.0, 30.0) == [true, true, true, true], name, "a clean, perfect, quick run did not complete all four")
+	_check(Challenges.earned(1, 0.9, 0, 20.0, 30.0) == [false, true, true, true], name, "a power used still completed NO_POWERS")
+	_check(Challenges.earned(0, Forgery.ASSIST_QUALITY, 0, 20.0, 30.0) == [true, false, true, true], name, "a Good fake completed PERFECT")
+	_check(Challenges.earned(0, Forgery.PERFECT_QUALITY, 0, 20.0, 30.0)[Challenges.Challenge.PERFECT], name, "a fake at the PERFECT threshold did not complete PERFECT")
+	_check(Challenges.earned(0, 0.9, 2, 20.0, 30.0) == [true, true, false, true], name, "a caught run completed NEVER_CAUGHT")
+	_check(Challenges.earned(0, 0.9, 0, 30.0, 30.0)[Challenges.Challenge.SPEED] and not Challenges.earned(0, 0.9, 0, 30.5, 30.0)[Challenges.Challenge.SPEED], name, "SPEED is not 'within the target'")
+	var wing := _test_wing()
+	wing.par_time = 90.0
+	_check(is_equal_approx(Challenges.speed_target(wing), 45.0), name, "the default speed target is %.1f, not half of par 90" % Challenges.speed_target(wing))
+	wing.speed_target = 60.0
+	_check(is_equal_approx(Challenges.speed_target(wing), 60.0) and Content.validate(wing, "w.tres").is_empty(), name, "a wing's own speed target is not used or is refused")
+	wing.speed_target = -1.0
+	var problems := Content.validate(wing, "w.tres")
+	_check(problems.size() == 1 and "speed_target" in problems[0], name, "a negative speed target is not refused with one problem: %s" % [problems])
+	_check(Challenges.ICONS.size() == Challenges.Challenge.size() and Challenges.ICONS.all(func(each: Texture2D) -> bool: return each != null), name, "not every challenge has its badge")
+
+
+## Save version 3 keeps each wing's challenges ever completed (a completed one stays so),
+## reports those first completed, reads back as written and refuses a bad entry; version 1
+## and 2 saves upgrade with every best, sketch and setting kept and no challenge yet.
+func _test_save_challenges() -> void:
+	var name := "save_challenges"
+	var problems: Array[String] = []
+	var data := Save.defaults()
+	_check(Save.VERSION == 3 and Save.READS == ([1, 2, 3] as Array[int]), name, "the save is version %d reading %s" % [Save.VERSION, Save.READS])
+	_check(Save.challenges_of(data, "wing_01") == Challenges.none(), name, "a wing never escaped from has challenges")
+	_check(Save.record_challenges(data, "wing_01", [true, false, true, false] as Array[bool]) == [true, false, true, false], name, "first completions are not all reported")
+	_check(Save.record_challenges(data, "wing_01", [false, true, true, false] as Array[bool]) == [false, true, false, false], name, "a challenge completed before is reported again")
+	_check(Save.challenges_of(data, "wing_01") == [true, true, true, false], name, "a completed challenge did not stay completed: %s" % [Save.challenges_of(data, "wing_01")])
+	_check(Save.record_challenges(data, "wing_01", Challenges.none()) == Challenges.none() and Save.challenges_of(data, "wing_01") == [true, true, true, false], name, "a run completing none lost or reported challenges")
+	Save.record(data, "wing_01", [true, true, false] as Array[bool], 70.0)
+	Save.record_sketch(data, "wing_01")
+	var back := Save.parse(Save.to_json(data), problems)
+	_check(problems.is_empty() and back == data, name, "a save with challenges does not read back as written: %s, %s" % [back, problems])
+	var v2 := Save.parse('{"version": 2, "wings": {"wing_01": {"stars": 2, "time": 70.5}}, "sketches": {"wing_01": true}, "settings": {"music": false, "sound": true, "reduce_motion": true, "assist": true}}', problems)
+	_check(problems.is_empty() and v2["version"] == 3 and v2["wings"] == {"wing_01": {"stars": 2, "time": 70.5}} and v2["sketches"] == {"wing_01": true}
+			and v2["challenges"] == {} and v2["settings"] == {"music": false, "sound": true, "reduce_motion": true, "assist": true}, name, "a version 2 save does not upgrade with its bests, sketches and settings: %s, %s" % [v2, problems])
+	var v1 := Save.parse('{"version": 1, "wings": {"wing_02": {"stars": 3, "time": 99}}, "settings": {"music": true, "sound": false, "reduce_motion": false, "assist": false}}', problems)
+	_check(problems.is_empty() and v1["version"] == 3 and v1["wings"] == {"wing_02": {"stars": 3, "time": 99.0}} and v1["sketches"] == {} and v1["challenges"] == {}
+			and v1["settings"]["sound"] == false and Save.challenges_of(v1, "wing_02") == Challenges.none(), name, "a version 1 save does not upgrade with its bests and settings: %s, %s" % [v1, problems])
+	for bad: String in ['{"version": 3, "wings": {}, "challenges": []}', '{"version": 3, "wings": {}, "challenges": {"wing_01": [true, false, true]}}',
+			'{"version": 3, "wings": {}, "challenges": {"wing_01": [true, false, true, 1]}}', '{"version": 3, "wings": {}, "challenges": {"wing_01": true}}']:
+		problems.clear()
+		_check(Save.parse(bad, problems).is_empty() and problems.size() == 1, name, "save '%s' is not refused with one problem: %s" % [bad, problems])
+
+
+## Game.record_escape keeps the run's challenges in the save (written) and returns those first
+## completed under "challenges"; a room loaded on its own records none.
+func _test_record_escape_challenges() -> void:
+	var name := "record_escape_challenges"
+	_game.save = Save.defaults()
+	_game.run = WingRun.new(load(Content.WINGS[0]) as WingData)
+	var beaten := _game.record_escape([true, true, true] as Array[bool], 40.0, [true, false, true, false] as Array[bool])
+	_check(beaten["challenges"] == [true, false, true, false] and Save.challenges_of(_game.save, "wing_01") == [true, false, true, false], name, "a first escape's challenges are not kept and reported: %s" % [beaten])
+	beaten = _game.record_escape([true, true, false] as Array[bool], 90.0, [true, true, false, false] as Array[bool])
+	_check(beaten["challenges"] == [false, true, false, false] and Save.challenges_of(_game.save, "wing_01") == [true, true, true, false], name, "a worse escape completing a new challenge did not keep and report only it: %s" % [beaten])
+	var problems: Array[String] = []
+	_check(Save.parse(FileAccess.get_file_as_string(_game.save_path), problems) == _game.save, name, "the new challenge was not written to the save")
+	_game.run = WingRun.new(WingData.new())
+	_check(_game.record_escape([true, true, true] as Array[bool], 1.0, [true, true, true, true] as Array[bool])["challenges"] == Challenges.none(), name, "a run without a wing file recorded challenges")
+	_game.run = null
+	_game.save = Save.defaults()
+	DirAccess.remove_absolute(_game.save_path)
+
+
+## The results pop the four challenge badges after the stars: completed ones bright (with the
+## `challenge` sound), the rest dim, a first completion with its rosette; the row sits on the
+## panel clear of the stars, legends, rosettes, sketch, buttons and mime. No challenges given: none show.
+func _test_results_challenge_badges() -> void:
+	var name := "results_challenge_badges"
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.active = false
+	var results := room.get_node("ResultsLayer/Results") as Results
+	var wait := (Results.STAR_GAP + Results.POP_TIME) * 3.0 + Results.STAR_GAP * 8.0 + Results.POP_TIME + 0.2
+	results.present([true, true, true] as Array[bool], {"stars": true, "time": true, "challenges": [false, true, false, false]}, Paintings.SKETCHES.get(&"pearl_earring"), [true, true, false, true] as Array[bool])
+	await create_timer(wait).timeout
+	_check(results.badges.all(func(each: TextureRect) -> bool: return each.visible and each.scale.is_equal_approx(Vector2.ONE)), name, "not every challenge badge popped in")
+	_check(results.badges[0].modulate == Color.WHITE and results.badges[2].modulate == Results.BADGE_DIM and _game.audio.played.has(&"challenge"), name, "completed badges are not bright with their sound and missed ones dim")
+	_check(results.badge_rosettes[1].visible and not results.badge_rosettes[0].visible and not results.badge_rosettes[3].visible and _game.audio.played.has(&"challenge_new"), name, "only the first completion should pin its rosette")
+	var inner := (results.get_node("Panel/Inner") as Control).get_rect()
+	var others: Array[Rect2] = [Rect2(results.mime.position - Vector2(30, 90), Vector2(60, 95))]
+	for path: String in ["Star0", "Star1", "Star2", "Legend0", "Legend1", "Legend2", "StarsBest", "TimeBest", "Sketch", "ReplayButton", "HomeButton"]:
+		others.append((results.get_node("Panel/" + path) as Control).get_rect().grow(4.0))
+	var rects: Array[Rect2] = []
+	for i in results.badges.size():
+		for each: TextureRect in [results.badges[i], results.badge_rosettes[i]]:
+			rects.append(each.get_rect())
+	for rect in rects:
+		_check(inner.encloses(rect), name, "a badge at %s leaves the panel %s" % [rect, inner])
+		for other in others:
+			_check(not rect.intersects(other), name, "a badge at %s covers %s" % [rect, other])
+	for i in results.badges.size() - 1:
+		_check(not results.badges[i].get_rect().intersects(results.badges[i + 1].get_rect()), name, "badges %d and %d overlap" % [i, i + 1])
+	results.present([true, false, false] as Array[bool])
+	await create_timer(wait).timeout
+	_check(not (results.badges + results.badge_rosettes).any(func(each: TextureRect) -> bool: return each.visible), name, "badges showed with no challenges given")
+
+
+## A hub door shows a pip for each challenge its wing ever completed, from the save; the pips
+## stay clear of the stars, the sketch, the painting, the archway and the neighbouring door.
+func _test_hub_challenge_pips() -> void:
+	var name := "hub_challenge_pips"
+	_game.run = null
+	_game.save = Save.defaults()
+	Save.record(_game.save, "wing_01", [true, true, true] as Array[bool], 60.0)
+	Save.record_challenges(_game.save, "wing_01", [true, false, true, true] as Array[bool])
+	var hub := await _load_hub()
+	_check(hub.wing_doors[0].challenges == [true, false, true, true] and hub.wing_doors[1].challenges == Challenges.none(), name, "the doors do not carry their wings' challenges")
+	var keep_out: Array[Rect2] = [WingDoor.SKETCH_RECT, Rect2(WingDoor.PICTURE_CENTER - WingDoor.PICTURE_SIZE / 2.0, WingDoor.PICTURE_SIZE), WingDoor.OPENING.grow(5.0),
+		Rect2(-WingDoor.OPENING.size.x / 2.0 - 5.0, WingDoor.OPENING.position.y - WingDoor.OPENING.size.x / 2.0 - 5.0, WingDoor.OPENING.size.x + 10.0, WingDoor.OPENING.size.x + 10.0)]
+	for i in 3:
+		keep_out.append(Rect2(Vector2((i - 1) * (WingDoor.STAR_SIZE + 4.0) - WingDoor.STAR_SIZE / 2.0, WingDoor.STAR_ROW_Y - WingDoor.STAR_SIZE / 2.0), Vector2.ONE * WingDoor.STAR_SIZE))
+	for i in Challenges.Challenge.size():
+		var pip := WingDoor.pip_rect(i)
+		_check(absf(pip.position.x) < Hub.DOOR_GAP / 2.0 and absf(pip.end.x) < Hub.DOOR_GAP / 2.0, name, "pip %d at %s reaches the next door" % [i, pip])
+		for j in i:
+			_check(not pip.intersects(WingDoor.pip_rect(j)), name, "pips %d and %d overlap" % [i, j])
+		for other in keep_out:
+			_check(not pip.intersects(other), name, "pip %d at %s covers %s" % [i, pip, other])
+	_game.save = Save.defaults()
+
+
+## A stolen original's plaque carries its wing's four challenge badges round the replay
+## button, never under it, all on the plaque.
+func _test_hideout_challenge_badges() -> void:
+	var name := "hideout_challenge_badges"
+	_game.run = null
+	_game.save = Save.defaults()
+	Save.record(_game.save, "wing_02", [true, false, false] as Array[bool], 200.0)
+	Save.record_challenges(_game.save, "wing_02", [false, true, false, true] as Array[bool])
+	change_scene_to_file("res://scenes/hideout.tscn")
+	for i in 3:
+		await process_frame
+	var hideout := current_scene as Hideout
+	if hideout == null:
+		_check(false, name, "the hideout did not load")
+		return
+	var decor := hideout.get_node("Decor") as HideoutDecor
+	_check(decor.challenges.size() == Content.WINGS.size() and decor.challenges[1] == [false, true, false, true] and decor.challenges[0] == Challenges.none(), name, "the plaques do not carry their wings' challenges: %s" % [decor.challenges])
+	for index in Content.WINGS.size():
+		var plate := HideoutDecor.plaque_rect(index)
+		var replay := Rect2(plate.get_center() - Vector2.ONE * Hideout.REPLAY_SIZE / 2.0, Vector2.ONE * Hideout.REPLAY_SIZE)
+		for i in Challenges.Challenge.size():
+			var badge := HideoutDecor.badge_rect(index, i)
+			_check(plate.encloses(badge) and not badge.intersects(replay), name, "frame %d's badge %d at %s is off its plaque %s or under the replay button" % [index, i, badge, plate])
+			for j in i:
+				_check(not badge.intersects(HideoutDecor.badge_rect(index, j)), name, "frame %d's badges %d and %d overlap" % [index, i, j])
+		if index + 1 < Content.WINGS.size():
+			_check(not plate.intersects(HideoutDecor.plaque_rect(index + 1)), name, "plaques %d and %d overlap" % [index, index + 1])
+	var button := hideout.get_node("Replay2") as Button
+	_check(button != null and button.get_rect().is_equal_approx(Rect2(HideoutDecor.plaque_rect(1).get_center() - button.size / 2.0, button.size)), name, "the replay button is not centred on its plaque")
+	_game.save = Save.defaults()

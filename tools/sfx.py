@@ -461,6 +461,16 @@ def fx_error(rng):
     return mix((knock(rng, 110.0, 0.1), 0, 1.0), (highpassed(noise(0.12, rng, [(0, 6000), (1, 2500)], decay=30.0)), 0.01, 0.6))
 
 
+def fx_challenge(rng):
+    """A challenge badge completed on the results: a wood block and a vibraphone ping (played higher badge by badge)."""
+    return mix((ping(note_hz(C6), 0.06, 60.0, WOOD), 0, 0.7), (ping(note_hz(C6 - 5), 0.5, 8.0, VIBES), 0.03, 0.8))
+
+
+def fx_challenge_new(rng):
+    """A challenge completed for the first time: its rosette's little bell flourish up the C minor triad."""
+    return mix((arpeggio([C6, Eb6, C6 + 7], 0.06, 0.35, 10.0, BELL), 0, 0.7), (ping(note_hz(C6 + 12), 0.5, 7.0, VIBES), 0.18, 0.5))
+
+
 # How loud each kind of sound may be as heard (loudness_of: K-weighted, the loudest 0.1 s,
 # LUFS), (floor, ceiling): a peak level alone does not set loudness (a sustained buzz is far
 # louder than a click of the same peak), so --check holds every file to its kind's band.
@@ -512,6 +522,8 @@ EFFECTS = {
     "pause": (fx_pause, 0.21, "ui"),
     "resume": (fx_resume, 0.21, "ui"),
     "error": (fx_error, 0.54, "event"),
+    "challenge": (fx_challenge, 0.42, "stinger"),
+    "challenge_new": (fx_challenge_new, 0.4, "stinger"),
 }
 
 

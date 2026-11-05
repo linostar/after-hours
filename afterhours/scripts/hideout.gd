@@ -7,7 +7,7 @@ extends Node2D
 ## (Game.replay_ghost) shows the ghost mime's escape from its wing. The home button goes back
 ## to the hub. A wing's hidden sketch, once found (Save.has_sketch), is pinned to the wall
 ## at its frame's top corner, robbed or not. The lair is drawn by HideoutDecor (each replay
-## button on its frame's plaque). The mime stands about, alive at rest (CharacterRig: breathing, blinking, its
+## button on its frame's plaque, between its challenge badges). The mime stands about, alive at rest (CharacterRig: breathing, blinking, its
 ## invisible-wall gag).
 
 const FIRST_X := 120.0
@@ -56,6 +56,7 @@ func _ready() -> void:
 		_add_replay_button(i)
 		hung += 1
 	($Decor as HideoutDecor).stolen.assign(originals.map(func(each: FramedPainting) -> bool: return each != null))
+	($Decor as HideoutDecor).challenges.assign(ids.map(func(id: String) -> Array[bool]: return Save.challenges_of(_game.save, id)))
 	_home.pressed.connect(_game.goto.bind(GameState.Flow.HUB))
 	_home.grab_focus()
 	_game.arrive(GameState.Flow.HIDEOUT)
