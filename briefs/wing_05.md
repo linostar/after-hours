@@ -1,5 +1,19 @@
 # Wing 5 brief: The Garden of Earthly Delights (Bosch)
 
+## Depth pass (feat/polish-depth)
+- Four rooms: an antechamber, then the triptych's three panels (Eden, the Garden, Hell); 9 guards.
+- Room 0, the antechamber (new): trick **frame lure** both ways at its gap's sentry.
+- Room 1, Eden: trick **hide** (the corridor).
+- Room 2, the Garden: trick **choose the frame**. The left frame pulls the guard by the back wall, the
+  next one the gap's sentry; on the way back the east frame pulls the sentry clear of the third guard.
+- Room 3, Hell: trick **lure** (a sentry on the swap spot, the far frame).
+- Sketch: inside the Garden's portrait, on the way back.
+- What the bot taught: the guard by the back wall heard the right frame before the sentry did, so he
+  stands further west (80 to 170, y 215), still nearest the wrong frame; the third guard keeps the
+  south-west (100 to 220, y 480); the in-lure steps aside to (310, 390) and the out-lure south behind
+  the shield (800, 430).
+- Bot result: 152 plays; 87.18 s, par 125; tricks 1, 4, 6, 10, 14, 17 and 19 proved needed; the sketch
+  route escapes with the sketch in 89.38 s.
 ## Constraints
 - Three linked rooms, the triptych: Eden, the Garden, Hell. Lengthened with more guards after the first playtest. 3 to 6 minutes; every star
   reachable (bot-proved).

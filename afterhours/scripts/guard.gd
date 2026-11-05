@@ -10,7 +10,7 @@ extends Node2D
 ## - INSPECT: once per pass (re-armed when it no longer sees it), stands facing the hung
 ##   fake (fake_point, while watches_fake) for INSPECT_TIME, then emits inspected.
 ## - INVESTIGATE: walks to a noise it heard (hear, within GuardBrain.HEARING_RANGE) at
-##   INVESTIGATE_SPEED and looks at where it came from.
+##   INVESTIGATE_SPEED and looks round there (INVESTIGATE_LOOK) before going back.
 ## - STRAIGHTEN: a tilted frame it sees (one of frames) gets walked to and, after
 ##   STRAIGHTEN_TIME, straightened (which also settles a noise that came from it).
 ## - SEARCH: walks to search_point at SEARCH_SPEED and looks around for SEARCH_TIME.
@@ -30,6 +30,10 @@ const PATROL_SPEED := 70.0
 const SEARCH_SPEED := 100.0
 const INVESTIGATE_SPEED := 90.0
 const STRAIGHTEN_TIME := 1.0
+## At a noise it walked to, the guard looks round for INVESTIGATE_LOOK, up to LOOK_SWEEP either
+## side of the way it came, before it goes back (a lure buys that much more time).
+const INVESTIGATE_LOOK := 1.5
+const LOOK_SWEEP := PI / 3.0
 ## A noise this close to a frame it straightens is that frame's (no longer to investigate).
 const NOISE_EXPLAINED := 40.0
 ## Below the mime's speed (Mime.SPEED): a mime that runs at once gets away.
@@ -61,8 +65,19 @@ const CONE_HALF_ANGLE := PI * 32.0 / 180.0
 const CONE_RAYS := 24
 ## Physics layers that block sight (walls, partitions).
 const SIGHT_MASK := 1
-const CONE_COLOR := Color(1.0, 0.92, 0.55, 0.26)
-const CONE_ALERT_COLOR := Color(1.0, 0.35, 0.25, 0.3)
+## The cone is the lantern's light on the floor: these colours added over the dark room
+## through CONE_LIGHT (brightest at the guard, its edge still clear at CONE_RANGE).
+const CONE_COLOR := Color(1.0, 0.82, 0.45, 0.42)
+const CONE_ALERT_COLOR := Color(1.0, 0.3, 0.2, 0.48)
+const CONE_LIGHT := preload("res://art/light_cone.tres")
+const LIGHT_POOL := preload("res://art/light_pool.tres")
+const LIGHT_ADD := preload("res://art/light_add.tres")
+const GLOW := preload("res://art/glow.tres")
+const LANTERN := preload("res://art/svg/lantern.svg")
+## The lantern's halo: its colour and diameter (forearm-local units, SVG units at
+## CharacterRig.ART_SCALE).
+const LANTERN_HALO := Color(1.0, 0.8, 0.4, 0.55)
+const LANTERN_HALO_SIZE := 110.0
 ## The suspicion eye, drawn above the head (guard-local).
 const EYE_CENTER := Vector2(0, -116)
 const EYE_SIZE := Vector2(22, 12)
@@ -147,6 +162,9 @@ var _straighten_frame: TiltFrame
 ## Whether it saw its target step into a hiding place (the chase does not lose it).
 var _knows_hiding := false
 var _straighten_left := 0.0
+## The look round at an investigated noise: seconds left, and the heading it arrived on.
+var _look_left := 0.0
+var _look_from := Vector2.RIGHT
 var _next := 0
 var _pause := 0.0
 
@@ -155,6 +173,28 @@ var _pause := 0.0
 @onready var _icon: Sprite2D = $IntentIcon
 ## Its drawing: faces where it looks and strides as it walks.
 @onready var rig: CharacterRig = $Rig
+
+
+## The lantern in its near hand (drawn bright, with a warm halo): its light is the cone.
+func _ready() -> void:
+	_cone.texture = CONE_LIGHT
+	_cone.material = LIGHT_ADD
+	var lantern := Sprite2D.new()
+	lantern.name = "Lantern"
+	lantern.texture = LANTERN
+	lantern.centered = false
+	lantern.offset = Vector2(-LANTERN.get_width() / 2.0, 0.0)
+	lantern.material = GLOW
+	var halo := Sprite2D.new()
+	halo.name = "Halo"
+	halo.texture = LIGHT_POOL
+	halo.material = LIGHT_ADD
+	halo.modulate = LANTERN_HALO
+	halo.position = Vector2(0.0, LANTERN.get_height() * 0.5)
+	halo.scale = Vector2.ONE * LANTERN_HALO_SIZE / LIGHT_POOL.get_width()
+	halo.show_behind_parent = true
+	lantern.add_child(halo)
+	rig.hold(lantern)
 
 
 ## Back to the start of the route, calm, facing its first leg, its senses cleared. A
@@ -170,6 +210,7 @@ func reset() -> void:
 	_knows_hiding = false
 	_straighten_frame = null
 	_straighten_left = 0.0
+	_look_left = 0.0
 	senses = GuardBrain.Senses.new()
 	rig.start_fidget(CharacterRig.Fidget.NONE, 0.0)
 	intent = GuardBrain.Intent.PATROL
@@ -221,6 +262,16 @@ func hear(point: Vector2) -> bool:
 func can_see(point: Vector2) -> bool:
 	if not Detection.in_cone(global_position, facing, point, CONE_RANGE, CONE_HALF_ANGLE):
 		return false
+	return _clear_to(point)
+
+
+## Whether `point` is close enough to bump into (Detection.TOUCH_RANGE, whichever way the
+## guard faces) with no wall between.
+func touches(point: Vector2) -> bool:
+	return global_position.distance_to(point) <= Detection.TOUCH_RANGE and _clear_to(point)
+
+
+func _clear_to(point: Vector2) -> bool:
 	var query := PhysicsRayQueryParameters2D.create(global_position, point, SIGHT_MASK)
 	return get_world_2d().direct_space_state.intersect_ray(query).is_empty()
 
@@ -393,9 +444,16 @@ func _chase(delta: float) -> void:
 
 func _investigate(delta: float) -> void:
 	if not _travel(noise_point, INVESTIGATE_SPEED, delta):
+		_look_left = INVESTIGATE_LOOK
+		_look_from = facing
+		return
+	# There: a look round, either side of the way it came, before it goes back.
+	_look_left -= delta
+	var sweep := sin(TAU * (1.0 - _look_left / INVESTIGATE_LOOK)) * LOOK_SWEEP
+	_aim(_look_from.rotated(sweep))
+	if _look_left > 0.0:
 		return
 	senses.noise_heard = false
-	_aim(noise_point - position if not noise_point.is_equal_approx(position) else Vector2.UP)
 	print("[Guard] %s investigated the noise at %s" % [name, noise_point.round()])
 
 
@@ -468,9 +526,10 @@ func _look(delta: float) -> void:
 	if target == null:
 		return
 	var light := gimmick.light_at(target.global_position) if gimmick != null else 1.0
-	var seen := target.visible and light > 0.0 and can_see(target.global_position)
+	var seen := target.visible and light > 0.0 and (can_see(target.global_position) or touches(target.global_position))
 	var before := suspicion
-	suspicion = Detection.suspicion_after(suspicion, seen, global_position.distance_to(target.global_position), CONE_RANGE, delta, light)
+	var distance := global_position.distance_to(target.global_position)
+	suspicion = Detection.close_seen(Detection.suspicion_after(suspicion, seen, distance, CONE_RANGE, delta, light), seen, distance, light)
 	senses.suspicion = suspicion
 	if _knows_hiding and target.visible:
 		# Out of its hiding place again: the chase can lose it like any other.
@@ -503,6 +562,12 @@ func _update_cone() -> void:
 		var hit := space.intersect_ray(PhysicsRayQueryParameters2D.create(global_position, end, SIGHT_MASK))
 		points.append(to_local(hit["position"] if not hit.is_empty() else end))
 	_cone.polygon = points
+	# The light texture is centred on the guard: CONE_RANGE out is the texture's edge.
+	var uv := PackedVector2Array()
+	var half := CONE_LIGHT.get_width() / 2.0
+	for point in points:
+		uv.append(Vector2.ONE * half + point * (half / CONE_RANGE))
+	_cone.uv = uv
 	_cone.color = cone_color(suspicion, intent == GuardBrain.Intent.CHASE or intent == GuardBrain.Intent.SEARCH)
 
 

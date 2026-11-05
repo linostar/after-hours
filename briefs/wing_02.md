@@ -1,5 +1,23 @@
 # Wing 2 brief: The Great Wave off Kanagawa (Hokusai)
 
+## Depth pass (feat/polish-depth)
+- Three rooms, 5 guards.
+- Room 0, the print room: trick **puddle lure** on the way in, **frame lure** on the way out. A screen
+  divides the room floor to wall with one narrow gap a sentry paces. Wade the west puddle to splash
+  (he is nearest in earshot), step north out of his way, slip through the gap behind him; on the way
+  back tilt the east frame and slip west along the bottom, a shield screening the way. A second guard
+  keeps the exit.
+- Room 1, the hall: trick **hide** (the corridor). A burst pipe's puddle at the wall edge wets the
+  return path only at full size: its beat is timed so it is dry when the guard has passed.
+- Room 2, the gallery: trick **choose the frame**. The sentry paces the swap spot; the left frame is
+  nearer the left guard (it pulls him), the right one only the sentry's earshot.
+- Sketch: behind the hall's first frame (tilting it is a noise too); the sketch route hides in the
+  middle portrait as the guard comes back.
+- What the bot taught: a door-blocking sentry cannot stand at a door the mime returns through (he
+  restarts on its arrival point), so the choke moved mid-room; a splash must be at the puddle's
+  always-wet centre; a guard now looks round at a noise for INVESTIGATE_LOOK before going back.
+- Bot result: 185 plays; 74.25 s, par 110; tricks 1, 4, 7, 11 and 13 proved needed; the sketch route
+  escapes with the sketch in 82.15 s.
 ## Constraints
 - Three rooms (lengthened from two after the first playtest); 3 to 6 minutes; every star reachable (bot-proved).
 - New idea: time. The player waits for the right moment instead of finding a hidden path.

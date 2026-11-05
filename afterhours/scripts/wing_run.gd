@@ -18,11 +18,18 @@ var catches := 0
 var fake_quality := 0.0
 var has_fake := false
 var carrying := false
+## Whether the mime picked up the wing's hidden sketch on this play, and whether a sketch's
+## hiding place let it fall (it then lies on that room's floor until picked up).
+var has_sketch := false
+var sketch_dropped := false
 ## Per room index: {"fake_hung": bool, "inspections": int, "found_out": bool}.
 var hung: Dictionary[int, Dictionary] = {}
 ## Per room index: how many times the mime has come in (the ghost mime replays the bot's
 ## stay of the same number).
 var visits: Dictionary[int, int] = {}
+## Per room index: how many times the mime was caught there on this play (Room.HINT_AFTER of
+## them show where the room's trick is).
+var room_catches: Dictionary[int, int] = {}
 ## A replay of the bot's run (the hideout's): the rooms follow the ghost mime, the only thing
 ## that moves; nothing is recorded.
 var replaying := false

@@ -13,6 +13,8 @@ const PICTURE_CENTER := Vector2(0, -150)
 const PICTURE_SIZE := Vector2(84, 62)
 const STAR_SIZE := 18.0
 const STAR_ROW_Y := -114.0
+## The wing's sketch, once found, beside the star row (door-local).
+const SKETCH_RECT := Rect2(38, -128, 16, 20)
 ## How far around the door, its painting and its spot a tap still means the door.
 const TAP_RECT := Rect2(-58, -190, 116, 214)
 const DARK := Color(0.1, 0.07, 0.09)
@@ -39,6 +41,8 @@ var open := false
 ## Whether the wing was escaped from, and its best stars then.
 var finished := false
 var stars := 0
+## Whether the wing's hidden sketch was found (Save.has_sketch).
+var sketch := false
 var broken := false
 ## Whether the unlock beat plays (open, its chains still falling).
 var unlocking := false
@@ -103,6 +107,9 @@ func _draw() -> void:
 		for i in 3:
 			var at := Vector2((i - 1) * (STAR_SIZE + 4.0) - STAR_SIZE / 2.0, STAR_ROW_Y - STAR_SIZE / 2.0)
 			draw_texture_rect(STAR if i < stars else STAR_EMPTY, Rect2(at, Vector2(STAR_SIZE, STAR_SIZE)), false)
+	var found: Texture2D = Paintings.SKETCHES.get(StringName(painting))
+	if sketch and found != null and not broken:
+		draw_texture_rect(found, SKETCH_RECT, false)
 	if broken:
 		draw_texture_rect(BADGE, Rect2(Vector2(-24, -86), Vector2(48, 48)), false)
 	elif not open:

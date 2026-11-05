@@ -9,83 +9,89 @@
 [ext_resource type="Texture2D" path="res://art/svg/floor_gothic.svg" id="floor_tile"]
 
 [node name="Room" instance=ExtResource("base")]
+hint_in = [NodePath("Frames/FrameB")]
+hint_out = [NodePath("Frames/FrameC")]
+sketch_in = NodePath("Portraits/PortraitA")
 
 [node name="Entrance" parent="."]
-position = Vector2(100, 330)
+position = Vector2(105, 330)
 
 [node name="BackWall" parent="."]
-color = Color(0.62, 0.78, 0.7, 1)
+color = Color(0.55, 0.7, 0.75, 1)
 
 [node name="Wainscot" parent="."]
-color = Color(0.32, 0.5, 0.3, 1)
+color = Color(0.3, 0.45, 0.4, 1)
 
 [node name="Floor" parent="."]
-color = Color(0.9, 0.94, 0.6, 1)
+color = Color(1, 1, 1, 1)
 texture_repeat = 2
 texture = ExtResource("floor_tile")
 
 [node name="FrameA" parent="Frames" instance=ExtResource("frame")]
-position = Vector2(250, 75)
+position = Vector2(180, 75)
 painting = "great_wave"
 
 [node name="FrameB" parent="Frames" instance=ExtResource("frame")]
-position = Vector2(700, 75)
+position = Vector2(420, 75)
 painting = "starry_night"
 
+[node name="FrameC" parent="Frames" instance=ExtResource("frame")]
+position = Vector2(800, 75)
+painting = "grande_jatte"
+
 [node name="PortraitA" parent="Portraits" instance=ExtResource("portrait")]
-position = Vector2(480, 105)
-painting = "pearl_earring"
-face = Vector2(-5, -10)
+position = Vector2(660, 105)
+painting = "mona_lisa"
+face = Vector2(0, -24)
 
-[node name="Partition0" type="StaticBody2D" parent="Actors"]
-position = Vector2(330, 440)
+[node name="ScreenNorth" type="StaticBody2D" parent="Actors"]
+position = Vector2(560, 290)
 script = ExtResource("partition")
 style = 5
-width = 120
-depth = 50
-height = 80
+width = 40
+depth = 118
+height = 60
 
-[node name="Partition1" type="StaticBody2D" parent="Actors"]
-position = Vector2(660, 330)
+[node name="ScreenSouth" type="StaticBody2D" parent="Actors"]
+position = Vector2(560, 505)
 script = ExtResource("partition")
 style = 5
-width = 120
-depth = 50
+width = 40
+depth = 125
+height = 60
+
+[node name="Shield" type="StaticBody2D" parent="Actors"]
+position = Vector2(700, 330)
+script = ExtResource("partition")
+style = 5
+width = 80
+depth = 60
 height = 80
 
 [node name="Guard" parent="Actors" instance=ExtResource("guard")]
-route = PackedVector2Array(200, 240, 760, 240)
+route = PackedVector2Array(540, 335, 580, 335)
 
 [node name="Guard2" parent="Actors" instance=ExtResource("guard")]
-route = PackedVector2Array(820, 480, 500, 480)
+route = PackedVector2Array(80, 215, 170, 215)
 
 [node name="Guard3" parent="Actors" instance=ExtResource("guard")]
-route = PackedVector2Array(760, 420, 880, 420)
+route = PackedVector2Array(100, 480, 220, 480)
 
 [node name="ToEden" parent="Doors" instance=ExtResource("door")]
 position = Vector2(45, 330)
-to_room = 0
+to_room = 1
 opening = Rect2(-45, -40, 24, 80)
 arrival = Vector2(60, 0)
 
 [node name="ToHell" parent="Doors" instance=ExtResource("door")]
 position = Vector2(925, 330)
-to_room = 2
+to_room = 3
 
 [node name="Rope" type="StaticBody2D" parent="Actors"]
-position = Vector2(140, 500)
+position = Vector2(440, 515)
 script = ExtResource("partition")
 style = 5
 prop = 3
-width = 110.0
-depth = 10.0
-height = 34.0
-
-[node name="Plinth" type="StaticBody2D" parent="Actors"]
-position = Vector2(510, 430)
-script = ExtResource("partition")
-style = 5
-prop = 2
-width = 34.0
-depth = 28.0
-height = 56.0
+width = 110
+depth = 10
+height = 34

@@ -10,15 +10,22 @@ extends SceneTree
 ##
 ## Run with --fixed-fps 60 (one frame = one physics tick):
 ##   "$GODOT" --headless --path afterhours --fixed-fps 60 --script "$PWD/tools/bot.gd" \
-##       -- [--record <wing.tres>] [--wing <wing.tres>]...
+##       -- [--record <wing.tres>] [--wing <wing.tres>]... [--check <wing.tres>]...
+## --check: replays and proves only the wings named (development).
 ## Default: replays every wing in Content.WINGS (and each --wing) with its bot_waits and
-##   fails unless it escapes unseen within par_time; prints "bot: OK (N wings)".
+##   fails unless it escapes unseen within par_time; prints "bot: OK (N wings)". For a wing
+##   in data/wings it also proves the puzzles: every room but its trick_free ones has a trick
+##   tap (bot_tricks) in the recorded run, and each trick is needed (the run without that tap
+##   is seen or caught whatever the next leg waits, 0 to MAX_WAIT in ABLATE_STEP); and its
+##   sketch_route (with sketch_waits) picks up the sketch and escapes, never caught.
 ## --record: searches bot_waits leg by leg (each wait from 0 to MAX_WAIT in WAIT_STEP,
 ##   the first that gets the leg through unseen), then writes them, par_time (the bot's
 ##   time plus PAINT_ALLOWANCE per ghost stroke, times PAR_FACTOR, up to the next
 ##   PAR_ROUND seconds) and the ghost replay
 ##   (data/ghosts/<wing file name>.ghost.json, or beside a wing outside data/wings: the
-##   mime's room, position and hiding every TRAIL_GAP frames) for the wing.
+##   mime's room, position and hiding every TRAIL_GAP frames) for the wing; then the
+##   sketch_route's waits the same way (a leg passes when it settles uncaught: the sketch's
+##   corner may be watched) as sketch_waits, and proves the puzzles as above.
 
 const TOUCH_INDEX := 7
 const BASE_WINDOW := Vector2i(960, 540)
@@ -33,12 +40,14 @@ const PAINT_PACE := 2.5
 ## time before PAR_FACTOR.
 const PAINT_ALLOWANCE := 1.5
 const PAR_ROUND := 5.0
+## The next leg's waits an ablation tries, in seconds apart (0 to MAX_WAIT).
+const ABLATE_STEP := 1.0
 const TRAIL_GAP := 6
 const GHOSTS_DIR := "res://data/ghosts/"
 ## A wing outside this directory (a test fixture) keeps its ghost replay beside it.
 const WINGS_DIR := "res://data/wings/"
-## Real-time limit for the whole run.
-const WATCHDOG_MSEC := 600000
+## Real-time limit for the whole run (the puzzle proofs replay every wing many times).
+const WATCHDOG_MSEC := 2700000
 
 var _game: GameState
 var _deadline_msec := 0
@@ -58,6 +67,9 @@ class Play:
 	## The stars the game awarded (empty unless it escaped).
 	var stars: Array[bool] = []
 	var trail: Array = []
+	## The room the mime was in at each tap, and whether it ended holding the sketch.
+	var tap_rooms: Array[int] = []
+	var has_sketch := false
 
 
 func _initialize() -> void:
@@ -83,11 +95,14 @@ func _main() -> void:
 	var args := OS.get_cmdline_user_args()
 	var paths: Array[String] = Content.WINGS.duplicate()
 	var recording := ""
+	var only: Array[String] = []
 	var i := 0
 	while i < args.size():
-		if args[i] in ["--wing", "--record"] and i + 1 < args.size():
+		if args[i] in ["--wing", "--record", "--check"] and i + 1 < args.size():
 			if args[i] == "--record":
 				recording = args[i + 1]
+			elif args[i] == "--check":
+				only.append(args[i + 1])
 			else:
 				paths.append(args[i + 1])
 			i += 2
@@ -98,6 +113,8 @@ func _main() -> void:
 	if recording != "":
 		quit(0 if await _record(recording) else 1)
 		return
+	if not only.is_empty():
+		paths = only
 	var failures: Array[String] = []
 	for path in paths:
 		var problem := await _check_wing(path)
@@ -129,7 +146,56 @@ func _check_wing(path: String) -> String:
 		return "%s: the run took %.2f s, over par %.0f" % [path, play.time, wing.par_time]
 	if Stars.count(play.stars) != Stars.Star.size():
 		return "%s: the game awarded %s, not every star" % [path, play.stars]
-	return ""
+	if path.get_base_dir() + "/" != WINGS_DIR:
+		return ""
+	return await _check_puzzles(path, wing, play)
+
+
+## Proves `wing`'s puzzles from its recorded `play`: a trick in every room but the trick_free
+## ones, each trick needed, and the sketch route; returns what is wrong ("" for none).
+func _check_puzzles(path: String, wing: WingData, play: Play) -> String:
+	var problems: Array[String] = []
+	for room in wing.rooms.size():
+		var tricked := false
+		for trick in wing.bot_tricks:
+			tricked = tricked or play.tap_rooms[trick] == room
+		if not tricked and not room in wing.trick_free:
+			problems.append("%s: room %d (%s) has no trick tap" % [path, room, wing.rooms[room].get_file()])
+	for trick in wing.bot_tricks:
+		var escaped_at := await _ablate(wing, trick)
+		if escaped_at >= 0.0:
+			problems.append("%s: trick tap %d (%s) is not needed: without it, waiting %.2f s before the next leg escapes unseen" % [path, trick, _leg_name(wing, trick), escaped_at])
+		else:
+			print("bot: %s: trick tap %d (%s) is needed" % [path, trick, _leg_name(wing, trick)])
+	if wing.sketch_route.is_empty():
+		problems.append("%s: no sketch_route" % path)
+	elif wing.sketch_waits.size() != wing.sketch_route.size():
+		problems.append("%s: %d sketch waits for %d sketch taps (run --record)" % [path, wing.sketch_waits.size(), wing.sketch_route.size()])
+	else:
+		var sketched := await _play(wing, wing.sketch_waits, wing.sketch_route.size(), wing.sketch_route)
+		print("bot: %s: sketch route: escaped %s, sketch %s, caught %s, %.2f s" % [path, sketched.escaped, sketched.has_sketch, sketched.caught, sketched.time])
+		if not sketched.escaped or not sketched.has_sketch or sketched.caught:
+			problems.append("%s: the sketch route no longer picks up the sketch and escapes uncaught (leg %d)" % [path, sketched.failed_leg])
+	return "; ".join(problems)
+
+
+## Plays `wing` without its trick tap `trick` (waiting it out instead), trying each wait of
+## the next leg from 0 to MAX_WAIT: returns the first wait that still escapes unseen, or -1
+## when every one is seen or caught (the trick is needed).
+func _ablate(wing: WingData, trick: int) -> float:
+	var next := trick + 1
+	var wait := 0.0
+	while wait <= MAX_WAIT:
+		var waits := wing.bot_waits.duplicate()
+		if next < waits.size():
+			waits[next] = wait
+		var play := await _play(wing, waits, wing.bot_route.size(), wing.bot_route, trick)
+		if not play.seen and not play.caught:
+			return wait
+		if next >= waits.size():
+			break
+		wait += ABLATE_STEP
+	return -1.0
 
 
 ## Finds bot_waits for the wing at `path` leg by leg, then writes them, its par time and
@@ -163,6 +229,27 @@ func _record(path: String) -> bool:
 	var best := await _play(wing, waits, wing.bot_route.size())
 	wing.bot_waits = waits
 	wing.par_time = ceilf((best.time + PAINT_ALLOWANCE * wing.ghosts.size()) * PAR_FACTOR / PAR_ROUND) * PAR_ROUND
+	if not wing.sketch_route.is_empty():
+		var sketch_waits := PackedFloat32Array()
+		for leg in wing.sketch_route.size():
+			var found := false
+			var wait := 0.0
+			while wait <= MAX_WAIT and not found:
+				var trial := sketch_waits.duplicate()
+				trial.append(wait)
+				var play := await _play(wing, trial, leg + 1, wing.sketch_route)
+				tries += 1
+				var last := leg == wing.sketch_route.size() - 1
+				found = play.failed_leg == -1 and not play.caught and (not last or (play.escaped and play.has_sketch))
+				if found:
+					sketch_waits = trial
+				else:
+					wait += WAIT_STEP
+			if not found:
+				printerr("bot: FAILED: %s: no wait up to %.1f s gets sketch leg %d (tap at %s) through uncaught" % [path, MAX_WAIT, leg, wing.sketch_route[leg]])
+				return false
+			print("bot: %s: sketch leg %d waits %.2f s" % [path, leg, sketch_waits[leg]])
+		wing.sketch_waits = sketch_waits
 	var error := ResourceSaver.save(wing, path)
 	if error != OK:
 		printerr("bot: FAILED: cannot save %s: %s" % [path, error_string(error)])
@@ -177,12 +264,20 @@ func _record(path: String) -> bool:
 	file.store_string(JSON.stringify({"wing": path, "time": snappedf(best.time, 0.01), "gap_frames": TRAIL_GAP, "trail": best.trail}) + "\n")
 	file.close()
 	print("bot: recorded %s in %d plays: %.2f s, par %.0f, ghost %s" % [path, tries, best.time, wing.par_time, ghost_path])
+	if path.get_base_dir() + "/" == WINGS_DIR:
+		var problem := await _check_puzzles(path, wing, best)
+		if problem != "":
+			printerr("bot: FAILED: " + problem)
+			return false
 	return true
 
 
-## Plays `wing` from its start: for each of its first `legs` route taps, waits `waits[i]`
-## seconds, taps, and waits for the mime to settle; stops at the first leg that fails.
-func _play(wing: WingData, waits: PackedFloat32Array, legs: int) -> Play:
+## Plays `wing` from its start: for each of its first `legs` taps of `route` (bot_route by
+## default), waits `waits[i]` seconds, taps (all but tap `skip`, which it only waits out), and
+## waits for the mime to settle; stops at the first leg that fails.
+func _play(wing: WingData, waits: PackedFloat32Array, legs: int, route := PackedVector2Array(), skip := -1) -> Play:
+	if route.is_empty():
+		route = wing.bot_route
 	var play := Play.new()
 	_trail = []
 	_trail_wait = 0
@@ -199,7 +294,10 @@ func _play(wing: WingData, waits: PackedFloat32Array, legs: int) -> Play:
 		if _spoiled(room, play):
 			play.failed_leg = leg
 			break
-		await _tap(wing.bot_route[leg])
+		play.tap_rooms.append(_game.run.room if _game.run != null else 0)
+		if leg == skip:
+			continue
+		await _tap(route[leg])
 		var settled := await _settle(room, play)
 		if not settled:
 			play.failed_leg = leg
@@ -210,6 +308,7 @@ func _play(wing: WingData, waits: PackedFloat32Array, legs: int) -> Play:
 		play.stars = room.stars
 		play.time = room.elapsed
 		play.seen = play.seen or room.ever_seen
+		play.has_sketch = room.run.has_sketch
 	play.trail = _trail
 	_game.run = null
 	return play
@@ -236,7 +335,7 @@ func _settle(room: Room, play: Play) -> bool:
 		if canvas.visible and not canvas.is_finished():
 			await _paint(canvas)
 			continue
-		var busy := room.mime.walking or room.swap_intent or room.paint_intent or room.hide_target != null or room.tilt_target != null or canvas.visible or room.tossing
+		var busy := room.mime.walking or room.swap_intent or room.paint_intent or room.hide_target != null or room.tilt_target != null or room.sketch_intent or canvas.visible or room.tossing
 		if not busy and not _game.is_transitioning():
 			return true
 		await _tick(room)

@@ -11,9 +11,10 @@
 [ext_resource type="Texture2D" path="res://art/svg/floor_checker.svg" id="floor_tile"]
 
 [node name="Room" instance=ExtResource("base")]
+hint_in = [NodePath("Frames/FrameA")]
 
 [node name="Entrance" parent="."]
-position = Vector2(100, 330)
+position = Vector2(105, 330)
 
 [node name="BackWall" parent="."]
 color = Color(0.22, 0.25, 0.3, 1)
@@ -29,39 +30,47 @@ texture = ExtResource("floor_tile")
 [node name="Gimmick" type="Node2D" parent="."]
 z_index = -9
 script = ExtResource("gimmick")
-window_x = 300.0
-sweep = 220.0
-period = 14.0
-width = 130.0
+window_x = 260
+sweep = 200
+period = 14
+width = 120
 
 [node name="Masterpiece" type="Node2D" parent="."]
 z_index = -9
-position = Vector2(620, 75)
+position = Vector2(480, 75)
 script = ExtResource("painting")
 size = Vector2(84, 100)
 
 [node name="FrameA" parent="Frames" instance=ExtResource("frame")]
-position = Vector2(440, 75)
+position = Vector2(840, 75)
 painting = "grande_jatte"
 
 [node name="PortraitA" parent="Portraits" instance=ExtResource("portrait")]
-position = Vector2(860, 105)
+position = Vector2(660, 105)
 painting = "madame_x"
 face = Vector2(0, -33)
 
 [node name="Partition0" type="StaticBody2D" parent="Actors"]
-position = Vector2(470, 420)
+position = Vector2(300, 430)
 script = ExtResource("partition")
 style = 1
 width = 140
 depth = 50
 height = 80
 
+[node name="Partition1" type="StaticBody2D" parent="Actors"]
+position = Vector2(690, 450)
+script = ExtResource("partition")
+style = 1
+width = 120
+depth = 50
+height = 80
+
 [node name="Guard" parent="Actors" instance=ExtResource("guard")]
-route = PackedVector2Array(240, 260, 800, 260, 800, 460, 240, 460)
+route = PackedVector2Array(455, 248, 505, 248)
 
 [node name="Guard2" parent="Actors" instance=ExtResource("guard")]
-route = PackedVector2Array(880, 470, 880, 250, 560, 250)
+route = PackedVector2Array(130, 470, 420, 470)
 
 [node name="ToHall" parent="Doors" instance=ExtResource("door")]
 position = Vector2(45, 330)
@@ -70,19 +79,19 @@ opening = Rect2(-45, -40, 24, 80)
 arrival = Vector2(60, 0)
 
 [node name="Rope" type="StaticBody2D" parent="Actors"]
-position = Vector2(150, 500)
+position = Vector2(880, 500)
 script = ExtResource("partition")
 style = 1
 prop = 3
-width = 110.0
-depth = 10.0
-height = 34.0
+width = 110
+depth = 10
+height = 34
 
 [node name="Plinth" type="StaticBody2D" parent="Actors"]
-position = Vector2(650, 410)
+position = Vector2(560, 500)
 script = ExtResource("partition")
 style = 1
 prop = 2
-width = 34.0
-depth = 28.0
-height = 56.0
+width = 34
+depth = 28
+height = 56

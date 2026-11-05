@@ -51,6 +51,7 @@ func _ready() -> void:
 		door.open = wing != null and Save.unlocked(_game.save, ids, i)
 		door.finished = Save.finished(_game.save, ids[i])
 		door.stars = Save.stars_of(_game.save, ids[i])
+		door.sketch = Save.has_sketch(_game.save, ids[i])
 		# A wing a first escape just opened plays its unlock here, once.
 		door.unlocking = door.open and i == _game.just_unlocked
 		$Doors.add_child(door)

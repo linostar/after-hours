@@ -148,6 +148,11 @@ func noise_sound(_point: Vector2) -> StringName:
 	return &"splash"
 
 
+## The pipe along the whole back wall, its flanges and bursts.
+func wall_rects() -> Array[Rect2]:
+	return [Rect2(0.0, PIPE_Y - FLANGE_RADIUS * 2.0, 960.0, FLANGE_RADIUS * 4.0)]
+
+
 ## Moves time on; a pipe that starts gushing sounds its burst.
 func tick(delta: float) -> void:
 	var was: Array[bool] = []

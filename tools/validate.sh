@@ -3,12 +3,14 @@
 # touch-first and landscape rules + strict script compile) and its violation fixtures,
 # scan fetcher self-test, headless gameplay tests, the playtest bot's replays, headless run of the main scene. Exits non-zero on the first failure and points at
 # the log that explains it. Every Godot call is killed after GODOT_TIMEOUT seconds.
-# Env: GODOT (Godot binary), GODOT_TIMEOUT (default 300), RUN_FRAMES (headless run length, default 120).
+# Env: GODOT (Godot binary), GODOT_TIMEOUT (default 300), BOT_TIMEOUT (the bot's replays and puzzle
+# proofs, default 2700), RUN_FRAMES (headless run length, default 120).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 GODOT="${GODOT:-/Applications/Godot.app/Contents/MacOS/Godot}"
 GODOT_TIMEOUT="${GODOT_TIMEOUT:-300}"
+BOT_TIMEOUT="${BOT_TIMEOUT:-2700}"
 LOG_DIR=build/logs
 mkdir -p "$LOG_DIR"
 
@@ -133,7 +135,7 @@ run_script test_gameplay "$LOG_DIR/test.log" --fixed-fps 60
 # The playtest bot replays every wing's recorded run (tools/bot.gd; and the slice fixture
 # wing's, which keeps the bot itself honest): each must escape unseen within its par time.
 bot_status=0
-godot "$LOG_DIR/bot.log" --headless --path afterhours --fixed-fps 60 --script "$PWD/tools/bot.gd" -- --wing res://scenes/test/slice_wing.tres || bot_status=$?
+GODOT_TIMEOUT="$BOT_TIMEOUT" godot "$LOG_DIR/bot.log" --headless --path afterhours --fixed-fps 60 --script "$PWD/tools/bot.gd" -- --wing res://scenes/test/slice_wing.tres || bot_status=$?
 if [ "$bot_status" -ne 0 ] || ! grep -q "^bot: OK" "$LOG_DIR/bot.log" || grep -qE "ERROR|WARNING" "$LOG_DIR/bot.log"; then
   fail "bot (status $bot_status)" "$LOG_DIR/bot.log"
 fi

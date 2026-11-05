@@ -134,6 +134,7 @@ func _tests() -> Array[Callable]:
 		_test_guard_chase_search_return,
 		_test_tilt_decoy_investigated,
 		_test_tilted_frame_seen_and_straightened,
+		_test_tilted_frame_straightened_after_catch,
 		_test_decoy_pulls_nearest_guard,
 		_test_hiding_checks_every_guard,
 		_test_second_guard_catches_and_resets_all,
@@ -150,6 +151,7 @@ func _tests() -> Array[Callable]:
 		_test_off_mesh_noise_and_chase_repath,
 		_test_intent_icons_and_overlay,
 		_test_keyboard_walks_and_interacts,
+		_test_keyboard_stays_on_its_floor,
 		_test_guard_pauses_facing_its_leg,
 		_test_guard_turns_smoothly,
 		_test_catches_during_swap_and_while_carrying,
@@ -164,6 +166,11 @@ func _tests() -> Array[Callable]:
 		_test_goto_missing_scene_reports,
 		_test_room_swap_and_escape,
 		_test_escape_beat_skips,
+		_test_room_hud,
+		_test_room_decor,
+		_test_sketch_found,
+		_test_hint_after_catches,
+		_test_wings_have_hints,
 		_test_room_swap_cancel_and_locked_exit,
 		_test_room_easel_paints_fake,
 		_test_room_catch_while_painting,
@@ -343,6 +350,10 @@ func _test_detection_suspicion() -> void:
 	_check(Detection.suspicion_after(0.01, false, 0.0, 150.0, 1.0) == 0.0, name, "suspicion drains below 0")
 	_check(Detection.suspicion_after(0.99, true, 0.0, 150.0, 1.0) == 1.0, name, "suspicion fills above 1")
 	_check(Detection.is_full(1.0) and not Detection.is_full(0.999), name, "full is not exactly suspicion 1")
+	# Under the guard's nose the mime is seen at once; a glimpse's grace is only for the far
+	# reach, and shade still hides it.
+	_check(Detection.close_seen(0.1, true, Detection.CLOSE_RANGE) == Detection.SEEN_AT and Detection.close_seen(0.8, true, 10.0) == 0.8, name, "a mime within CLOSE_RANGE is not seen at once")
+	_check(Detection.close_seen(0.1, true, Detection.CLOSE_RANGE + 1.0) == 0.1 and Detection.close_seen(0.1, false, 10.0) == 0.1 and Detection.close_seen(0.1, true, 10.0, 0.0) == 0.1, name, "close_seen raised suspicion beyond reach, unseen or in shade")
 	# Seen point-blank from nothing, a catch takes 1 / (FILL_FAR + FILL_NEAR) seconds at 60 ticks per second.
 	var suspicion := 0.0
 	var ticks := 0
@@ -532,8 +543,16 @@ func _test_save_shape() -> void:
 	_check(Save.unlocked(Save.defaults(), ids, 0) and not Save.unlocked(Save.defaults(), ids, 1), name, "a fresh save opens more than wing 1")
 	var older := Save.parse('{"version": 1, "wings": {}, "settings": {"music": false}}', problems)
 	_check(problems.is_empty() and older["settings"] == {"music": false, "sound": true, "reduce_motion": false, "assist": false}, name, "a missing setting does not take its default: %s" % [older])
-	for bad: String in ["{", "[]", '{"version": 2, "wings": {}}', '{"version": 1, "wings": []}', '{"version": 1, "wings": {"wing_01": {"stars": 4, "time": 1}}}',
-			'{"version": 1, "wings": {"wing_01": {"stars": 1.5, "time": 1}}}', '{"version": 1, "wings": {}, "settings": {"music": 1}}']:
+	# A version 1 save (before sketches) upgrades: every best and setting kept, no sketch yet.
+	var v1 := Save.parse('{"version": 1, "wings": {"wing_01": {"stars": 3, "time": 61.5}, "wing_02": {"stars": 1, "time": 140}}, "settings": {"music": false, "sound": true, "reduce_motion": true, "assist": false}}', problems)
+	_check(problems.is_empty() and v1["version"] == Save.VERSION and v1["wings"] == {"wing_01": {"stars": 3, "time": 61.5}, "wing_02": {"stars": 1, "time": 140.0}} and v1["sketches"] == {}
+			and v1["settings"] == {"music": false, "sound": true, "reduce_motion": true, "assist": false}, name, "a version 1 save does not upgrade with its bests and settings: %s, %s" % [v1, problems])
+	_check(Save.record_sketch(data, "wing_02") and not Save.record_sketch(data, "wing_02") and Save.has_sketch(data, "wing_02") and not Save.has_sketch(data, "wing_01"), name, "a found sketch is not kept once: %s" % [data["sketches"]])
+	back = Save.parse(Save.to_json(data), problems)
+	_check(problems.is_empty() and back == data, name, "a save with a sketch does not read back as written: %s, %s" % [back, problems])
+	for bad: String in ["{", "[]", '{"version": 3, "wings": {}}', '{"version": 1, "wings": []}', '{"version": 1, "wings": {"wing_01": {"stars": 4, "time": 1}}}',
+			'{"version": 1, "wings": {"wing_01": {"stars": 1.5, "time": 1}}}', '{"version": 1, "wings": {}, "settings": {"music": 1}}',
+			'{"version": 2, "wings": {}, "sketches": []}', '{"version": 2, "wings": {}, "sketches": {"wing_01": 1}}']:
 		problems.clear()
 		_check(Save.parse(bad, problems).is_empty() and problems.size() == 1, name, "save '%s' is not refused with one problem: %s" % [bad, problems])
 
@@ -953,6 +972,210 @@ func _load_two_guard_room(route: PackedVector2Array) -> Room:
 	if not await _wait_until(func() -> bool: return NavigationServer2D.map_get_closest_point_owner(map, room.mime.position).is_valid(), 60):
 		_check(false, "load_two_guard_room", "the room's navigation map never synced")
 	return room
+
+
+## The slice room hiding the sketch in `source` (a path under the room), made current.
+func _load_sketch_room(source: NodePath) -> Room:
+	var room := (load(ROOM_PATH) as PackedScene).instantiate() as Room
+	room.sketch_in = source
+	var old := current_scene
+	root.add_child(room)
+	current_scene = room
+	if old != null:
+		old.queue_free()
+	for i in 3:
+		await physics_frame
+	var map := room.get_world_2d().navigation_map
+	await _wait_until(func() -> bool: return NavigationServer2D.map_get_closest_point_owner(map, room.mime.position).is_valid(), 60)
+	room.guard.active = false
+	return room
+
+
+## The hidden sketch: unseen until its hiding place is used (a tilted frame, a portrait hidden
+## in), then it flutters down and lies on the floor; a tap (or E) picks it up, which the run
+## keeps and the HUD and results show; a dropped sketch lies there again on a later visit;
+## Game.record_sketch saves it for a wing file's run; the hub door and the hideout show a
+## found sketch; a bad sketch_in is reported.
+func _test_sketch_found() -> void:
+	var name := "sketch_found"
+	var room := await _load_sketch_room(^"Frames/FrameA")
+	if room == null:
+		return
+	var sketch := room.sketch
+	_check(sketch != null and sketch.state == Sketch.State.HIDDEN and sketch.texture == Paintings.SKETCHES[StringName(room.run.wing.painting)], name, "the sketch is not tucked away unseen with its wing's drawing")
+	await _tap_at(sketch.position)
+	_check(not room.sketch_intent, name, "a tap on a hidden sketch's spot heads for it")
+	room._tilt(room.get_node("Frames/FrameA") as TiltFrame)
+	_check(sketch.state == Sketch.State.FALLING and room.run.sketch_dropped and _game.audio.played.has(&"sketch_drop"), name, "tilting its frame did not let the sketch fall")
+	await create_timer(Sketch.FALL_TIME + 0.1).timeout
+	_check(sketch.state == Sketch.State.LYING, name, "the sketch did not land")
+	var map := room.get_world_2d().navigation_map
+	_check(NavigationServer2D.map_get_closest_point(map, sketch.position).distance_to(sketch.position) < 1.0, name, "the sketch lies off the walkable floor at %s" % sketch.position)
+	await _tap_at(sketch.position)
+	_check(room.sketch_intent, name, "a tap on the sketch does not walk the mime to it")
+	_check(await _wait_until(func() -> bool: return room.run.has_sketch, 900), name, "the mime never picked the sketch up")
+	_check(sketch.state == Sketch.State.TAKEN and _game.audio.played.has(&"sketch_found"), name, "picking it up did not take it with its sound")
+	await process_frame
+	await process_frame
+	_check(room.hud.has_sketch, name, "the HUD does not show the sketch")
+	room.mime.carrying = true
+	room._escape()
+	room._skip_escape()
+	var results := room.get_node("ResultsLayer/Results") as Results
+	await create_timer(Results.STAR_GAP * 6.0 + Results.POP_TIME + 0.2).timeout
+	_check(results.sketch.visible and results.sketch.texture == sketch.texture, name, "the results do not show the sketch")
+	# By E, from a portrait, and lying again on a later visit after it fell.
+	_game.run = null
+	var portrait_room := await _load_sketch_room(^"Portraits/PortraitA")
+	var portrait := portrait_room.get_node("Portraits/PortraitA") as HidingPortrait
+	portrait_room._hide_in(portrait)
+	_check(portrait_room.sketch.state == Sketch.State.FALLING, name, "hiding in its portrait did not let the sketch fall")
+	portrait_room._step_out()
+	await create_timer(Sketch.FALL_TIME + 0.1).timeout
+	portrait_room.mime.place_at(portrait_room.sketch.position + Vector2(20, 0))
+	portrait_room._keys.interacted.emit()
+	_check(portrait_room.sketch_intent, name, "E beside the sketch does not head for it")
+	_check(await _wait_until(func() -> bool: return portrait_room.run.has_sketch, 600), name, "E never picked the sketch up")
+	var revisit := (load(ROOM_PATH) as PackedScene).instantiate() as Room
+	revisit.sketch_in = ^"Frames/FrameB"
+	var run := WingRun.new((load(Content.WINGS[0]) as WingData))
+	run.wing = run.wing.duplicate()
+	run.wing.rooms = [ROOM_PATH]
+	run.sketch_dropped = true
+	_game.run = run
+	var old := current_scene
+	root.add_child(revisit)
+	current_scene = revisit
+	old.queue_free()
+	await physics_frame
+	_check(revisit.sketch.state == Sketch.State.LYING, name, "a sketch that fell on this play does not lie there on a later visit")
+	_game.run = null
+	# Saved at once for a wing file's run; shown on the hub door and pinned in the hideout.
+	_game.save = Save.defaults()
+	_game.run = WingRun.new(load(Content.WINGS[1]) as WingData)
+	_game.record_sketch()
+	_check(Save.has_sketch(_game.save, "wing_02") and Save.has_sketch(Save.parse(FileAccess.get_file_as_string(_game.save_path), [] as Array[String]), "wing_02"), name, "the sketch was not saved at once")
+	_game.run = null
+	_game.goto(GameState.Flow.HUB)
+	await _wait_until(func() -> bool: return current_scene is Hub and not _game.is_transitioning(), 300)
+	var hub := current_scene as Hub
+	_check(hub != null and hub.wing_doors[1].sketch and not hub.wing_doors[0].sketch, name, "the hub door does not show the found sketch")
+	_game.goto(GameState.Flow.HIDEOUT)
+	await _wait_until(func() -> bool: return current_scene is Hideout and not _game.is_transitioning(), 300)
+	var hideout := current_scene as Hideout
+	_check(hideout != null and hideout.get_node_or_null("Originals/Sketch2") is Sprite2D and hideout.get_node_or_null("Originals/Sketch1") == null, name, "the hideout does not pin the found sketch")
+	# A sketch_in that is not one of the room's frames or portraits is reported.
+	_game.quiet_errors = true
+	var errors_before := _game.errors.size()
+	var stray := await _load_sketch_room(^"Actors/Mime")
+	_check(_game.errors.size() == errors_before + 1 and stray.sketch == null, name, "a bad sketch_in is not reported")
+	_game.quiet_errors = false
+	_game.save = Save.defaults()
+
+
+## A play of a one-room wing of the slice room (so a room loaded into it is that wing's room 0,
+## not a room on its own with a run of its own).
+func _hint_run() -> WingRun:
+	var run := WingRun.new((load(Content.WINGS[0]) as WingData))
+	run.wing = run.wing.duplicate()
+	run.wing.rooms = [ROOM_PATH]
+	return run
+
+
+## The slice room hinting at `way_in` and `way_out`, loaded into `run` and made current.
+func _load_hint_room(run: WingRun, way_in: Array, way_out: Array) -> Room:
+	var room := (load(ROOM_PATH) as PackedScene).instantiate() as Room
+	room.hint_in = way_in
+	room.hint_out = way_out
+	_game.run = run
+	var old := current_scene
+	root.add_child(room)
+	current_scene = room
+	if old != null:
+		old.queue_free()
+	for i in 3:
+		await physics_frame
+	room.guard.active = false
+	return room
+
+
+## The trick's hint: none before HINT_AFTER catches in the room; from the third (a toss's) it
+## shows the way in before the swap and the way out while carrying; it stays across leaving
+## and coming back on the same play; a new play starts at none; Reduce Motion holds it
+## steady; a room without hint data has none; a bad hint entry is reported.
+func _test_hint_after_catches() -> void:
+	var name := "hint_after_catches"
+	var run := _hint_run()
+	var room := await _load_hint_room(run, [^"Frames/FrameA"], [Vector2(300, 400), ^"Portraits/PortraitB"])
+	var way_in := room.hints[0]
+	var way_out := room.hints[1]
+	if way_in == null or way_out == null:
+		_check(false, name, "the room made no hint for a way (in %s, out %s)" % [way_in, way_out])
+		return
+	var frame := room.get_node("Frames/FrameA") as TiltFrame
+	var portrait := room.get_node("Portraits/PortraitB") as HidingPortrait
+	_check(way_in.rects == ([frame.rect()] as Array[Rect2]) and way_in.spots.is_empty(), name, "the way in's hint is not FrameA: %s, %s" % [way_in.rects, way_in.spots])
+	_check(way_out.rects == ([portrait.rect()] as Array[Rect2]) and way_out.spots == PackedVector2Array([Vector2(300, 400)]), name, "the way out's hint is not the spot and PortraitB: %s, %s" % [way_out.rects, way_out.spots])
+	_check(way_in.material == Room.GLOW and way_in.z_index == Room.HINT_Z, name, "the hint is not drawn in the room's glow under the walkers")
+	for caught in Room.HINT_AFTER:
+		_check(not way_in.visible and not way_out.visible, name, "a hint shows after %d catch(es)" % caught)
+		room._on_caught()
+		await _wait_until(func() -> bool: return not room.tossing, 120)
+	_check(run.room_catches[0] == Room.HINT_AFTER and way_in.visible and not way_out.visible, name, "the third catch does not show the way in's hint alone (catches %s, in %s, out %s)" % [run.room_catches, way_in.visible, way_out.visible])
+	room.mime.has_fake = true
+	room._swap()
+	_check(way_out.visible and not way_in.visible, name, "carrying the original does not switch to the way out's hint")
+	room._give_run()
+	var again := await _load_hint_room(run, [^"Frames/FrameA"], [Vector2(300, 400)])
+	_check(again.hints[1].visible and not again.hints[0].visible, name, "coming back into the room on the same play loses the hint")
+	_game.set_setting("reduce_motion", true)
+	var still := again.hints[1].breath()
+	await create_timer(0.3).timeout
+	_check(is_equal_approx(again.hints[1].breath(), still) and is_equal_approx(still, RoomHint.STEADY), name, "under Reduce Motion the hint still breathes")
+	_game.set_setting("reduce_motion", false)
+	var fresh := await _load_hint_room(_hint_run(), [^"Frames/FrameA"], [])
+	_check(not fresh.hints[0].visible and fresh.hints[1] == null, name, "a new play starts with the hint showing, or a way without data has one")
+	var bare := await _load_hint_room(_hint_run(), [], [])
+	_check(bare.hints == ([null, null] as Array[RoomHint]) and bare.find_children("*", "RoomHint", false, false).is_empty(), name, "a room without hint data makes a hint")
+	_game.quiet_errors = true
+	var errors_before := _game.errors.size()
+	var stray := await _load_hint_room(_hint_run(), [^"Actors/Mime", ^"Frames/Nowhere", 7, ^"Frames/FrameB"], [])
+	_check(_game.errors.size() == errors_before + 3 and stray.hints[0].rects == ([(stray.get_node("Frames/FrameB") as TiltFrame).rect()] as Array[Rect2]), name, "bad hint entries are not reported one each (errors %d)" % (_game.errors.size() - errors_before))
+	_game.quiet_errors = false
+	_game.run = null
+
+
+## Every wing room with a trick hints at it each way it is crossed: the way in everywhere, the
+## way out everywhere but the masterpiece's room (the mime turns back there); every entry is
+## one of the room's frames or portraits or a floor spot, and every bot trick tap lands on a
+## hinted frame or portrait or by a hinted spot; trick-free rooms have no hint.
+func _test_wings_have_hints() -> void:
+	var name := "wings_have_hints"
+	for path in Content.WINGS:
+		var wing := load(path) as WingData
+		var targets: Array[Rect2] = []
+		for i in wing.rooms.size():
+			var room := (load(wing.rooms[i]) as PackedScene).instantiate() as Room
+			var label := "%s room %d (%s)" % [path, i, wing.rooms[i].get_file()]
+			if i in wing.trick_free:
+				_check(room.hint_in.is_empty() and room.hint_out.is_empty(), name, "%s is trick-free but has a hint" % label)
+			else:
+				_check(not room.hint_in.is_empty(), name, "%s has no hint on the way in" % label)
+				_check(not room.hint_out.is_empty() or room.has_node("Masterpiece"), name, "%s has no hint on the way out" % label)
+			for entry: Variant in room.hint_in + room.hint_out:
+				var target: Node = room.get_node_or_null(entry) if entry is NodePath else null
+				if entry is Vector2:
+					targets.append(Rect2(entry, Vector2.ZERO).grow(RoomHint.RING_RADIUS))
+				elif target is TiltFrame and target.get_parent() == room.get_node("Frames"):
+					targets.append((target as TiltFrame).rect())
+				elif target is HidingPortrait and target.get_parent() == room.get_node("Portraits"):
+					targets.append((target as HidingPortrait).rect())
+				else:
+					_check(false, name, "%s hints at %s, not a frame, portrait or floor spot" % [label, entry])
+			room.free()
+		for trick in wing.bot_tricks:
+			var tap := wing.bot_route[trick]
+			_check(targets.any(func(target: Rect2) -> bool: return target.has_point(tap)), name, "%s: trick tap %d at %s is on no hint" % [path, trick, tap])
 
 
 ## Stands `guard` still at `at`, facing `facing`.
@@ -1375,6 +1598,22 @@ func _test_tilted_frame_seen_and_straightened() -> void:
 	_check(straightened and not room.guard.senses.tilted_frame_known, name, "the seen frame was not straightened")
 
 
+## A frame tilted just before a catch is still straightened: the toss resets the guards
+## (wiping the noise they heard), so the room has the nearest in earshot hear it again.
+func _test_tilted_frame_straightened_after_catch() -> void:
+	var name := "tilted_frame_straightened_after_catch"
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.target = null
+	var frame := room.get_node("Frames/FrameB") as TiltFrame
+	room._tilt(frame)
+	room._on_caught()
+	await create_timer(Room.TOSS_SHAKE + Room.TOSS_FLIGHT + 0.2).timeout
+	_check(frame.tilted and room.guard.intent == GuardBrain.Intent.INVESTIGATE, name, "after the toss the guard does not go to the tilted frame (intent %s)" % _intent_name(room.guard.intent))
+	_check(await _wait_until(func() -> bool: return not frame.tilted, 1200), name, "the frame tilted before the catch was never straightened (guard %s at %s)" % [_intent_name(room.guard.intent), room.guard.position])
+
+
 ## Hiding unseen: the mime steps into the portrait (gone, its face on the sitter) and a
 ## guard staring at it from close by builds no suspicion; a floor tap steps it out.
 func _test_hide_unseen_and_step_out() -> void:
@@ -1789,9 +2028,27 @@ func _test_room_at_night() -> void:
 		return
 	var night := room.get_node_or_null("Night") as CanvasModulate
 	_check(night != null and night.color == Room.NIGHT, name, "the room has no night tint")
-	for path: String in ["PauseButton", "FakeIcon", "Actors/Guard", "Actors/Guard/Cone"]:
+	for path: String in ["PauseButton", "FakeIcon", "Actors/Guard", "Actors/Guard/Cone", "Hud"]:
 		var item := room.get_node(path) as CanvasItem
-		_check(item.material == Room.GLOW, name, "%s is not lit against the night" % path)
+		_check(item.material is CanvasItemMaterial and (item.material as CanvasItemMaterial).light_mode == CanvasItemMaterial.LIGHT_MODE_UNSHADED, name, "%s is not lit against the night" % path)
+	# The cone is the lantern's light: added over the floor, through the light texture.
+	var cone := room.get_node("Actors/Guard/Cone") as Polygon2D
+	_check((cone.material as CanvasItemMaterial).blend_mode == CanvasItemMaterial.BLEND_MODE_ADD and cone.texture == Guard.CONE_LIGHT and cone.uv.size() == cone.polygon.size(), name, "the cone is not the lantern's added light")
+	_check(room.guard.rig.find_child("Lantern", true, false) is Sprite2D, name, "the guard carries no lantern")
+	# What the player uses is lifted out of the dark; the characters draw through the night material.
+	var lights := room.get_node_or_null("Lights") as RoomLights
+	var painting_count := room.get_node("Frames").get_child_count() + room.get_node("Portraits").get_child_count() + (1 if room.masterpiece != null else 0)
+	_check(lights != null and lights.paintings.size() == painting_count, name, "not every painting has its picture light")
+	var boosted: Array[CanvasItem] = [room.masterpiece, room.easel]
+	boosted.append_array(room.doors)
+	boosted.append_array(room.get_node("Frames").get_children())
+	boosted.append_array(room.get_node("Portraits").get_children())
+	for item in boosted:
+		_check(item.modulate.is_equal_approx(Room.lit_boost()), name, "%s is not picked out of the night" % item.name)
+	var night_lit := Room.lit_boost() * Room.NIGHT
+	_check(is_equal_approx(night_lit.r, Room.LIT_SHARE) and is_equal_approx(night_lit.b, Room.LIT_SHARE), name, "the boost does not cancel the night to LIT_SHARE")
+	for rig: CharacterRig in [room.mime.rig, room.guard.rig]:
+		_check(rig.material is ShaderMaterial and (rig.material as ShaderMaterial).shader == Room.RIG_NIGHT and rig.get_children().all(func(part: Node) -> bool: return not part is Sprite2D or (part as CanvasItem).use_parent_material), name, "%s does not draw through the night material" % rig.get_parent().name)
 	for wing: String in Content.WINGS:
 		var first := (load((load(wing) as WingData).rooms[0]) as PackedScene).instantiate()
 		var lefts := 0
@@ -1862,15 +2119,17 @@ func _test_puddles_clear_of_partitions() -> void:
 
 
 ## Guards patrol round display walls, never through them, nor brushing them: in wing 2's
-## hall the guard's legs down x 700 and up x 260 run straight across a partition; over two
-## of its loops' legs no guard's feet ever come within Partition.WALKER_CLEARANCE of a
-## footprint (so no body overlaps a wall), and the guard still reaches the waypoints past
-## them.
+## gallery a guard sent up and down x 300 runs straight across its left display wall; over
+## its loops no guard's feet ever come within Partition.WALKER_CLEARANCE of a footprint (so
+## no body overlaps a wall), and the guard still reaches the waypoints either side of it.
 func _test_guards_patrol_round_partitions() -> void:
 	var name := "guards_patrol_round_partitions"
-	var room := await _load_wing_room(name, "res://scenes/wings/wing_02_hall.tscn")
+	var room := await _load_wing_room(name, "res://scenes/wings/wing_02_gallery.tscn")
 	if room == null:
 		return
+	var across := room.guards[1]
+	across.route = PackedVector2Array([Vector2(300, 330), Vector2(300, 490)])
+	across.reset()
 	var feet := _footprints(room)
 	# Walkers cut a path's corner by their agents' path_desired_distance; the carve allows
 	# Partition.CORNER_SLACK for it.
@@ -1887,11 +2146,11 @@ func _test_guards_patrol_round_partitions() -> void:
 			var gap := _clearance(guard.position, feet)
 			if gap < Partition.WALKER_CLEARANCE - 0.5:
 				brushed.append([guard.name, guard.position.round(), snappedf(gap, 0.1)])
-		for point: Vector2 in [Vector2(700, 480), Vector2(260, 250)]:
-			if room.guard.position.distance_to(point) < 1.0:
+		for point: Vector2 in [Vector2(300, 330), Vector2(300, 490)]:
+			if across.position.distance_to(point) < 1.0:
 				reached[point] = true
 	_check(brushed.is_empty(), name, "guards came within a body of a partition at [name, at, gap] %s" % [brushed.slice(0, 3)])
-	_check(reached.size() == 2, name, "the hall guard did not reach the waypoints past the partitions (reached %s)" % [reached.keys()])
+	_check(reached.size() == 2, name, "the guard did not reach the waypoints either side of the display wall (reached %s)" % [reached.keys()])
 
 
 ## Every guard's patrol keeps clear of every display wall, in every wing room and the slice
@@ -1944,6 +2203,41 @@ func _load_wing_room(name: String, path: String) -> Room:
 		_check(false, name, "%s's navigation map never synced" % path.get_file())
 		return null
 	return room
+
+
+## Keyboard steps keep the mime on the floor it stands on: in wing 4's hall a south nudge
+## from the corridor stops at the low screens, never jumping through their gaps onto the
+## unconnected floor below (the navmesh's closest point answered it there).
+func _test_keyboard_stays_on_its_floor() -> void:
+	var name := "keyboard_stays_on_its_floor"
+	var room := await _load_wing_room(name, "res://scenes/wings/wing_04_hall.tscn")
+	if room == null:
+		return
+	for each in room.guards:
+		each.active = false
+	for x: float in [100.0, 200.0, 300.0, 480.0, 560.0, 740.0, 900.0]:
+		for heading: Vector2 in [Vector2.DOWN, Vector2(1, 1).normalized(), Vector2(-1, 1).normalized()]:
+			room.mime.place_at(Vector2(x, 210))
+			for i in 60:
+				room.mime.nudge(heading, 1.0 / 60.0)
+			_check(room.mime.position.y <= 241.0, name, "nudging %s from (%.0f, 210) took the mime through the screens to %s" % [heading.round(), x, room.mime.position.round()])
+	room.mime.place_at(Vector2(300, 210))
+	for i in 30:
+		room.mime.nudge(Vector2(1, 1).normalized(), 1.0 / 60.0)
+	_check(room.mime.position.x > 320.0, name, "a diagonal nudge into the screens did not slide the mime along them (at %s)" % room.mime.position.round())
+	# On open floor a step's path keeps a point at each polygon edge it crosses; still
+	# straight, so the step goes its full length (refusing those were invisible walls).
+	room = await _load_wing_room(name, "res://scenes/wings/wing_04_terrace.tscn")
+	if room == null:
+		return
+	for each in room.guards:
+		each.active = false
+	for start: Array in [[Vector2(50, 210), Vector2.RIGHT], [Vector2(90, 310), Vector2.DOWN], [Vector2(330, 430), Vector2.UP], [Vector2(390, 390), Vector2.DOWN]]:
+		var at := start[0] as Vector2
+		room.mime.place_at(at)
+		var full := room.mime.speed() / 60.0
+		room.mime.nudge(start[1] as Vector2, 1.0 / 60.0)
+		_check(absf(room.mime.position.distance_to(at) - full) < 0.2, name, "a step %s from %s on open floor moved %.2f, not %.2f" % [start[1], at, room.mime.position.distance_to(at), full])
 
 
 ## The floor footprints of `room`'s display walls (Partition).
@@ -2659,6 +2953,126 @@ func _test_escape_beat_skips() -> void:
 	_check(_game.audio.played.count(&"door") == 1 and swinging.exit_door.shut == 1.0 and not swinging.exit_door.glowing, name, "a skip mid-swing did not shut the door with one thud and its glow out (sounds %s)" % [_game.audio.played])
 
 
+## The HUD: the par clock follows the wing timer over par (and stops with it), warms only
+## past par; the objective strip ticks off painting, swapping and escaping as they happen,
+## keeps them through a catch, and the HUD hides in a hideout replay.
+func _test_room_hud() -> void:
+	var name := "room_hud"
+	_check(RoomHud.clock_fill(0.0, 80.0) == 0.0 and is_equal_approx(RoomHud.clock_fill(20.0, 80.0), 0.25) and RoomHud.clock_fill(120.0, 80.0) == 1.0, name, "the clock does not fill with elapsed over par")
+	_check(RoomHud.warmth(79.0, 80.0) == 0.0 and RoomHud.warmth(80.0 + RoomHud.WARM_TIME * 0.5, 80.0) == 0.5 and RoomHud.warmth(200.0, 80.0) == 1.0, name, "the face does not warm only past par")
+	_check(RoomHud.goals(false, false, false) == [false, false, false] and RoomHud.goals(true, false, false) == [true, false, false]
+			and RoomHud.goals(false, true, false) == [true, true, false] and RoomHud.goals(false, true, true) == [true, true, true], name, "the goals do not follow the mime's state")
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.active = false
+	var hud := room.hud
+	var areas: Array[Rect2] = [RoomHud.clock_rect(), RoomHud.plate_rect(), RoomHud.sketch_rect()]
+	var canvas := room.get_node("EaselLayer/ForgeryCanvas/Easel") as Control
+	for area in areas:
+		_check(hud.visible and Rect2(Vector2.ZERO, Vector2(960, 540)).encloses(area) and not area.intersects(room.get_node("PauseButton").get_rect()) and not area.intersects(canvas.get_global_rect()), name, "the HUD (%s) is off the world, over the pause button or the canvas board" % area)
+	# No wing room hangs a painting under it.
+	for wing_path in Content.WINGS:
+		for room_path: String in (load(wing_path) as WingData).rooms:
+			var scene := (load(room_path) as PackedScene).instantiate()
+			var hung: Dictionary[String, Rect2] = {}
+			for frame in scene.get_node("Frames").get_children():
+				hung["frame " + frame.name] = Rect2(frame.position - TiltFrame.SIZE / 2.0, TiltFrame.SIZE)
+			for portrait in scene.get_node("Portraits").get_children():
+				hung["portrait " + portrait.name] = Rect2(portrait.position - HidingPortrait.SIZE / 2.0, HidingPortrait.SIZE)
+			var picture := scene.get_node_or_null("Masterpiece") as FramedPainting
+			if picture != null:
+				hung["the masterpiece"] = Rect2(picture.position - picture.size / 2.0, picture.size)
+			for what in hung:
+				_check(not areas.any(func(area: Rect2) -> bool: return area.intersects(hung[what])), name, "%s: %s is under the HUD" % [room_path, what])
+			scene.free()
+	await physics_frame
+	_check(hud.done == [false, false, false], name, "goals are done before anything was: %s" % [hud.done])
+	var before := room.elapsed
+	for i in 30:
+		await physics_frame
+	_check(room.elapsed > before and is_equal_approx(RoomHud.clock_fill(room.elapsed, room.par_time), room.elapsed / room.par_time), name, "the clock does not follow the running timer")
+	room._on_painted(Forgery.ASSIST_QUALITY)
+	await process_frame
+	await process_frame
+	_check(hud.done == [true, false, false], name, "painting did not tick the brush: %s" % [hud.done])
+	room._swap()
+	await process_frame
+	await process_frame
+	_check(hud.done == [true, true, false], name, "swapping did not tick the swap: %s" % [hud.done])
+	room._on_caught()
+	await create_timer(Room.TOSS_SHAKE + Room.TOSS_FLIGHT + 0.1).timeout
+	_check(hud.done == [true, true, false], name, "a catch lost the goals: %s" % [hud.done])
+	room._escape()
+	var stopped := room.elapsed
+	await process_frame
+	await process_frame
+	await physics_frame
+	_check(hud.done == [true, true, true] and room.elapsed == stopped, name, "escaping did not tick the exit and stop the clock: %s" % [hud.done])
+	var replay := await _load_room()
+	if replay == null:
+		return
+	# Stopped first (leaving), so the replay's empty stay does not end it and leave the room.
+	replay.leaving = true
+	replay.run.replaying = true
+	await process_frame
+	await process_frame
+	_check(not replay.hud.visible, name, "the HUD shows in a hideout replay")
+	replay.run.replaying = false
+
+
+## Every wing room's back wall is dressed in its wing's style (RoomDecor), its lamps hung only
+## in clear wall (off every painting, the gimmick's window or pipe and the HUD), each lighting
+## the wall and the floor (two pools); the finale never paints wing 4's starry sky; an
+## unknown style is reported.
+func _test_room_decor() -> void:
+	var name := "room_decor"
+	var paintings: Array[Rect2] = [Rect2(300, 40, 70, 130), Rect2(600, 50, 60, 50)]
+	for x in RoomDecor.lamp_xs(paintings, 88.0, RoomDecor.LAMP_BOX):
+		var lamp := Rect2(Vector2(x, 88.0) + RoomDecor.LAMP_BOX.position, RoomDecor.LAMP_BOX.size)
+		_check(x >= RoomDecor.HUD_CLEAR and not paintings.any(func(each: Rect2) -> bool: return each.grow(RoomDecor.LAMP_CLEARANCE - 1.0).intersects(lamp)), name, "a lamp at x %.0f hangs over a painting or the HUD" % x)
+	_check(RoomDecor.lamp_xs([Rect2(0, 96, 960, 32)] as Array[Rect2], 88.0, RoomDecor.LAMP_BOX).is_empty(), name, "a lamp hangs across a wall-wide pipe")
+	for wing_path in Content.WINGS:
+		var wing := load(wing_path) as WingData
+		for index in wing.rooms.size():
+			# The room as one of its wing's (its style is the wing's painting), come in at its Entrance.
+			_game.run = WingRun.new(wing)
+			_game.run.room = index
+			change_scene_to_file(wing.rooms[index])
+			var room := await _wait_for_room(wing.rooms[index], 120)
+			if room == null:
+				_check(false, name, "%s did not load" % wing.rooms[index])
+				continue
+			var decor := room.get_node_or_null("Decor") as RoomDecor
+			_check(decor != null and decor.style == StringName(wing.painting) and decor.z_index == Room.DECOR_Z, name, "%s is not dressed in %s" % [wing.rooms[index], wing.painting])
+			if decor == null:
+				continue
+			var lights := room.get_node("Lights") as RoomLights
+			_check(lights.pools.size() == decor.lamps.size() * 2, name, "%s: its %d lamps do not each light the wall and floor" % [wing.rooms[index], decor.lamps.size()])
+			for lamp in decor.lamps:
+				var box := Rect2(lamp + RoomDecor.LAMP_BOX.position, RoomDecor.LAMP_BOX.size)
+				var blocked := decor.avoid.any(func(each: Rect2) -> bool: return each.intersects(box))
+				_check(not blocked and lamp.x >= RoomDecor.HUD_CLEAR, name, "%s: the lamp at %s hangs over a painting, the gimmick's wall or the HUD" % [wing.rooms[index], lamp])
+			if wing.painting == "mona_lisa" and room.gimmick != null:
+				var parts: Array[Gimmick] = []
+				if room.gimmick is GimmickMix:
+					parts = (room.gimmick as GimmickMix).parts()
+				else:
+					parts.append(room.gimmick)
+				for part in parts:
+					_check(not part is Searchlights or not (part as Searchlights).sky, name, "%s paints wing 4's starry sky" % wing.rooms[index])
+	_game.run = null
+	var stray := RoomDecor.new()
+	stray.style = &"no_such_style"
+	_game.quiet_errors = true
+	var errors_before := _game.errors.size()
+	root.add_child(stray)
+	_check(_game.errors.size() == errors_before + 1 and stray.lamps.is_empty(), name, "an unknown style is not reported")
+	_game.quiet_errors = false
+	stray.queue_free()
+	await process_frame
+
+
 ## Tapping away mid-swap cancels it; the exit does nothing without the original.
 func _test_room_swap_cancel_and_locked_exit() -> void:
 	var name := "room_swap_cancel_and_locked_exit"
@@ -2715,10 +3129,10 @@ func _test_room_easel_paints_fake() -> void:
 	_check(not glow.visible and not canvas.visible, name, "after painting the easel still glows or the canvas stays open")
 	_check(Forgery.grade(room.fake_quality) == Forgery.Grade.PERFECT, name, "an exact trace of the room's painting graded %s (%.2f)" % [Forgery.Grade.keys()[Forgery.grade(room.fake_quality)], room.fake_quality])
 	var carried := room.mime.get_node("Carried") as FramedPainting
-	_check(carried.visible and carried.modulate == Mime.FAKE_TINT, name, "the carried fake does not show, tinted")
+	_check(carried.visible and carried.modulate.is_equal_approx(Mime.FAKE_TINT * room.mime.carried_light), name, "the carried fake does not show, tinted")
 	await _tap_at(room.painting_rect().get_center())
 	_check(await _wait_until(func() -> bool: return room.mime.carrying, 900), name, "the fake never swapped for the original")
-	_check(not room.mime.has_fake and carried.modulate == Color.WHITE, name, "after the swap the mime still has the fake, or the original shows tinted")
+	_check(not room.mime.has_fake and carried.modulate.is_equal_approx(room.mime.carried_light), name, "after the swap the mime still has the fake, or the original shows tinted")
 	await _tap_at(room.easel.rect().get_center())
 	_check(not room.paint_intent, name, "carrying the original, a tap on the easel meant paint")
 

@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://scripts/room.gd" id="1_room"]
 [ext_resource type="PackedScene" path="res://scenes/mime.tscn" id="2_mime"]
@@ -8,6 +8,7 @@
 [ext_resource type="Script" path="res://scripts/ui/keyboard_input.gd" id="6_keys"]
 [ext_resource type="Texture2D" path="res://art/svg/icon_pause.svg" id="7_pause"]
 [ext_resource type="PackedScene" path="res://scenes/pause_menu.tscn" id="8_pause_menu"]
+[ext_resource type="Script" path="res://scripts/room_hud.gd" id="9_hud"]
 
 [sub_resource type="NavigationPolygon" id="NavigationPolygon_floor"]
 outlines = Array[PackedVector2Array]([PackedVector2Array(32, 172, 928, 172, 928, 508, 32, 508)])
@@ -85,6 +86,10 @@ icon = ExtResource("7_pause")
 flat = true
 icon_alignment = 1
 expand_icon = true
+
+[node name="Hud" type="Node2D" parent="."]
+z_index = 50
+script = ExtResource("9_hud")
 
 [node name="KeyboardInput" type="Node" parent="."]
 script = ExtResource("6_keys")

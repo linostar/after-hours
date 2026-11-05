@@ -1,19 +1,20 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/room_base.tscn" id="base"]
 [ext_resource type="Script" path="res://scripts/gimmicks/footprints.gd" id="gimmick"]
 [ext_resource type="PackedScene" path="res://scenes/tilt_frame.tscn" id="frame"]
-[ext_resource type="PackedScene" path="res://scenes/hiding_portrait.tscn" id="portrait"]
 [ext_resource type="PackedScene" path="res://scenes/easel.tscn" id="easel"]
+[ext_resource type="Script" path="res://scripts/partition.gd" id="partition"]
 [ext_resource type="PackedScene" path="res://scenes/guard.tscn" id="guard"]
 [ext_resource type="PackedScene" path="res://scenes/door.tscn" id="door"]
 [ext_resource type="Texture2D" path="res://art/svg/floor_terrazzo.svg" id="floor_tile"]
-[ext_resource type="Script" path="res://scripts/partition.gd" id="partition"]
 
 [node name="Room" instance=ExtResource("base")]
+hint_in = [Vector2(800, 210)]
+hint_out = [Vector2(800, 210)]
 
 [node name="Entrance" parent="."]
-position = Vector2(70, 330)
+position = Vector2(70, 470)
 
 [node name="BackWall" parent="."]
 color = Color(0.62, 0.75, 0.82, 1)
@@ -29,28 +30,47 @@ texture = ExtResource("floor_tile")
 [node name="Gimmick" type="Node2D" parent="."]
 z_index = -9
 script = ExtResource("gimmick")
-parasols = PackedVector3Array(330, 300, 55, 640, 440, 60)
+parasols = PackedVector3Array(800, 210, 50, 250, 430, 55)
 
 [node name="FrameA" parent="Frames" instance=ExtResource("frame")]
-position = Vector2(220, 75)
+position = Vector2(360, 75)
 painting = "starry_night"
 
-[node name="PortraitA" parent="Portraits" instance=ExtResource("portrait")]
-position = Vector2(760, 105)
-painting = "pearl_earring"
-face = Vector2(-5, -10)
+[node name="Hedge0" type="StaticBody2D" parent="Actors"]
+position = Vector2(560, 290)
+script = ExtResource("partition")
+style = 3
+width = 160
+depth = 20
+height = 30
+
+[node name="Hedge1" type="StaticBody2D" parent="Actors"]
+position = Vector2(740, 290)
+script = ExtResource("partition")
+style = 3
+width = 160
+depth = 20
+height = 30
+
+[node name="Hedge2" type="StaticBody2D" parent="Actors"]
+position = Vector2(884, 290)
+script = ExtResource("partition")
+style = 3
+width = 88
+depth = 20
+height = 30
 
 [node name="Easel" parent="Actors" instance=ExtResource("easel")]
-position = Vector2(480, 300)
+position = Vector2(250, 300)
 
 [node name="Guard" parent="Actors" instance=ExtResource("guard")]
-route = PackedVector2Array(180, 470, 180, 250, 820, 250, 820, 470)
+route = PackedVector2Array(560, 210, 905, 210, 500, 210)
 
 [node name="Guard2" parent="Actors" instance=ExtResource("guard")]
-route = PackedVector2Array(560, 400, 360, 400)
+route = PackedVector2Array(560, 400, 860, 400)
 
-[node name="ToGallery" parent="Doors" instance=ExtResource("door")]
-position = Vector2(925, 330)
+[node name="ToHall" parent="Doors" instance=ExtResource("door")]
+position = Vector2(925, 210)
 to_room = 1
 
 [node name="Exit" parent="Doors" instance=ExtResource("door")]
@@ -59,20 +79,19 @@ to_room = -1
 opening = Rect2(-45, -40, 24, 80)
 arrival = Vector2(60, 0)
 
-[node name="Plinth" type="StaticBody2D" parent="Actors"]
-position = Vector2(250, 400)
-script = ExtResource("partition")
-style = 3
-prop = 2
-width = 34.0
-depth = 28.0
-height = 56.0
-
 [node name="Bench" type="StaticBody2D" parent="Actors"]
-position = Vector2(820, 420)
+position = Vector2(700, 470)
 script = ExtResource("partition")
 style = 3
 prop = 1
-width = 96.0
-depth = 22.0
-height = 24.0
+width = 96
+depth = 22
+
+[node name="Plinth" type="StaticBody2D" parent="Actors"]
+position = Vector2(420, 500)
+script = ExtResource("partition")
+style = 3
+prop = 2
+width = 34
+depth = 28
+height = 56

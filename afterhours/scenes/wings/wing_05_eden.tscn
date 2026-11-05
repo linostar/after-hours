@@ -1,18 +1,18 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/room_base.tscn" id="base"]
-[ext_resource type="PackedScene" path="res://scenes/tilt_frame.tscn" id="frame"]
 [ext_resource type="PackedScene" path="res://scenes/hiding_portrait.tscn" id="portrait"]
-[ext_resource type="PackedScene" path="res://scenes/easel.tscn" id="easel"]
+[ext_resource type="Script" path="res://scripts/partition.gd" id="partition"]
 [ext_resource type="PackedScene" path="res://scenes/guard.tscn" id="guard"]
 [ext_resource type="PackedScene" path="res://scenes/door.tscn" id="door"]
 [ext_resource type="Texture2D" path="res://art/svg/floor_gothic.svg" id="floor_tile"]
-[ext_resource type="Script" path="res://scripts/partition.gd" id="partition"]
 
 [node name="Room" instance=ExtResource("base")]
+hint_in = [NodePath("Portraits/PortraitB")]
+hint_out = [NodePath("Portraits/PortraitB")]
 
 [node name="Entrance" parent="."]
-position = Vector2(70, 330)
+position = Vector2(105, 210)
 
 [node name="BackWall" parent="."]
 color = Color(0.55, 0.7, 0.75, 1)
@@ -21,52 +21,86 @@ color = Color(0.55, 0.7, 0.75, 1)
 color = Color(0.3, 0.45, 0.4, 1)
 
 [node name="Floor" parent="."]
-color = Color(0.8, 0.92, 0.66, 1)
+color = Color(1, 1, 1, 1)
 texture_repeat = 2
 texture = ExtResource("floor_tile")
 
-[node name="FrameA" parent="Frames" instance=ExtResource("frame")]
-position = Vector2(300, 75)
-painting = "fighting_temeraire"
-
 [node name="PortraitA" parent="Portraits" instance=ExtResource("portrait")]
-position = Vector2(800, 105)
-painting = "mona_lisa"
-face = Vector2(0, -24)
+position = Vector2(480, 105)
+painting = "pearl_earring"
+face = Vector2(-5, -10)
 
-[node name="Easel" parent="Actors" instance=ExtResource("easel")]
-position = Vector2(560, 250)
+[node name="PortraitB" parent="Portraits" instance=ExtResource("portrait")]
+position = Vector2(820, 105)
+painting = "castiglione"
+face = Vector2(10, -22)
+
+[node name="Screen0" type="StaticBody2D" parent="Actors"]
+position = Vector2(110, 290)
+script = ExtResource("partition")
+style = 5
+width = 160
+depth = 20
+height = 30
+
+[node name="Screen1" type="StaticBody2D" parent="Actors"]
+position = Vector2(290, 290)
+script = ExtResource("partition")
+style = 5
+width = 160
+depth = 20
+height = 30
+
+[node name="Screen2" type="StaticBody2D" parent="Actors"]
+position = Vector2(470, 290)
+script = ExtResource("partition")
+style = 5
+width = 160
+depth = 20
+height = 30
+
+[node name="Screen3" type="StaticBody2D" parent="Actors"]
+position = Vector2(650, 290)
+script = ExtResource("partition")
+style = 5
+width = 160
+depth = 20
+height = 30
+
+[node name="Screen4" type="StaticBody2D" parent="Actors"]
+position = Vector2(830, 290)
+script = ExtResource("partition")
+style = 5
+width = 160
+depth = 20
+height = 30
 
 [node name="Guard" parent="Actors" instance=ExtResource("guard")]
-route = PackedVector2Array(160, 470, 820, 470)
+route = PackedVector2Array(500, 210, 905, 210, 65, 210)
 
-[node name="Guard2" parent="Actors" instance=ExtResource("guard")]
-route = PackedVector2Array(200, 320, 200, 440, 480, 440, 480, 320)
-
-[node name="ToGarden" parent="Doors" instance=ExtResource("door")]
-position = Vector2(925, 330)
-to_room = 1
-
-[node name="Exit" parent="Doors" instance=ExtResource("door")]
-position = Vector2(45, 470)
-to_room = -1
+[node name="ToFirst" parent="Doors" instance=ExtResource("door")]
+position = Vector2(45, 210)
+to_room = 0
 opening = Rect2(-45, -40, 24, 80)
 arrival = Vector2(60, 0)
 
-[node name="Bench" type="StaticBody2D" parent="Actors"]
-position = Vector2(580, 420)
-script = ExtResource("partition")
-style = 5
-prop = 1
-width = 96.0
-depth = 22.0
-height = 24.0
+[node name="ToLast" parent="Doors" instance=ExtResource("door")]
+position = Vector2(925, 210)
+to_room = 2
 
 [node name="Plinth" type="StaticBody2D" parent="Actors"]
-position = Vector2(870, 440)
+position = Vector2(300, 470)
 script = ExtResource("partition")
 style = 5
 prop = 2
-width = 34.0
-depth = 28.0
-height = 56.0
+width = 34
+depth = 28
+height = 56
+
+[node name="Bench" type="StaticBody2D" parent="Actors"]
+position = Vector2(700, 460)
+script = ExtResource("partition")
+style = 5
+prop = 1
+width = 96
+depth = 22

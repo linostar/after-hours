@@ -13,6 +13,9 @@ extends Node2D
 
 ## Walking speed in base units per second.
 const SPEED := 170.0
+## How much longer than straight a keyboard step's path may be (rounding where it crosses
+## navmesh polygon edges); longer goes round a wall and is refused.
+const STRAIGHT_SLACK := 0.5
 const RING_CENTER := Vector2(34, -84)
 const RING_RADIUS := 14.0
 const RING_TRACK := Color(0.1, 0.08, 0.13, 0.7)
@@ -45,6 +48,13 @@ var walking := false
 var busy := false
 ## The room's gimmick (null for none): how fast it walks where it stands.
 var gimmick: Gimmick
+## How bright the carried painting draws (a room after dark lifts it out of the night:
+## Room.lit_boost); its tint (FAKE_TINT for the fake) on top.
+var carried_light := Color.WHITE:
+	set(value):
+		carried_light = value
+		if is_node_ready():
+			_sync_carried()
 var swap_progress := 0.0:
 	set(value):
 		swap_progress = value
@@ -107,7 +117,20 @@ func nudge(direction: Vector2, delta: float) -> void:
 	var step := position + direction * speed() * delta
 	if not NavigationServer2D.map_get_closest_point_owner(map, step).is_valid():
 		return
-	var to := NavigationServer2D.map_get_closest_point(map, step)
+	# Not map_get_closest_point: inside a navmesh polygon with collinear vertices on an
+	# edge (a corridor walled by display screens) it answers a point on another, unconnected
+	# polygon, and the mime jumped through the walls. A path stays on the floor it stands on;
+	# a straight one only (it keeps a point where it crosses each polygon edge, so straight
+	# means as long as the way to its end), so a step never goes round a wall.
+	var line := NavigationServer2D.map_get_path(map, position, step, true)
+	if line.is_empty():
+		return
+	var to := line[line.size() - 1]
+	var length := 0.0
+	for i in range(1, line.size()):
+		length += line[i - 1].distance_to(line[i])
+	if length > position.distance_to(to) + STRAIGHT_SLACK:
+		return
 	_moved += position.distance_to(to)
 	_nudged = true
 	face(direction)
@@ -192,7 +215,7 @@ func _squash_tween() -> void:
 
 func _sync_carried() -> void:
 	_carried.visible = carrying or has_fake
-	_carried.modulate = Color.WHITE if carrying else FAKE_TINT
+	_carried.modulate = (Color.WHITE if carrying else FAKE_TINT) * carried_light
 
 
 # The room nudges the mime from its own _physics_process, which runs before this one (the

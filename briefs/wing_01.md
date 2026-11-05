@@ -1,5 +1,24 @@
 # Wing 1 brief: Girl with a Pearl Earring (Vermeer), the tutorial
 
+## Depth pass (feat/polish-depth)
+- Three rooms, 3 guards (the ramp: 3, 5, 6, 8, 9, 12 across the wings). Teach, in order: walk, paint,
+  door, then hiding in the hall and tilting in the gallery, each a room's needed trick.
+- Room 0, the foyer (safe, no guard; trick-free): the Mona Lisa portrait hides the wing's **sketch**
+  (stepping in drops it to the floor below; tap it).
+- Room 1, the hall: trick **hide**. A narrow back corridor (walkable y 180 to 240, doors at y 210) its
+  guard sweeps from just inside one door to just inside the other; low Delft vitrines wall off the
+  lower floor. On the way in the mime hides in the far portrait as he turns at the far door; on the
+  way back (he restarts heading straight at the returning mime) it hides there at once and walks out
+  behind him.
+- Room 2, the gallery: trick **lure**. A sentry paces across the swap spot (his back is never turned
+  for the 1.5 s swap); the frame at the far end of the back wall is in his earshot only. Go low round
+  the right, tilt it, step aside as he comes, swap while he straightens it.
+- What the bot taught: guards now see the mime at once within CLOSE_RANGE in their cone and notice
+  one brushing past within TOUCH_RANGE (it slipped past at first: overtaking in dim light, and round
+  his back as he turned); the corridor was narrowed so no one passes the guard; a middle-portrait hide
+  on the way back proved unneeded and was dropped.
+- Bot result (depth pass, with the look round): 94 plays; 60.63 s, par 90; tricks 2, 5 and 9 proved
+  needed; the sketch route escapes with the sketch in 61.95 s.
 ## Constraints
 - Three rooms (lengthened from two after the first playtest); 3 to 6 minutes for a first-time player; every star reachable (bot-proved).
 - Teach, in order and without words: walk, paint, go through a door, swap, hide, tilt.

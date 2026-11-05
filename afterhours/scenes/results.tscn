@@ -163,6 +163,18 @@ mouse_filter = 2
 texture = ExtResource("8_rosette")
 expand_mode = 1
 
+[node name="Sketch" type="TextureRect" parent="Panel"]
+visible = false
+layout_mode = 0
+offset_left = 630.0
+offset_top = 318.0
+offset_right = 678.0
+offset_bottom = 378.0
+rotation = 0.12
+pivot_offset = Vector2(24, 30)
+mouse_filter = 2
+expand_mode = 1
+
 [node name="Confetti" type="Control" parent="Panel"]
 layout_mode = 3
 anchors_preset = 0

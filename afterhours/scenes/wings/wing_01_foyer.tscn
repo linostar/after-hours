@@ -9,6 +9,7 @@
 [ext_resource type="Script" path="res://scripts/partition.gd" id="partition"]
 
 [node name="Room" instance=ExtResource("base")]
+sketch_in = NodePath("Portraits/PortraitA")
 
 [node name="Entrance" parent="."]
 position = Vector2(70, 330)

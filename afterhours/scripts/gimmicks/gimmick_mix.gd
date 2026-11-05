@@ -94,6 +94,13 @@ func forget() -> void:
 		part.forget()
 
 
+func wall_rects() -> Array[Rect2]:
+	var rects: Array[Rect2] = []
+	for part in parts():
+		rects.append_array(part.wall_rects())
+	return rects
+
+
 ## The glass: the haze graded down the pane, each glare band a soft diagonal (bright in its
 ## middle, clear at both edges), the glint, and a faint rim.
 func _draw_glass() -> void:

@@ -177,11 +177,13 @@ func _ready() -> void:
 	_body.centered = false
 	_body.offset = -feet_at * ART_SCALE
 	_body.scale = Vector2.ONE / ART_SCALE
+	_body.use_parent_material = true
 	add_child(_body)
 	# The lids, over the body's face (body-local units are SVG units at ART_SCALE).
 	_lids = Node2D.new()
 	_lids.name = "Lids"
 	_lids.position = -feet_at * ART_SCALE
+	_lids.use_parent_material = true
 	_lids.draw.connect(_draw_lids)
 	_body.add_child(_lids)
 	# Characters made together blink apart: each starts its blink cycle by its owner's name.
@@ -201,6 +203,7 @@ func _limb(limb_name: String, texture: Texture2D) -> Sprite2D:
 	limb.centered = false
 	limb.offset = Vector2(-texture.get_width() / 2.0, 0.0)
 	limb.scale = Vector2.ONE / ART_SCALE
+	limb.use_parent_material = true
 	add_child(limb)
 	return limb
 
@@ -214,8 +217,17 @@ func _lower(upper: Sprite2D, part_name: String, texture: Texture2D, joint: float
 	lower.centered = false
 	lower.offset = Vector2(-texture.get_width() / 2.0, -cap * ART_SCALE)
 	lower.position = Vector2(0.0, joint * ART_SCALE)
+	lower.use_parent_material = true
 	upper.add_child(lower)
 	return lower
+
+
+## Hangs `item` from the hand of arm `i` (1: the near arm in the side view): it swings and
+## turns with that forearm (forearm-local units are SVG units at ART_SCALE).
+func hold(item: Node2D, i := 1) -> void:
+	var forearm := _forearms[i]
+	item.position = Vector2(0.0, forearm.texture.get_height() - JOINT_CAP * ART_SCALE)
+	forearm.add_child(item)
 
 
 ## Turns the drawing toward `heading` (view_for).

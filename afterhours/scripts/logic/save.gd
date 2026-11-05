@@ -2,18 +2,22 @@ class_name Save
 extends RefCounted
 ## The save's shape, pure (Game reads and writes the file): a versioned JSON object with
 ## the progress per wing (its id, the wing file's name: the best stars of one escape and
-## the best escape time) and the settings. parse() turns a save's text back into that data
-## or names what is wrong with it; record() keeps a wing's best; unlocked() tells which
-## wings the hub opens: the first, and each one after a wing that was escaped from.
+## the best escape time), the wings whose hidden sketch was found and the settings. parse()
+## turns a save's text back into that data or names what is wrong with it; record() keeps a
+## wing's best; record_sketch() keeps a found sketch; unlocked() tells which wings the hub
+## opens: the first, and each one after a wing that was escaped from.
 
-const VERSION := 1
+## Version 2 added the sketches.
+const VERSION := 2
+## The versions parse() reads: an older one is upgraded (what it lacks takes its default).
+const READS: Array[int] = [1, 2]
 ## The settings and their defaults.
 const SETTINGS := {"music": true, "sound": true, "reduce_motion": false, "assist": false}
 
 
 ## A fresh save: no wing finished, default settings.
 static func defaults() -> Dictionary:
-	return {"version": VERSION, "wings": {}, "settings": SETTINGS.duplicate()}
+	return {"version": VERSION, "wings": {}, "sketches": {}, "settings": SETTINGS.duplicate()}
 
 
 static func to_json(data: Dictionary) -> String:
@@ -21,8 +25,9 @@ static func to_json(data: Dictionary) -> String:
 
 
 ## The save in `text`, or {} with what is wrong appended to `problems`. A setting the save
-## lacks takes its default (an older save, a newer setting); anything else that is missing
-## or of the wrong kind makes the whole save corrupt.
+## lacks takes its default (an older save, a newer setting), and so do the sketches (a
+## version 1 save has none; it comes back as the current VERSION); anything else that is
+## missing or of the wrong kind makes the whole save corrupt.
 static func parse(text: String, problems: Array[String]) -> Dictionary:
 	var json := JSON.new()
 	if json.parse(text) != OK:
@@ -32,8 +37,8 @@ static func parse(text: String, problems: Array[String]) -> Dictionary:
 		problems.append("not a JSON object")
 		return {}
 	var raw: Dictionary = json.data
-	if not _is_whole(raw.get("version")) or int(raw["version"]) != VERSION:
-		problems.append("version is %s, expected %d" % [raw.get("version"), VERSION])
+	if not _is_whole(raw.get("version")) or not int(raw["version"]) in READS:
+		problems.append("version is %s, expected one of %s" % [raw.get("version"), READS])
 		return {}
 	var data := defaults()
 	if not raw.get("wings") is Dictionary:
@@ -46,6 +51,15 @@ static func parse(text: String, problems: Array[String]) -> Dictionary:
 			problems.append("wing '%s' is %s, expected {stars: 0 to 3, time: seconds}" % [id, entry])
 			return {}
 		data["wings"][id] = {"stars": int(entry["stars"]), "time": float(entry["time"])}
+	var sketches: Variant = raw.get("sketches", {})
+	if not sketches is Dictionary:
+		problems.append("sketches is not an object")
+		return {}
+	for id: Variant in sketches:
+		if not id is String or not sketches[id] is bool or not sketches[id]:
+			problems.append("sketch '%s' is %s, expected true" % [id, sketches[id]])
+			return {}
+		data["sketches"][id] = true
 	var settings: Variant = raw.get("settings", {})
 	if not settings is Dictionary:
 		problems.append("settings is not an object")
@@ -95,6 +109,18 @@ static func stars_of(data: Dictionary, id: String) -> int:
 
 static func finished(data: Dictionary, id: String) -> bool:
 	return data["wings"].has(id)
+
+
+## Keeps wing `id`'s sketch as found. Returns whether it was new.
+static func record_sketch(data: Dictionary, id: String) -> bool:
+	if data["sketches"].has(id):
+		return false
+	data["sketches"][id] = true
+	return true
+
+
+static func has_sketch(data: Dictionary, id: String) -> bool:
+	return data["sketches"].has(id)
 
 
 ## JSON numbers load as floats: a whole number only, and only one a float holds exactly.

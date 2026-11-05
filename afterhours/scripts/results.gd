@@ -5,7 +5,8 @@ extends Control
 ## missed; then replay (the wing again, from its start) and home (the hub) icon buttons.
 ## The mime stands at the panel's side; after the last star a three-star run bursts into
 ## paint-dab confetti (Confetti) while the mime bows, and a rosette pops in by the stars for
-## a new best star count and on the clock for a new best time (Save.improvement).
+## a new best star count and on the clock for a new best time (Save.improvement); the wing's
+## sketch, picked up on this play, pops in last by the buttons.
 ## The panel sits over the room (Game.world_offset). While shown it takes every touch, so
 ## the room below gets none.
 
@@ -24,6 +25,7 @@ const BURST_AT := Vector2(480, 120)
 @onready var confetti: Confetti = $Panel/Confetti
 @onready var stars_best: TextureRect = $Panel/StarsBest
 @onready var time_best: TextureRect = $Panel/TimeBest
+@onready var sketch: TextureRect = $Panel/Sketch
 
 
 func _ready() -> void:
@@ -47,11 +49,13 @@ func _process(delta: float) -> void:
 
 
 ## Shows `stars` (Stars.Star order), popping in one by one, then the celebration of a
-## three-star run and the rosettes for what the escape `beaten` (Save.improvement).
-func present(stars: Array[bool], beaten := {}) -> void:
+## three-star run, the rosettes for what the escape `beaten` (Save.improvement) and the
+## `found` sketch (a Paintings.SKETCHES texture; null when none was picked up).
+func present(stars: Array[bool], beaten := {}, found: Texture2D = null) -> void:
 	show()
 	stars_best.hide()
 	time_best.hide()
+	sketch.hide()
 	(get_node(GameState.AUTOLOAD_PATH) as GameState).audio.play_music("results")
 	_replay.grab_focus()
 	var pops := create_tween()
@@ -69,7 +73,10 @@ func present(stars: Array[bool], beaten := {}) -> void:
 		if best[1]:
 			pops.tween_callback(_pop_rosette.bind(best[0]))
 			pops.tween_interval(STAR_GAP)
-	print("[Results] Stars %s (%d of 3), new best: %s" % [stars, Stars.count(stars), beaten])
+	if found != null:
+		sketch.texture = found
+		pops.tween_callback(_pop_sketch)
+	print("[Results] Stars %s (%d of 3), new best: %s, sketch: %s" % [stars, Stars.count(stars), beaten, found != null])
 	# Where the buttons landed (screen base units), for the web smoke test's taps.
 	print("[Results] Home button at %s" % _home.get_global_rect().get_center())
 
@@ -80,6 +87,13 @@ func _celebrate() -> void:
 	mime.start_fidget(CharacterRig.Fidget.BOW, BOW_TIME)
 	Audio.play_for(self, &"confetti")
 	print("[Results] Three stars: confetti and a bow")
+
+
+func _pop_sketch() -> void:
+	sketch.show()
+	sketch.scale = Vector2.ZERO
+	create_tween().tween_property(sketch, "scale", Vector2.ONE, POP_TIME).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	Audio.play_for(self, &"sketch_found")
 
 
 func _pop_rosette(rosette: TextureRect) -> void:
