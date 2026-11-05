@@ -2225,6 +2225,19 @@ func _test_keyboard_stays_on_its_floor() -> void:
 	for i in 30:
 		room.mime.nudge(Vector2(1, 1).normalized(), 1.0 / 60.0)
 	_check(room.mime.position.x > 320.0, name, "a diagonal nudge into the screens did not slide the mime along them (at %s)" % room.mime.position.round())
+	# On open floor a step's path keeps a point at each polygon edge it crosses; still
+	# straight, so the step goes its full length (refusing those were invisible walls).
+	room = await _load_wing_room(name, "res://scenes/wings/wing_04_terrace.tscn")
+	if room == null:
+		return
+	for each in room.guards:
+		each.active = false
+	for start: Array in [[Vector2(50, 210), Vector2.RIGHT], [Vector2(90, 310), Vector2.DOWN], [Vector2(330, 430), Vector2.UP], [Vector2(390, 390), Vector2.DOWN]]:
+		var at := start[0] as Vector2
+		room.mime.place_at(at)
+		var full := room.mime.speed() / 60.0
+		room.mime.nudge(start[1] as Vector2, 1.0 / 60.0)
+		_check(absf(room.mime.position.distance_to(at) - full) < 0.2, name, "a step %s from %s on open floor moved %.2f, not %.2f" % [start[1], at, room.mime.position.distance_to(at), full])
 
 
 ## The floor footprints of `room`'s display walls (Partition).

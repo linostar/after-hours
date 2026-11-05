@@ -13,6 +13,9 @@ extends Node2D
 
 ## Walking speed in base units per second.
 const SPEED := 170.0
+## How much longer than straight a keyboard step's path may be (rounding where it crosses
+## navmesh polygon edges); longer goes round a wall and is refused.
+const STRAIGHT_SLACK := 0.5
 const RING_CENTER := Vector2(34, -84)
 const RING_RADIUS := 14.0
 const RING_TRACK := Color(0.1, 0.08, 0.13, 0.7)
@@ -117,11 +120,17 @@ func nudge(direction: Vector2, delta: float) -> void:
 	# Not map_get_closest_point: inside a navmesh polygon with collinear vertices on an
 	# edge (a corridor walled by display screens) it answers a point on another, unconnected
 	# polygon, and the mime jumped through the walls. A path stays on the floor it stands on;
-	# a straight one (two points) only, so a step never goes round a wall.
+	# a straight one only (it keeps a point where it crosses each polygon edge, so straight
+	# means as long as the way to its end), so a step never goes round a wall.
 	var line := NavigationServer2D.map_get_path(map, position, step, true)
-	if line.size() != 2:
+	if line.is_empty():
 		return
-	var to := line[1]
+	var to := line[line.size() - 1]
+	var length := 0.0
+	for i in range(1, line.size()):
+		length += line[i - 1].distance_to(line[i])
+	if length > position.distance_to(to) + STRAIGHT_SLACK:
+		return
 	_moved += position.distance_to(to)
 	_nudged = true
 	face(direction)
