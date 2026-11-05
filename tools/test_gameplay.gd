@@ -246,6 +246,7 @@ func _tests() -> Array[Callable]:
 		_test_power_refill,
 		_test_power_cancel,
 		_test_power_unlock_beat,
+		_test_back_view_hides_front_gestures,
 	]
 
 
@@ -5029,3 +5030,29 @@ func _test_power_unlock_beat() -> void:
 	_check(played.count(&"power_unlock") == 1, name, "the ball popped in after the wing was escaped from")
 	_game.save = saved
 	_game.run = null
+
+
+## From behind (View.BACK) a fidget whose hands work in front of the body (FRONT_GESTURES:
+## the watch, the yawn...) leaves the arms as they were, so no forearm swings across the back;
+## a wide one (the stretch) still poses them, and from the front the watch does.
+func _test_back_view_hides_front_gestures() -> void:
+	var name := "back_view_hides_front_gestures"
+	var rig := (load("res://scenes/rig_guard.tscn") as PackedScene).instantiate() as CharacterRig
+	root.add_child(rig)
+	var posed := func(heading: Vector2, kind: CharacterRig.Fidget) -> float:
+		rig.start_fidget(CharacterRig.Fidget.NONE, 0.0)
+		rig.face(heading)
+		for i in 10:
+			rig.walk(0.0, 1.0 / 60.0, false)
+		var rest: float = rig._forearms[1].rotation + rig._arms[1].rotation
+		rig.start_fidget(kind, 1.0)
+		for i in 20:
+			rig.walk(0.0, 1.0 / 60.0, false)
+		return absf(rig._forearms[1].rotation + rig._arms[1].rotation - rest)
+	_check(rig.view == CharacterRig.View.FRONT, name, "a rig facing down is not seen from the front")
+	_check(posed.call(Vector2.DOWN, CharacterRig.Fidget.WATCH) > 0.2, name, "from the front the watch fidget does not move the arm")
+	for kind: CharacterRig.Fidget in CharacterRig.FRONT_GESTURES:
+		_check(posed.call(Vector2.UP, kind) < 0.01, name, "from behind %s still swings the arm" % CharacterRig.Fidget.keys()[kind])
+	_check(rig.view == CharacterRig.View.BACK, name, "a rig facing up is not seen from behind")
+	_check(posed.call(Vector2.UP, CharacterRig.Fidget.STRETCH) > 0.2, name, "from behind the stretch does not move the arms")
+	rig.free()

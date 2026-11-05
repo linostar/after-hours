@@ -35,6 +35,9 @@ enum Fidget { NONE, STRETCH, WATCH, YAWN, DUST, TIP, BOW, BROW, THROW, PULL }
 ## The face's expression (none from behind): calm brows and a smile; alarmed, brows up and
 ## knitted, mouth open and a drop of sweat; smug, one brow up, eyes half shut and a smirk.
 enum Mood { CALM, ALARMED, SMUG }
+## Fidgets whose hands work in front of the body: from behind (View.BACK) the arms keep their
+## walk or rest pose (the stretch and the bow, flung wide, still read from behind).
+const FRONT_GESTURES: Array[Fidget] = [Fidget.DUST, Fidget.BROW, Fidget.TIP, Fidget.PULL, Fidget.WATCH, Fidget.YAWN]
 
 ## A front or back view turns to the side once the heading's across exceeds this share of
 ## its along (about 35 degrees off vertical), so a diagonal walks side on; a side view turns
@@ -448,6 +451,10 @@ func _fidget_weight() -> float:
 ## `out` turns a rotation outward (positive swings a hanging end to -x, outward for the
 ## left arm); side on, negative rotation reaches forward (the mirror handles facing left).
 func _gesture(i: int) -> void:
+	if view == View.BACK and fidget in FRONT_GESTURES:
+		# Hands at work in front of the body are hidden by it from behind; posed anyway, the
+		# forearm swings across the back.
+		return
 	var out := 1.0 if i == 0 else -1.0
 	var side := is_side()
 	var target := Vector2.ZERO

@@ -274,13 +274,14 @@ func _pop_icons(texture: Texture2D) -> void:
 	Audio.play_for(self, &"guard_suspect" if texture == QUERY else &"guard_alert")
 
 
-## Fake `i` passes: the "?" goes and each guard fidgets.
+## Fake `i` passes: the "?" goes and each guard fidgets until the stop ends (never into the
+## walk on, where the gesture would fight the arm swing).
 func _pass(i: int) -> void:
 	for icon: Sprite2D in _icons.values():
 		icon.hide()
 	var fidgets: Array = PASSES[i]
-	watchman.start_fidget(fidgets[0], STOP_TIME - REACT_AT + WALK_TIME * 0.5)
-	rookie.start_fidget(fidgets[1], STOP_TIME - REACT_AT + WALK_TIME * 0.5)
+	watchman.start_fidget(fidgets[0], STOP_TIME - REACT_AT)
+	rookie.start_fidget(fidgets[1], STOP_TIME - REACT_AT)
 
 
 ## The Mona Lisa's fake wobbles on its nail and slips crooked (straight to crooked when `still`).
