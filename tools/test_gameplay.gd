@@ -226,6 +226,9 @@ func _tests() -> Array[Callable]:
 		_test_close_call_heartbeat,
 		_test_near_miss,
 		_test_routes_never_double_tap,
+		_test_finale_due_once,
+		_test_finale_skips_and_returns,
+		_test_hideout_replays_finale,
 	]
 
 
@@ -4349,3 +4352,113 @@ func _test_routes_never_double_tap() -> void:
 				if at_room < 0:
 					break
 	_check(pairs > 100, name, "only %d tap pairs checked" % pairs)
+
+
+## A save with `count` wings finished (Content.WINGS order).
+func _save_finished(count: int) -> Dictionary:
+	var save := Save.defaults()
+	var ids := Content.wing_ids()
+	for i in count:
+		Save.record(save, ids[i], [true, true, false] as Array[bool], 300.0)
+	return save
+
+
+func _reset_finale_state() -> void:
+	_game.run = null
+	_game.save = Save.defaults()
+	_game.just_unlocked = -1
+	_game.ending_due = false
+	_game.finale_return = GameState.Flow.HUB
+	DirAccess.remove_absolute(_game.save_path)
+
+
+## The finale is due only on the escape that finishes the last unfinished wing: not on an
+## escape before it, not on a later escape once every wing is finished.
+func _test_finale_due_once() -> void:
+	var name := "finale_due_once"
+	var stars: Array[bool] = [true, true, true]
+	_reset_finale_state()
+	_game.save = _save_finished(4)
+	_game.run = WingRun.new(load(Content.WINGS[4]) as WingData)
+	_game.record_escape(stars, 100.0)
+	_check(not _game.ending_due and not _game.all_wings_finished(), name, "the finale is due with wing 6 unfinished")
+	_game.run = WingRun.new(load(Content.WINGS[5]) as WingData)
+	_game.record_escape(stars, 100.0)
+	_check(_game.ending_due and _game.all_wings_finished(), name, "the escape that finished every wing did not make the finale due")
+	_game.ending_due = false
+	_game.record_escape(stars, 90.0)
+	_check(not _game.ending_due, name, "a later escape with every wing finished made the finale due again")
+	# Out of order: the last wing to finish need not be wing 6.
+	_game.save = _save_finished(6)
+	(_game.save["wings"] as Dictionary).erase("wing_02")
+	_game.run = WingRun.new(load(Content.WINGS[1]) as WingData)
+	_game.record_escape(stars, 100.0)
+	_check(_game.ending_due, name, "finishing wing 2 last did not make the finale due")
+	_reset_finale_state()
+
+
+## The results' home plays the due finale once (then the hub), or goes to the hub when none
+## is due; the finale skips on a tap, E, Space and ui_accept (its focused skip button), and
+## unskipped it plays to its end, each time going to finale_return.
+func _test_finale_skips_and_returns() -> void:
+	var name := "finale_skips_and_returns"
+	_reset_finale_state()
+	_game.ending_due = true
+	_game.leave_results()
+	var arrived := await _wait_until(func() -> bool: return current_scene is Finale and not _game.is_transitioning(), 300)
+	_check(arrived and _game.state == GameState.Flow.FINALE and not _game.ending_due and _game.finale_return == GameState.Flow.HUB, name, "the results' home with the finale due did not play it once, back to the hub")
+	if not arrived:
+		_reset_finale_state()
+		return
+	var skip := current_scene.get_node("SkipButton") as Button
+	_check(skip.has_focus(true) and skip.size.x >= 44.0 and skip.size.y >= 44.0 and not skip.accessibility_name.is_empty(), name, "the skip button is not a focused, named 44x44 button")
+	_check(_game.music_for(GameState.Flow.FINALE) == "results", name, "the finale does not play the results' fanfare")
+	await _tap_at(Vector2(480, 400))
+	var back := await _wait_until(func() -> bool: return current_scene is Hub and not _game.is_transitioning(), 300)
+	_check(back, name, "a tap did not skip the finale to the hub")
+	_game.leave_results()
+	await _wait_until(func() -> bool: return not _game.is_transitioning() and current_scene is Hub, 300)
+	_check(_game.state == GameState.Flow.HUB, name, "the results' home with no finale due did not go to the hub")
+	for key: Key in [KEY_E, KEY_SPACE, KEY_ENTER]:
+		_game.play_finale(GameState.Flow.HIDEOUT)
+		await _wait_until(func() -> bool: return current_scene is Finale and not _game.is_transitioning(), 300)
+		await _press_key(key)
+		back = await _wait_until(func() -> bool: return current_scene is Hideout and not _game.is_transitioning(), 300)
+		_check(back, name, "%s did not skip the finale to the hideout" % OS.get_keycode_string(key))
+	_game.play_finale(GameState.Flow.HUB)
+	await _wait_until(func() -> bool: return current_scene is Finale and not _game.is_transitioning(), 300)
+	var finale := current_scene as Finale
+	var frames := ceili(Finale.LENGTH * 60.0)
+	await _wait_until(func() -> bool: return finale.beat == 2, frames)
+	_check(finale.beat == 2 and finale.thumbs.size() == 6 and finale.fakes.size() == 6 and finale.originals.size() == 6, name, "the finale did not reach its credits with six paintings in each beat")
+	back = await _wait_until(func() -> bool: return current_scene is Hub and not _game.is_transitioning(), frames)
+	_check(back, name, "the finale did not end in the hub on its own")
+	_reset_finale_state()
+
+
+## The hideout offers the finale again (a named 44x44 button) only once every wing is
+## finished; it plays the finale and comes back to the hideout.
+func _test_hideout_replays_finale() -> void:
+	var name := "hideout_replays_finale"
+	_reset_finale_state()
+	_game.save = _save_finished(5)
+	change_scene_to_file("res://scenes/hideout.tscn")
+	await process_frame
+	await process_frame
+	_check(current_scene.get_node_or_null("FinaleButton") == null, name, "the hideout offers the finale with a wing unfinished")
+	_game.save = _save_finished(6)
+	change_scene_to_file("res://scenes/hideout.tscn")
+	await process_frame
+	await process_frame
+	var button := current_scene.get_node_or_null("FinaleButton") as Button
+	_check(button != null and button.size.x >= 44.0 and button.size.y >= 44.0 and not button.accessibility_name.is_empty() and button.focus_mode == Control.FOCUS_ALL, name, "with every wing finished the hideout has no focusable, named 44x44 finale button")
+	if button == null:
+		_reset_finale_state()
+		return
+	await _tap_control(button)
+	var arrived := await _wait_until(func() -> bool: return current_scene is Finale and not _game.is_transitioning(), 300)
+	_check(arrived and _game.finale_return == GameState.Flow.HIDEOUT, name, "the hideout's button did not play the finale back to the hideout")
+	await _tap_at(Vector2(480, 400))
+	var back := await _wait_until(func() -> bool: return current_scene is Hideout and not _game.is_transitioning(), 300)
+	_check(back, name, "the finale from the hideout did not return there")
+	_reset_finale_state()
