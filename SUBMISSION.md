@@ -13,8 +13,8 @@ Everything between the two rules below is the public page; paste it as is.
 - **Embed options:** viewport 960 x 540, fullscreen button on, "SharedArrayBuffer support" off. Tick "Mobile friendly" and choose landscape orientation.
 - **Classification:** Game. Genre: Puzzle. Tags: stealth, heist, art, museum, painting, mime, no-text, mobile, touch, godot.
 - **Cover image:** `submission/cover.png` (630 x 500).
-- **Screenshots:** `submission/1-title.png` to `submission/13-sketch.png`, in that order (1920 x 1080, landscape).
-- **Trailer / gameplay video:** `build/afterhours_demo.mp4` (32.5 s; itch takes a YouTube or Vimeo link, so upload it there first, or attach it to the jam post).
+- **Screenshots:** `submission/1-title.png` to `submission/16-finale.png`, in that order (1920 x 1080, landscape).
+- **Trailer / gameplay video:** `build/afterhours_demo.mp4` (31.5 s; itch takes a YouTube or Vimeo link, so upload it there first, or attach it to the jam post).
 - **Jam:** submit the page to the jam; it uses the optional theme "Great Works of Art" and the mandatory restriction "No Text".
 
 ---
