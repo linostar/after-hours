@@ -4386,19 +4386,19 @@ func _test_finale_due_once() -> void:
 	_reset_finale_state()
 	_game.save = _save_finished(4)
 	_game.run = WingRun.new(load(Content.WINGS[4]) as WingData)
-	_game.record_escape(stars, 100.0)
+	_game.record_escape(stars, 100.0, Challenges.none())
 	_check(not _game.ending_due and not _game.all_wings_finished(), name, "the finale is due with wing 6 unfinished")
 	_game.run = WingRun.new(load(Content.WINGS[5]) as WingData)
-	_game.record_escape(stars, 100.0)
+	_game.record_escape(stars, 100.0, Challenges.none())
 	_check(_game.ending_due and _game.all_wings_finished(), name, "the escape that finished every wing did not make the finale due")
 	_game.ending_due = false
-	_game.record_escape(stars, 90.0)
+	_game.record_escape(stars, 90.0, Challenges.none())
 	_check(not _game.ending_due, name, "a later escape with every wing finished made the finale due again")
 	# Out of order: the last wing to finish need not be wing 6.
 	_game.save = _save_finished(6)
 	(_game.save["wings"] as Dictionary).erase("wing_02")
 	_game.run = WingRun.new(load(Content.WINGS[1]) as WingData)
-	_game.record_escape(stars, 100.0)
+	_game.record_escape(stars, 100.0, Challenges.none())
 	_check(_game.ending_due, name, "finishing wing 2 last did not make the finale due")
 	_reset_finale_state()
 
