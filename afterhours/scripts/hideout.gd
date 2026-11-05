@@ -7,7 +7,8 @@ extends Node2D
 ## (Game.replay_ghost) shows the ghost mime's escape from its wing. The home button goes back
 ## to the hub. A wing's hidden sketch, once found (Save.has_sketch), is pinned to the wall
 ## at its frame's top corner, robbed or not. The lair is drawn by HideoutDecor (each replay
-## button on its frame's plaque). The mime stands about, alive at rest (CharacterRig: breathing, blinking, its
+## button on its frame's plaque). Once every wing is finished, a clapperboard button beside
+## home plays the finale again (Game.play_finale, back to the hideout). The mime stands about, alive at rest (CharacterRig: breathing, blinking, its
 ## invisible-wall gag).
 
 const FIRST_X := 120.0
@@ -24,6 +25,9 @@ const SKETCH_SIZE := Vector2(34, 42)
 const SKETCH_OFFSET := Vector2(58, -38)
 const SKETCH_SLANT := 0.16
 const PIN := Color(0.78, 0.16, 0.14)
+## Once every wing is finished, the button that plays the finale again (beside home).
+const FINALE_ICON := preload("res://art/svg/icon_finale.svg")
+const FINALE_RECT := Rect2(100, 440, 64, 64)
 
 ## Per wing (Content.WINGS order): its painting, or null while it is not stolen.
 var originals: Array[FramedPainting] = []
@@ -57,6 +61,8 @@ func _ready() -> void:
 		hung += 1
 	($Decor as HideoutDecor).stolen.assign(originals.map(func(each: FramedPainting) -> bool: return each != null))
 	_home.pressed.connect(_game.goto.bind(GameState.Flow.HUB))
+	if _game.all_wings_finished():
+		_add_finale_button()
 	_home.grab_focus()
 	_game.arrive(GameState.Flow.HIDEOUT)
 	print("[Hideout] %d original(s) hung, %d gilded" % [hung, originals.filter(func(each: FramedPainting) -> bool: return each != null and each.gilded).size()])
@@ -95,6 +101,21 @@ func _add_replay_button(index: int) -> void:
 	button.size = Vector2.ONE * REPLAY_SIZE
 	button.position = HideoutDecor.plaque_rect(index).get_center() - button.size / 2.0
 	button.pressed.connect(_game.replay_ghost.bind(Content.WINGS[index]))
+	add_child(button)
+
+
+## The clapperboard button that plays the finale again, ending back in the hideout.
+func _add_finale_button() -> void:
+	var button := Button.new()
+	button.name = "FinaleButton"
+	button.accessibility_name = "Watch the ending again"
+	button.icon = FINALE_ICON
+	button.flat = true
+	button.expand_icon = true
+	button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	button.position = FINALE_RECT.position
+	button.size = FINALE_RECT.size
+	button.pressed.connect(_game.play_finale.bind(GameState.Flow.HIDEOUT))
 	add_child(button)
 
 

@@ -2,7 +2,8 @@ class_name Results
 extends Control
 ## The end-of-wing overlay, wordless: three stars over their legend icons (swap, unseen,
 ## par clock), each popping in STAR_GAP after the last, gold when earned and dark when
-## missed; then replay (the wing again, from its start) and home (the hub) icon buttons.
+## missed; then replay (the wing again, from its start) and home (the hub; the finale
+## first after the escape that finished every wing, Game.leave_results) icon buttons.
 ## The mime stands at the panel's side; after the last star a three-star run bursts into
 ## paint-dab confetti (Confetti) while the mime bows, and a rosette pops in by the stars for
 ## a new best star count and on the clock for a new best time (Save.improvement); the wing's
@@ -31,7 +32,7 @@ const BURST_AT := Vector2(480, 120)
 func _ready() -> void:
 	var game := get_node(GameState.AUTOLOAD_PATH) as GameState
 	_replay.pressed.connect(game.replay)
-	_home.pressed.connect(game.goto.bind(GameState.Flow.HUB))
+	_home.pressed.connect(game.leave_results)
 	game.screen_fit_changed.connect(_fit.bind(game))
 	_fit(game)
 	hide()

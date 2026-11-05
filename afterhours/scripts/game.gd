@@ -11,7 +11,7 @@ extends Node
 ## Every error goes to the log (push_error) and shows the cracked-frame ErrorBadge,
 ## never text (CLAUDE.md, "Errors are visible without words").
 
-enum Flow { TITLE, ROOM, HUB, HIDEOUT }
+enum Flow { TITLE, ROOM, HUB, HIDEOUT, FINALE }
 
 ## Scripts reach the autoload through this path (get_node(GameState.AUTOLOAD_PATH)), never
 ## the bare Game name, which tool runs (--script) cannot compile against.
@@ -42,6 +42,7 @@ var scene_paths: Dictionary[Flow, String] = {
 	Flow.ROOM: "res://scenes/room.tscn",
 	Flow.HUB: "res://scenes/hub.tscn",
 	Flow.HIDEOUT: "res://scenes/hideout.tscn",
+	Flow.FINALE: "res://scenes/finale.tscn",
 }
 var state := Flow.TITLE
 ## The wing being played (null before any; a room loaded on its own makes a one-room run).
@@ -49,6 +50,11 @@ var run: WingRun
 ## The wing (index in Content.WINGS) a first escape just unlocked, until the hub plays its
 ## unlock beat (-1: none).
 var just_unlocked := -1
+## Whether the escape just recorded was the first to finish every wing: the results' home
+## then plays the finale once (leave_results) instead of going to the hub.
+var ending_due := false
+## Where the finale goes when it ends or is skipped (play_finale).
+var finale_return := Flow.HUB
 ## Every error reported this run, oldest first.
 var errors: Array[String] = []
 ## While true, report_error logs with print instead of push_error, so a test that
@@ -191,6 +197,7 @@ func record_escape(stars: Array[bool], time: float) -> Dictionary:
 	var id := Content.wing_id(run.wing.resource_path)
 	var beaten := Save.improvement(save, id, stars, time)
 	var first := not Save.finished(save, id)
+	var all_before := all_wings_finished()
 	if Save.record(save, id, stars, time):
 		print("[Game] New best for %s: %d star(s), %.2f s" % [id, Save.stars_of(save, id), save["wings"][id]["time"]])
 		write_save()
@@ -198,7 +205,31 @@ func record_escape(stars: Array[bool], time: float) -> Dictionary:
 	if first and index >= 0 and index + 1 < Content.WINGS.size():
 		just_unlocked = index + 1
 		print("[Game] Wing %d unlocked" % (just_unlocked + 1))
+	if not all_before and all_wings_finished():
+		ending_due = true
+		print("[Game] Every wing finished: the finale is due")
 	return beaten
+
+
+## Whether every wing (Content.WINGS) has been escaped from (the finale is earned).
+func all_wings_finished() -> bool:
+	return Content.wing_ids().all(func(id: String) -> bool: return Save.finished(save, id))
+
+
+## The results' home: the finale once when it is due (ending_due, then back to the hub),
+## else the hub.
+func leave_results() -> void:
+	if ending_due:
+		ending_due = false
+		play_finale(Flow.HUB)
+	else:
+		goto(Flow.HUB)
+
+
+## Plays the finale, which ends (or is skipped) at `back_to`.
+func play_finale(back_to: Flow) -> void:
+	finale_return = back_to
+	goto(Flow.FINALE)
 
 
 ## Keeps the run's wing's sketch as found (Save.record_sketch) and writes the save at once, so
@@ -500,10 +531,13 @@ func arrive(flow: Flow) -> void:
 
 
 ## The loop of `flow`: in a wing's rooms its era's (wing_NN by its painting's place in
-## Paintings.IDS, the wings' order), the caper everywhere else.
+## Paintings.IDS, the wings' order), the results' fanfare in the finale, the caper everywhere
+## else.
 func music_for(flow: Flow) -> String:
 	if flow == Flow.ROOM and run != null:
 		return "wing_%02d" % (Paintings.IDS.find(StringName(run.wing.painting)) + 1)
+	if flow == Flow.FINALE:
+		return "results"
 	return "caper"
 
 
