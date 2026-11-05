@@ -1,40 +1,62 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="48" height="96" viewBox="0 0 48 96">
   <defs>
-    <linearGradient id="shade" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#3a3050" stop-opacity="0.08"/>
-      <stop offset="0.5" stop-color="#3a3050" stop-opacity="0"/>
-      <stop offset="1" stop-color="#3a3050" stop-opacity="0.32"/>
-    </linearGradient>
-    <linearGradient id="cloth" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#3a3546"/>
-      <stop offset="0.45" stop-color="#25212e"/>
-      <stop offset="1" stop-color="#16131c"/>
-    </linearGradient>
-    <linearGradient id="hair" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#3d3648"/>
-      <stop offset="1" stop-color="#1f1b27"/>
-    </linearGradient>
     <clipPath id="shirt">
       <path d="M12.5 36.5 Q13 33 17.5 32.5 L30.5 32.5 Q35 33 35.5 36.5 L35 60 L13 60 Z"/>
     </clipPath>
+    <clipPath id="pants">
+      <path d="M13.5 57 L34.5 57 L35.2 66.5 Q30 68 24.6 66.6 L24 63 L23.4 66.6 Q18 68 12.8 66.5 Z"/>
+    </clipPath>
+    <clipPath id="head">
+      <circle cx="24" cy="20" r="11.5"/>
+    </clipPath>
+    <clipPath id="beret">
+      <path d="M11.4 18.6 Q10.6 6 24 5.2 Q37.4 6 36.6 18.6 Q30 15.6 24 15.8 Q18 15.6 11.4 18.6 Z"/>
+    </clipPath>
   </defs>
-  <path d="M13.5 57 L34.5 57 L35.2 66.5 Q30 68 24.6 66.6 L24 63 L23.4 66.6 Q18 68 12.8 66.5 Z" fill="url(#cloth)" stroke="#1b1622" stroke-width="1.2" stroke-linejoin="round"/>
-  <path d="M12.5 36.5 Q13 33 17.5 32.5 L30.5 32.5 Q35 33 35.5 36.5 L35 60 L13 60 Z" fill="#f7f4ee"/>
-  <g clip-path="url(#shirt)" fill="#22202c">
-    <path d="M10 37 Q24 38.2 38 37 L38 40 Q24 41.2 10 40 Z"/>
-    <path d="M10 43 Q24 44.2 38 43 L38 46 Q24 47.2 10 46 Z"/>
-    <path d="M10 49 Q24 50.2 38 49 L38 52 Q24 53.2 10 52 Z"/>
-    <path d="M10 55 Q24 56.2 38 55 L38 58 Q24 59.2 10 58 Z"/>
+  <!-- Trousers from behind. -->
+  <path d="M13.5 57 L34.5 57 L35.2 66.5 Q30 68 24.6 66.6 L24 63 L23.4 66.6 Q18 68 12.8 66.5 Z" fill="#2a2633"/>
+  <g clip-path="url(#pants)">
+    <path d="M27.4 56 L36 56 L36 68 L26.4 68 Z" fill="#14111a"/>
+    <path d="M17.2 59 L16.6 66" stroke="#555066" stroke-width="0.8" stroke-linecap="round"/>
   </g>
-  <path d="M12.5 36.5 Q13 33 17.5 32.5 L30.5 32.5 Q35 33 35.5 36.5 L35 60 L13 60 Z" fill="url(#shade)"/>
+  <path d="M13.5 57 L34.5 57 L35.2 66.5 Q30 68 24.6 66.6 L24 63 L23.4 66.6 Q18 68 12.8 66.5 Z" fill="none" stroke="#1b1622" stroke-width="1.2" stroke-linejoin="round"/>
+  <!-- The shirt's back: stripes, the cel shadow, a seam and folds at the waist. -->
+  <path d="M12.5 36.5 Q13 33 17.5 32.5 L30.5 32.5 Q35 33 35.5 36.5 L35 60 L13 60 Z" fill="#f8f5ef"/>
+  <g clip-path="url(#shirt)">
+    <g fill="#23202d">
+      <path d="M10 37 Q24 38.4 38 37 L38 40 Q24 41.4 10 40 Z"/>
+      <path d="M10 43 Q24 44.4 38 43 L38 46 Q24 47.4 10 46 Z"/>
+      <path d="M10 49 Q24 50.4 38 49 L38 52 Q24 53.4 10 52 Z"/>
+      <path d="M10 55 Q24 56.6 38 55 L38 58 Q24 59.4 10 58 Z"/>
+    </g>
+    <path d="M29.2 32 Q32.6 46 30.6 61 L37 61 L37 32 Z" fill="#2b2246" opacity="0.34"/>
+    <path d="M16.2 60.4 Q18.6 56.6 21.2 60.4 M26.6 60.4 Q29 57 31.6 60.4" stroke="#7d7590" stroke-width="0.6" fill="none" stroke-linecap="round"/>
+    <path d="M14.6 37.6 Q14 46 14.6 55" stroke="#ffffff" stroke-width="1.1" fill="none" stroke-linecap="round" opacity="0.6"/>
+  </g>
   <path d="M12.5 36.5 Q13 33 17.5 32.5 L30.5 32.5 Q35 33 35.5 36.5 L35 60 L13 60 Z" fill="none" stroke="#1b1622" stroke-width="1.2" stroke-linejoin="round"/>
-  <rect x="20.5" y="28" width="7" height="6" fill="#e9e4ea" stroke="#1b1622" stroke-width="0.9"/>
-  <path d="M17.5 32 Q24 34.6 30.5 32 L30 34.6 Q24 36.6 18 34.6 Z" fill="#c8323a" stroke="#1b1622" stroke-width="0.9" stroke-linejoin="round"/>
+  <!-- Neck and the scarf's band round the back. -->
+  <rect x="20.5" y="28" width="7" height="6" fill="#ebe6ec" stroke="#1b1622" stroke-width="0.9"/>
+  <path d="M17.5 32 Q24 34.6 30.5 32 L30 34.6 Q24 36.6 18 34.6 Z" fill="#d43a43" stroke="#1b1622" stroke-width="0.9" stroke-linejoin="round"/>
+  <path d="M18.6 34 Q24 35.8 29.4 34" stroke="#95202b" stroke-width="0.9" fill="none" stroke-linecap="round"/>
+  <!-- Ears, then the back of the head: black hair, cel-shaded, combed down to the nape. -->
   <ellipse cx="12.6" cy="21" rx="1.8" ry="2.8" fill="#eeeaee" stroke="#1b1622" stroke-width="0.9"/>
-  <ellipse cx="35.4" cy="21" rx="1.8" ry="2.8" fill="#eeeaee" stroke="#1b1622" stroke-width="0.9"/>
-  <circle cx="24" cy="20" r="11.5" fill="url(#hair)" stroke="#1b1622" stroke-width="1.2"/>
-  <path d="M15.6 22 Q24 25 32.4 22 M16.6 26.2 Q24 28.8 31.4 26.2" stroke="#504860" stroke-width="0.7" fill="none" stroke-linecap="round"/>
-  <path d="M11.4 18.6 Q10.6 6 24 5.2 Q37.4 6 36.6 18.6 Q30 15.6 24 15.8 Q18 15.6 11.4 18.6 Z" fill="#24212e" stroke="#1b1622" stroke-width="1" stroke-linejoin="round"/>
-  <path d="M15 12 Q20 7.6 28 7.6" stroke="#4a4460" stroke-width="1.2" fill="none" stroke-linecap="round"/>
-  <path d="M24 5.4 L24.6 2.8" stroke="#24212e" stroke-width="1.8" stroke-linecap="round"/>
+  <ellipse cx="35.4" cy="21" rx="1.8" ry="2.8" fill="#d4ccdb" stroke="#1b1622" stroke-width="0.9"/>
+  <circle cx="24" cy="20" r="11.5" fill="#2e2938"/>
+  <g clip-path="url(#head)">
+    <path d="M27 6 Q33 18 28.6 33 L37 33 L37 6 Z" fill="#1a1721"/>
+    <path d="M17.6 30.4 Q24 28.4 30.4 30.4 L31 33 L17 33 Z" fill="#e4dee6"/>
+    <path d="M17.6 30.4 Q24 28.4 30.4 30.4" stroke="#1b1622" stroke-width="0.6" fill="none"/>
+    <path d="M18.4 18 Q17.6 23.6 18.8 28.4 M22.2 17.4 Q21.6 23.6 22.6 29.2 M26 17.4 Q26.6 23.6 25.6 29.2 M29.8 18 Q30.6 23.6 29.4 28.4" stroke="#57506a" stroke-width="0.7" fill="none" stroke-linecap="round"/>
+    <path d="M15.4 18.4 Q14.6 22 16 25" stroke="#6a6280" stroke-width="0.9" fill="none" stroke-linecap="round"/>
+  </g>
+  <circle cx="24" cy="20" r="11.5" fill="none" stroke="#1b1622" stroke-width="1.2"/>
+  <!-- The beret from behind. -->
+  <path d="M11.4 18.6 Q10.6 6 24 5.2 Q37.4 6 36.6 18.6 Q30 15.6 24 15.8 Q18 15.6 11.4 18.6 Z" fill="#2c2838"/>
+  <g clip-path="url(#beret)">
+    <path d="M10 20 Q16 14.6 24 14.4 Q32 14.6 38 20 L38 13.6 Q31 12.4 24 12.6 Q17 12.4 10 13.6 Z" fill="#14111b"/>
+    <path d="M28 4 Q37 6 38 13 L38 4 Z" fill="#1c1925"/>
+  </g>
+  <path d="M15 12 Q20 7.6 28 7.6" stroke="#5c5578" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+  <path d="M11.4 18.6 Q10.6 6 24 5.2 Q37.4 6 36.6 18.6 Q30 15.6 24 15.8 Q18 15.6 11.4 18.6 Z" fill="none" stroke="#1b1622" stroke-width="1" stroke-linejoin="round"/>
+  <path d="M24 5.4 L24.6 2.8" stroke="#2c2838" stroke-width="1.8" stroke-linecap="round"/>
 </svg>

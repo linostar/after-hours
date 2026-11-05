@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Synthesises After Hours' eight music loops and encodes them to MP3.
+"""Synthesises After Hours' eight music loops, six tension stems and a chase sting, and encodes
+them to MP3.
 
 Engine ported from Hunt Frenzy's tools/music.py (../hunt-frenzy, itself from BrewMagic's):
 the note parser, plucked partials and bowed wavetables, wrap-around rendering, BS.1770
@@ -14,6 +15,11 @@ slip, answered by ANSWER), rearranged per wing in its painting's era:
     wing_05    Bosch, around 1500: a shawm in the Dorian mode over a drone and a tabor
     wing_06    Leonardo, the Renaissance: lute in the Aeolian mode, picked chords
     results    the answer slowed on vibraphone, a warm close
+Each wing loop has a tension stem, wing_NN_tension: the same length, tempo and chords, so it
+loops in sync under its wing loop (Audio fades it in with the room's suspicion): a low pulsing
+ostinato on the chord roots with a chromatic neighbour, in the era's instruments, and
+percussion on the off-beats; no melody, so it never clashes with the tune. chase_sting is a
+short one-shot (not looped) stab on a chase's start, louder than the loops.
 The melodies are written here from scratch; none quotes any existing tune or game's music.
 The era versions snap the motif's notes into their scale (remap), so it stays recognisable.
 
@@ -32,9 +38,9 @@ ffmpeg needed, so validate.sh runs it).
 Usage (from repo root):
     python3 tools/music.py           render, encode afterhours/audio/music/<track>.mp3, write the lock
     python3 tools/music.py --check   render in memory and verify the lock, the MP3s and their
-                                     .import loop flags; prints "music: OK"
+                                     .import loop flags (off for the sting); prints "music: OK"
 Generating needs lame and ffmpeg on PATH (Homebrew: brew install lame ffmpeg). The MP3s are
-constant bitrate (80 kbps mono) without ID3 tags.
+constant bitrate mono (80 kbps, STEM_KBPS for the quiet stems) without ID3 tags.
 """
 import hashlib
 import json
@@ -60,6 +66,10 @@ RATE = 32000
 # LOUDNESS LUFS (BS.1770 gated, loudness()), under the effects' events (tools/sfx.py
 # LOUDNESS_BANDS, about -24..-14), so no loop is louder than another. No sample may pass PEAK.
 LOUDNESS = -26.0
+# The tension stems sit STEM_DROP LU under their loop at full tension; the chase sting
+# STING_LIFT LU over the loops, so it reads as an event.
+STEM_DROP = 6.0
+STING_LIFT = 4.0
 PEAK = 0.6
 # BS.1770's gating: LOUDNESS_BLOCK-second blocks every LOUDNESS_HOP seconds, an absolute gate
 # at -70 LUFS and a relative gate 10 LU under the absolutely gated mean.
@@ -68,7 +78,9 @@ LOUDNESS_HOP = 0.1
 NOTE_NAMES = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
 FLAT_NAMES = ("C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B")
 # The loops together must stay under this (the web build stays small).
-MAX_TOTAL_BYTES = 4 * 1024 * 1024
+MAX_TOTAL_BYTES = 6 * 1024 * 1024
+# The stems are quiet and low: a lower bitrate keeps them small.
+STEM_KBPS = 48
 # Steps (8th notes) per bar: every track is in 4/4.
 BAR_STEPS = 8
 
@@ -311,6 +323,9 @@ def bass_bars(chords, style):
             bars.append(f"{root} {root} {fifth} {fifth} {root} {root} {fifth} {root}")
         elif style == "whole":
             bars.append(f"{root} - - - - - - -")
+        elif style == "pulse":
+            # Tension: the root throbbing in 8ths, a chromatic neighbour above before the bar ends.
+            bars.append(f"{root} {root} {root} {root} {root} {root} {note_name(midi(root) + 1)} {root}")
         else:
             raise MusicError(f"unknown bass style '{style}'")
     return bars
@@ -339,13 +354,21 @@ def chord_bars(chords, style):
     return bars
 
 
-def track(name, bpm, parts, chords, *, swing=0.0, perc=None):
+def track(name, bpm, parts, chords, *, swing=0.0, perc=None, loudness=LOUDNESS, loop=True, kbps=80):
     """A loop at `bpm` quarter notes a minute: `parts` are (instrument, bars, gain), one
     bar per chord; `swing` delays every off-beat 8th by that share of a step; `perc` is the
     percussion bars (BAR_STEPS characters: 'b' brush, 'r' ride, 't' tabor, 'w' wood block,
-    '.' none; None: no percussion)."""
+    '.' none; None: no percussion); set to `loudness` LUFS, encoded at `kbps`, imported
+    looping unless `loop` is False (a one-shot)."""
     return {"name": name, "step": 60.0 / bpm / 2, "parts": parts, "chords": chords, "swing": swing,
-            "perc": perc if perc is not None else ["." * BAR_STEPS] * len(chords)}
+            "perc": perc if perc is not None else ["." * BAR_STEPS] * len(chords),
+            "loudness": loudness, "loop": loop, "kbps": kbps}
+
+
+def tension(wing, parts, perc):
+    """`wing`'s tension stem: its tempo, chords and swing (so the same length, looping in
+    sync), STEM_DROP LU quieter, at STEM_KBPS."""
+    return dict(wing, name=wing["name"] + "_tension", parts=parts, perc=perc, loudness=LOUDNESS - STEM_DROP, kbps=STEM_KBPS)
 
 
 CAPER = track("caper", 126, [
@@ -387,7 +410,39 @@ RESULTS = track("results", 84, [
     (PIANO, chord_bars(ANSWER_CHORDS, "comp"), 0.1),
     (PIZZ_BASS, bass_bars(ANSWER_CHORDS, "whole"), 0.4),
 ], ANSWER_CHORDS, swing=0.22, perc=["b...b..."] * 8)
-TRACKS = (CAPER, WING_01, WING_02, WING_03, WING_04, WING_05, WING_06, RESULTS)
+# Measured tremolo: short bowed strokes restruck every 8th.
+STRINGS_SHORT = ("bowed", STRINGS[1], 0.01, 0.04, 0.0)
+STEMS = (
+    tension(WING_01, [
+        (HARPSICHORD, bass_bars(TUNE_CHORDS, "pulse"), 0.3),
+        (HARPSICHORD, shift(bass_bars(TUNE_CHORDS, "whole"), 1), 0.08),
+    ], [".w.w.w.w"] * 16),
+    tension(WING_02, [
+        (KOTO, remap(bass_bars(["Cm"] * 16, "pulse"), HIRAJOSHI), 0.3),
+    ], ["t..t.t.t"] * 16),
+    tension(WING_03, [
+        (PIANO, bass_bars(TUNE_CHORDS, "pulse"), 0.3),
+    ], [".w.w.w.w"] * 16),
+    tension(WING_04, [
+        (STRINGS_SHORT, bass_bars(TUNE_CHORDS, "pulse"), 0.2),
+        (PIZZ_BASS, bass_bars(TUNE_CHORDS, "two"), 0.3),
+    ], [".b.b.b.b"] * 16),
+    tension(WING_05, [
+        (SHAWM, remap(bass_bars(TUNE_CHORDS, "pulse"), DORIAN), 0.12),
+        (DRONE, chord_bars(TUNE_CHORDS, "drone"), 0.06),
+    ], [".t.t.t.t"] * 16),
+    tension(WING_06, [
+        (LUTE, remap(bass_bars(TUNE_CHORDS, "pulse"), AEOLIAN), 0.32),
+    ], [".t.t.t.t"] * 16),
+)
+# The chase sting: two diminished stabs and a held one over a low hit, one bar, the rest of
+# the bar its tail (nothing wraps round: it is not a loop).
+CHASE_STING = track("chase_sting", 90, [
+    (STRINGS, ["B3+D4+F4+Ab4 C4+Eb4+Gb4+A4 C4+Eb4+Gb4+A4 - - - . ."], 0.2),
+    (PIZZ_BASS, ["C2 C2 C2 - - - . ."], 0.5),
+], ["Cm"], perc=["ttt....."], loudness=LOUDNESS + STING_LIFT, loop=False)
+TRACKS = (CAPER, WING_01, WING_02, WING_03, WING_04, WING_05, WING_06, RESULTS) + STEMS + (CHASE_STING,)
+SPECS = {spec["name"]: spec for spec in TRACKS}
 PERC_GAINS = {"b": 0.05, "r": 0.035, "t": 0.2, "w": 0.06}
 
 
@@ -441,13 +496,13 @@ def loudness(samples):
     return -0.691 + 10 * math.log10(sum(gated) / len(gated))
 
 
-def to_pcm(samples, name):
-    """16-bit PCM of `samples` scaled to LOUDNESS LUFS; a loop that would pass PEAK there is
+def to_pcm(samples, name, target=LOUDNESS):
+    """16-bit PCM of `samples` scaled to `target` LUFS; a track that would pass PEAK there is
     an error (lower its voices instead)."""
-    gain = 10 ** ((LOUDNESS - loudness(samples)) / 20)
+    gain = 10 ** ((target - loudness(samples)) / 20)
     top = max(abs(s) for s in samples) * gain
     if top > PEAK:
-        raise MusicError(f"{name}: at {LOUDNESS} LUFS it peaks at {top:.3f}, above PEAK {PEAK}")
+        raise MusicError(f"{name}: at {target} LUFS it peaks at {top:.3f}, above PEAK {PEAK}")
     return b"".join(struct.pack("<h", int(s * gain * 32767)) for s in samples)
 
 
@@ -455,7 +510,7 @@ def render_all():
     """{track name: (16-bit mono PCM bytes, sample count)} for every track."""
     rendered = {}
     for spec in TRACKS:
-        pcm = to_pcm(render(spec), spec["name"])
+        pcm = to_pcm(render(spec), spec["name"], spec["loudness"])
         rendered[spec["name"]] = (pcm, len(pcm) // 2)
     return rendered
 
@@ -469,9 +524,10 @@ def lock_entry(pcm, samples, mp3):
             "mp3_sha256": file_sha(mp3), "mp3_bytes": mp3.stat().st_size}
 
 
-def import_has_loop(mp3):
+def import_loop(mp3):
+    """Whether <mp3>.import switches the loop on (None: no .import)."""
     path = Path(str(mp3) + ".import")
-    return path.exists() and "loop=true" in path.read_text().splitlines()
+    return "loop=true" in path.read_text().splitlines() if path.exists() else None
 
 
 def check():
@@ -497,8 +553,9 @@ def check():
         total_bytes += mp3.stat().st_size
         if want.get("mp3_bytes") != mp3.stat().st_size or want.get("mp3_sha256") != file_sha(mp3):
             problems.append(f"{mp3.relative_to(ROOT)} differs from the MP3 the lock records, run python3 tools/music.py")
-        if not import_has_loop(mp3):
-            problems.append(f"{mp3.relative_to(ROOT)}.import does not switch the loop on (loop=true)")
+        looping = SPECS[name]["loop"]
+        if import_loop(mp3) != looping:
+            problems.append(f"{mp3.relative_to(ROOT)}.import does not switch the loop {'on (loop=true)' if looping else 'off (loop=false)'}")
     for path in sorted(OUT_DIR.glob("*.mp3")):
         if path.stem not in rendered:
             problems.append(f"{path.relative_to(ROOT)} is stale: no track makes it any more")
@@ -506,7 +563,7 @@ def check():
         problems.append(f"the MP3s total {total_bytes} bytes, over {MAX_TOTAL_BYTES}")
     if problems:
         raise MusicError("\n".join(problems))
-    print(f"music: OK ({len(rendered)} loops, {total_bytes} bytes of MP3)")
+    print(f"music: OK ({len(rendered)} tracks, {len(STEMS)} of them tension stems, {total_bytes} bytes of MP3)")
 
 
 def check_decode(ffmpeg, mp3, samples):
@@ -520,10 +577,11 @@ def check_decode(ffmpeg, mp3, samples):
         raise MusicError(f"{mp3} decodes to {len(raw) // 2} samples, expected {samples}; is lame still writing its LAME tag?")
 
 
-def write_import(mp3):
-    """Switches Godot's plain loop on in <mp3>.import, keeping whatever else Godot wrote there."""
+def write_import(mp3, loop=True):
+    """Switches Godot's plain loop on (or off) in <mp3>.import, keeping whatever else Godot
+    wrote there."""
     path = Path(str(mp3) + ".import")
-    params = {"loop": "true", "loop_offset": "0", "bpm": "0", "beat_count": "0", "bar_beats": "4"}
+    params = {"loop": "true" if loop else "false", "loop_offset": "0", "bpm": "0", "beat_count": "0", "bar_beats": "4"}
     if path.exists():
         lines, seen = [], set()
         for line in path.read_text().splitlines():
@@ -557,14 +615,14 @@ def generate():
                 w.writeframes(pcm)
             mp3 = OUT_DIR / f"{name}.mp3"
             # CBR, no ID3 tags. Keep the LAME tag (no -t): it makes the decoded file one loop long.
-            result = subprocess.run([lame, "--quiet", "-m", "m", "-b", "80", "--noreplaygain", str(wav), str(mp3)],
+            result = subprocess.run([lame, "--quiet", "-m", "m", "-b", str(SPECS[name]["kbps"]), "--noreplaygain", str(wav), str(mp3)],
                                     capture_output=True, text=True)
             if result.returncode != 0:
                 raise MusicError(f"lame failed for {mp3}: {result.stderr.strip()}")
             check_decode(ffmpeg, mp3, samples)
-            write_import(mp3)
+            write_import(mp3, SPECS[name]["loop"])
             lock[name] = lock_entry(pcm, samples, mp3)
-            print(f"music: wrote {mp3.relative_to(ROOT)} ({samples / RATE:.3f}s loop, {samples} samples, {mp3.stat().st_size} bytes)")
+            print(f"music: wrote {mp3.relative_to(ROOT)} ({samples / RATE:.3f}s{' loop' if SPECS[name]['loop'] else ' one-shot'}, {samples} samples, {mp3.stat().st_size} bytes)")
     for path in sorted(OUT_DIR.glob("*.mp3")):
         if path.stem not in lock:
             raise MusicError(f"{path.relative_to(ROOT)} is stale: no track makes it any more; delete it and its .import")

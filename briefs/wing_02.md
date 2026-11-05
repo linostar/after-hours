@@ -1,5 +1,17 @@
 # Wing 2 brief: The Great Wave off Kanagawa (Hokusai)
 
+## Fun pass (feat/fun-polish)
+- The ball's wing: the print room's lure on the way in is now the invisible ball, thrown from the easel
+  onto the west puddle's always-wet centre (380, 430), within `BALL_RANGE` 260:
+  the gap's sentry, nearest in earshot, walks over to look and the mime slips through the gap behind
+  him. Wading the puddle to splash still works beside it (the hint's ring is the same spot), but the
+  mime then has to wade back out, slow and loud; the ball keeps it dry at the easel. Layout unchanged.
+- Speed route: the doors dashed. Dashing the gallery's approach or the print room's way out too only
+  made the run slower (the bot had to wait out the guards each dashed step called). Best 55.52 s
+  against half par 52.5: `speed_target` 60.
+- Bot result: 185 plays; 72.98 s, par 105; tricks 1 (the ball), 4, 7, 11 and 13 proved needed; the sketch
+  route escapes with the sketch in 80.88 s; the speed route escapes in 55.52 s (target 60).
+
 ## Depth pass (feat/polish-depth)
 - Three rooms, 5 guards.
 - Room 0, the print room: trick **puddle lure** on the way in, **frame lure** on the way out. A screen

@@ -2,22 +2,24 @@ class_name Save
 extends RefCounted
 ## The save's shape, pure (Game reads and writes the file): a versioned JSON object with
 ## the progress per wing (its id, the wing file's name: the best stars of one escape and
-## the best escape time), the wings whose hidden sketch was found and the settings. parse()
+## the best escape time), the wings whose hidden sketch was found, the challenges each wing
+## ever had completed (Challenges, a bool each in Challenge order) and the settings. parse()
 ## turns a save's text back into that data or names what is wrong with it; record() keeps a
-## wing's best; record_sketch() keeps a found sketch; unlocked() tells which wings the hub
+## wing's best; record_sketch() keeps a found sketch; record_challenges() keeps completed
+## challenges; unlocked() tells which wings the hub
 ## opens: the first, and each one after a wing that was escaped from.
 
-## Version 2 added the sketches.
-const VERSION := 2
+## Version 2 added the sketches, version 3 the challenges.
+const VERSION := 3
 ## The versions parse() reads: an older one is upgraded (what it lacks takes its default).
-const READS: Array[int] = [1, 2]
+const READS: Array[int] = [1, 2, 3]
 ## The settings and their defaults.
 const SETTINGS := {"music": true, "sound": true, "reduce_motion": false, "assist": false}
 
 
 ## A fresh save: no wing finished, default settings.
 static func defaults() -> Dictionary:
-	return {"version": VERSION, "wings": {}, "sketches": {}, "settings": SETTINGS.duplicate()}
+	return {"version": VERSION, "wings": {}, "sketches": {}, "challenges": {}, "settings": SETTINGS.duplicate()}
 
 
 static func to_json(data: Dictionary) -> String:
@@ -25,8 +27,8 @@ static func to_json(data: Dictionary) -> String:
 
 
 ## The save in `text`, or {} with what is wrong appended to `problems`. A setting the save
-## lacks takes its default (an older save, a newer setting), and so do the sketches (a
-## version 1 save has none; it comes back as the current VERSION); anything else that is
+## lacks takes its default (an older save, a newer setting), and so do the sketches and the
+## challenges (an older save has none; it comes back as the current VERSION); anything else that is
 ## missing or of the wrong kind makes the whole save corrupt.
 static func parse(text: String, problems: Array[String]) -> Dictionary:
 	var json := JSON.new()
@@ -60,6 +62,17 @@ static func parse(text: String, problems: Array[String]) -> Dictionary:
 			problems.append("sketch '%s' is %s, expected true" % [id, sketches[id]])
 			return {}
 		data["sketches"][id] = true
+	var challenges: Variant = raw.get("challenges", {})
+	if not challenges is Dictionary:
+		problems.append("challenges is not an object")
+		return {}
+	for id: Variant in challenges:
+		var done: Variant = challenges[id]
+		if not id is String or not done is Array or done.size() != Challenges.Challenge.size() \
+				or done.any(func(each: Variant) -> bool: return not each is bool):
+			problems.append("challenges of '%s' are %s, expected %d of true or false" % [id, done, Challenges.Challenge.size()])
+			return {}
+		data["challenges"][id] = Array(done, TYPE_BOOL, &"", null)
 	var settings: Variant = raw.get("settings", {})
 	if not settings is Dictionary:
 		problems.append("settings is not an object")
@@ -121,6 +134,27 @@ static func record_sketch(data: Dictionary, id: String) -> bool:
 
 static func has_sketch(data: Dictionary, id: String) -> bool:
 	return data["sketches"].has(id)
+
+
+## Keeps the challenges an escape from wing `id` completed (`done`, Challenge order) on top of
+## those it ever had: a completed challenge stays completed. Returns the ones completed for
+## the first time (Challenge order).
+static func record_challenges(data: Dictionary, id: String, done: Array[bool]) -> Array[bool]:
+	var before := challenges_of(data, id)
+	var fresh := Challenges.none()
+	var kept := Challenges.none()
+	for i in kept.size():
+		fresh[i] = done[i] and not before[i]
+		kept[i] = done[i] or before[i]
+	data["challenges"][id] = kept
+	return fresh
+
+
+## The challenges wing `id` ever had completed (Challenge order; none if never escaped from).
+static func challenges_of(data: Dictionary, id: String) -> Array[bool]:
+	var done: Array[bool] = Challenges.none()
+	done.assign(data["challenges"].get(id, done))
+	return done
 
 
 ## JSON numbers load as floats: a whole number only, and only one a float holds exactly.

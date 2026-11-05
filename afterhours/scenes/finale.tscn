@@ -1,0 +1,73 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://scripts/finale.gd" id="1_finale"]
+[ext_resource type="Script" path="res://scripts/ui/floor_input.gd" id="2_floor"]
+[ext_resource type="Script" path="res://scripts/ui/keyboard_input.gd" id="3_keys"]
+[ext_resource type="Texture2D" path="res://art/svg/icon_play.svg" id="4_skip"]
+[ext_resource type="Shader" path="res://shaders/iris_wipe.gdshader" id="5_iris"]
+[ext_resource type="Script" path="res://scripts/confetti.gd" id="6_confetti"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_iris"]
+shader = ExtResource("5_iris")
+
+[node name="Finale" type="Node2D"]
+script = ExtResource("1_finale")
+
+[node name="Backdrop" type="ColorRect" parent="."]
+z_index = -20
+offset_left = -1000.0
+offset_top = -1000.0
+offset_right = 1960.0
+offset_bottom = 1540.0
+mouse_filter = 2
+color = Color(0.067, 0.063, 0.11, 1)
+
+[node name="Museum" type="Node2D" parent="."]
+
+[node name="Hideout" type="Node2D" parent="."]
+visible = false
+
+[node name="Credits" type="Node2D" parent="."]
+visible = false
+
+[node name="Confetti" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 960.0
+offset_bottom = 540.0
+mouse_filter = 2
+script = ExtResource("6_confetti")
+
+[node name="FloorInput" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 960.0
+offset_bottom = 540.0
+script = ExtResource("2_floor")
+
+[node name="SkipButton" type="Button" parent="."]
+offset_left = 896.0
+offset_top = 472.0
+offset_right = 952.0
+offset_bottom = 528.0
+accessibility_name = "Skip the ending"
+icon = ExtResource("4_skip")
+flat = true
+icon_alignment = 1
+expand_icon = true
+
+[node name="KeyboardInput" type="Node" parent="."]
+script = ExtResource("3_keys")
+
+[node name="CoverLayer" type="CanvasLayer" parent="."]
+layer = 50
+
+[node name="Cover" type="ColorRect" parent="CoverLayer"]
+material = SubResource("ShaderMaterial_iris")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.067, 0.063, 0.11, 0)

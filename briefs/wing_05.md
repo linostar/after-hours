@@ -1,5 +1,14 @@
 # Wing 5 brief: The Garden of Earthly Delights (Bosch)
 
+## Fun pass (feat/fun-polish)
+- Every power is available (ball, rope); the recorded route keeps its frame lures (each frame pulls the
+  right guard, the wing's idea) and uses none, which the NO_POWERS challenge rewards.
+- Speed route: the doors and the antechamber's floor walks dashed. With the garden's floor walk dashed
+  too, no wait got the mime through the garden's door to the hell panel uncaught (each dashed step is a
+  noise), so the garden and the panels stay tiptoed. Best 74.62 s against half par 62.5 (four rooms there and back): `speed_target` 75.
+- Bot result: 152 plays; 87.18 s, par 125; tricks 1, 4, 6, 10, 14, 17 and 19 proved needed; the sketch
+  route escapes with the sketch in 89.38 s; the speed route escapes in 74.62 s (target 75).
+
 ## Depth pass (feat/polish-depth)
 - Four rooms: an antechamber, then the triptych's three panels (Eden, the Garden, Hell); 9 guards.
 - Room 0, the antechamber (new): trick **frame lure** both ways at its gap's sentry.

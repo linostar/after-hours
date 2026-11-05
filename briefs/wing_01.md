@@ -1,5 +1,14 @@
 # Wing 1 brief: Girl with a Pearl Earring (Vermeer), the tutorial
 
+## Fun pass (feat/fun-polish)
+- No power yet (the ball unlocks with wing 2); the route and layout are unchanged.
+- Speed route (the SPEED challenge): the main route with the doors dashed (a double tap on a door now
+  dashes through it). Dashing the gallery's floor walks brings the sentry running (each dashed step is
+  a noise) and he catches the mime at the step-aside, so those stay tiptoed. The bot's best is 46.92 s
+  (seen, never caught) against half par 45: `speed_target` 50.
+- Bot result: 94 plays; 60.63 s, par 90; tricks 2, 5 and 9 proved needed; the sketch route escapes with
+  the sketch in 61.95 s; the speed route escapes in 46.92 s (target 50).
+
 ## Depth pass (feat/polish-depth)
 - Three rooms, 3 guards (the ramp: 3, 5, 6, 8, 9, 12 across the wings). Teach, in order: walk, paint,
   door, then hiding in the hall and tilting in the gallery, each a room's needed trick.

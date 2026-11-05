@@ -216,6 +216,36 @@ func _tests() -> Array[Callable]:
 		_test_no_flash_rates,
 		_test_ghost_replay_visits,
 		_test_ghost_mime_until_escape,
+		_test_tension_stems,
+		_test_tension_eases,
+		_test_chase_sting_once,
+		_test_room_drives_tension,
+		_test_dash_double_tap,
+		_test_dash_shift,
+		_test_dash_footfalls_heard,
+		_test_close_call_heartbeat,
+		_test_near_miss,
+		_test_routes_never_double_tap,
+		_test_finale_due_once,
+		_test_finale_skips_and_returns,
+		_test_hideout_replays_finale,
+		_test_challenges_judged,
+		_test_save_challenges,
+		_test_record_escape_challenges,
+		_test_results_challenge_badges,
+		_test_hub_challenge_pips,
+		_test_hideout_challenge_badges,
+		_test_mood_rules,
+		_test_guard_looks,
+		_test_room_drives_moods,
+		_test_powers_locked_per_wing,
+		_test_power_bar_placement,
+		_test_power_ball,
+		_test_power_rope,
+		_test_power_box,
+		_test_power_refill,
+		_test_power_cancel,
+		_test_power_unlock_beat,
 	]
 
 
@@ -404,6 +434,10 @@ func _test_sfx_files() -> void:
 		if file.get_extension() == "mp3":
 			loops.append(file.get_basename())
 	var tracks := Audio.MUSIC_TRACKS.duplicate()
+	for track in Audio.MUSIC_TRACKS:
+		if Audio.stem_for(track) != "":
+			tracks.append(Audio.stem_for(track))
+	tracks.append(Audio.STING)
 	tracks.sort()
 	loops.sort()
 	_check(loops == tracks, name, "audio/music holds %s, Audio.MUSIC_TRACKS lists %s" % [loops, tracks])
@@ -550,7 +584,7 @@ func _test_save_shape() -> void:
 	_check(Save.record_sketch(data, "wing_02") and not Save.record_sketch(data, "wing_02") and Save.has_sketch(data, "wing_02") and not Save.has_sketch(data, "wing_01"), name, "a found sketch is not kept once: %s" % [data["sketches"]])
 	back = Save.parse(Save.to_json(data), problems)
 	_check(problems.is_empty() and back == data, name, "a save with a sketch does not read back as written: %s, %s" % [back, problems])
-	for bad: String in ["{", "[]", '{"version": 3, "wings": {}}', '{"version": 1, "wings": []}', '{"version": 1, "wings": {"wing_01": {"stars": 4, "time": 1}}}',
+	for bad: String in ["{", "[]", '{"version": 4, "wings": {}}', '{"version": 1, "wings": []}', '{"version": 1, "wings": {"wing_01": {"stars": 4, "time": 1}}}',
 			'{"version": 1, "wings": {"wing_01": {"stars": 1.5, "time": 1}}}', '{"version": 1, "wings": {}, "settings": {"music": 1}}',
 			'{"version": 2, "wings": {}, "sketches": []}', '{"version": 2, "wings": {}, "sketches": {"wing_01": 1}}']:
 		problems.clear()
@@ -3485,6 +3519,11 @@ func _test_content_validates_wings() -> void:
 		"off the canvas": func(w: WingData) -> void: w.ghosts = [PackedVector2Array([Vector2(321, 10)])],
 		"bot_route is empty": func(w: WingData) -> void: w.bot_route = PackedVector2Array(),
 		"off the (960": func(w: WingData) -> void: w.bot_route = PackedVector2Array([Vector2(10, 541)]),
+		"speed_route tap": func(w: WingData) -> void: w.speed_route = PackedVector2Array([Vector2(-1, 10)]),
+		"bot_actions has": func(w: WingData) -> void: w.bot_actions = PackedInt32Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0].slice(0, w.bot_route.size() + 1)),
+		"sketch_actions[0]": func(w: WingData) -> void:
+			w.sketch_route = PackedVector2Array([Vector2(10, 10)])
+			w.sketch_actions = PackedInt32Array([WingData.BotAction.size()]),
 	}
 	for field in cases:
 		var wing := _test_wing()
@@ -3497,6 +3536,15 @@ func _test_content_validates_wings() -> void:
 	var problems: Array[String] = []
 	_check(Content.load_wing("res://data/wings/missing.tres", problems) == null and problems.size() == 1, name, "a missing wing file loaded or was not reported: %s" % [problems])
 	_check(Content.validate(null, "x.tres") == (["x.tres: is not a WingData"] as Array[String]), name, "a missing WingData was not reported")
+	# Bot actions: one per tap; a power only where the wing has it (wing 1 has none, a wing
+	# outside Content.WINGS every one).
+	var acting := _test_wing()
+	acting.speed_route = PackedVector2Array([Vector2(10, 10), Vector2(20, 10), Vector2(30, 10), Vector2(40, 10), Vector2(50, 10)])
+	acting.speed_actions = PackedInt32Array([WingData.BotAction.TAP, WingData.BotAction.DASH, WingData.BotAction.BALL, WingData.BotAction.ROPE, WingData.BotAction.BOX])
+	_check(Content.validate(acting, "acting.tres").is_empty(), name, "every action refused outside the play order: %s" % [Content.validate(acting, "acting.tres")])
+	var locked := Content.validate(acting, Content.WINGS[0])
+	_check(locked.size() == 3 and locked.all(func(problem: String) -> bool: return "not unlocked" in problem), name, "wing 1's powers were not refused: %s" % [locked])
+	_check(Content.power_of(WingData.BotAction.ROPE) == Powers.Power.ROPE and Content.power_of(WingData.BotAction.DASH) == -1, name, "a bot action's power is wrong")
 
 
 ## Every wing in Content.WINGS validates, and its rooms make a whole wing: each room loads
@@ -4000,3 +4048,984 @@ func _test_rotate_overlay_pauses() -> void:
 	_game.fit_screen()
 	_check(paused, name, "a tree paused before the overlay was unpaused by it")
 	paused = false
+
+
+## Every wing loop has a tension stem (Audio.stem_for, tools/music.py STEMS) that loads as a
+## looping MP3 exactly as long as its loop (so they stay locked); the chase sting loads as a
+## one-shot; the caper and results have no stem. play_music starts a wing's stem on the
+## player paired with its loop.
+func _test_tension_stems() -> void:
+	var name := "tension_stems"
+	var stems := 0
+	for track in Audio.MUSIC_TRACKS:
+		var stem := Audio.stem_for(track)
+		_check((stem != "") == track.begins_with("wing_"), name, "%s has stem '%s'" % [track, stem])
+		if stem == "":
+			continue
+		stems += 1
+		var loop := load(Audio.MUSIC_PATH % track) as AudioStreamMP3
+		var layer := load(Audio.MUSIC_PATH % stem) as AudioStreamMP3
+		_check(layer != null and layer.loop and is_equal_approx(layer.get_length(), loop.get_length()), name, "stem %s is missing, not looping or not as long as %s" % [stem, track])
+	_check(stems == 6, name, "%d wing loops have stems, expected 6" % stems)
+	var sting := load(Audio.MUSIC_PATH % Audio.STING) as AudioStreamMP3
+	_check(sting != null and not sting.loop and sting.get_length() < 4.0, name, "the chase sting is missing, looping or long")
+	var audio := _game.audio
+	var was := audio.music
+	audio.play_music("wing_02")
+	_check(audio.current_stem().stream == load(Audio.MUSIC_PATH % "wing_02_tension") and audio.current_stem().bus == Audio.MUSIC_BUS, name, "wing_02 did not start its stem on the Music bus")
+	audio.play_music("caper")
+	_check(audio.current_stem().stream == null, name, "the caper started a stem")
+	audio.play_music(was)
+
+
+## set_tension eases the stem: up over TENSION_RISE, down over TENSION_FALL (half way after
+## half the time), clamped to 0..1; the stem plays at the tension times its loop's volume, so
+## a crossfade to a loop without a stem fades it out and calms the target.
+func _test_tension_eases() -> void:
+	var name := "tension_eases"
+	var audio := _game.audio
+	var was := audio.music
+	audio.play_music("wing_01")
+	audio.tension = 0.0
+	audio.set_tension(2.0)
+	_check(audio.tension_target == 1.0, name, "set_tension does not clamp to 1")
+	audio._process(Audio.TENSION_RISE / 2.0)
+	_check(is_equal_approx(audio.tension, 0.5), name, "half the rise time eased to %.2f, not 0.5" % audio.tension)
+	audio._process(Audio.TENSION_RISE)
+	_check(audio.tension == 1.0, name, "the stem did not reach full tension")
+	var music := audio.get_node("Music" + audio.current_stem().name.trim_prefix("Stem")) as AudioStreamPlayer
+	_check(is_equal_approx(audio.current_stem().volume_linear, music.volume_linear), name, "the stem plays at %.2f, its loop at %.2f" % [audio.current_stem().volume_linear, music.volume_linear])
+	audio.set_tension(0.0)
+	audio._process(Audio.TENSION_FALL / 2.0)
+	_check(is_equal_approx(audio.tension, 0.5), name, "half the fall time eased to %.2f, not 0.5" % audio.tension)
+	audio.set_tension(1.0)
+	audio.play_music("caper")
+	_check(audio.tension_target == 0.0, name, "a new loop did not calm the tension")
+	audio.tension = 0.0
+	audio.play_music(was)
+
+
+## A chase's start plays the sting once; it does not repeat while the chase goes on, and a
+## new chase plays it again.
+func _test_chase_sting_once() -> void:
+	var name := "chase_sting_once"
+	var audio := _game.audio
+	audio.set_chase(false)
+	var before := audio.stings
+	audio.set_chase(true)
+	audio.set_chase(true)
+	audio.set_chase(true)
+	_check(audio.stings == before + 1, name, "one chase played %d stings" % (audio.stings - before))
+	audio.set_chase(false)
+	audio.set_chase(true)
+	_check(audio.stings == before + 2, name, "a second chase did not play the sting")
+	audio.set_chase(false)
+
+
+## The room's danger is the peak suspicion of its active guards, full while one chases or
+## searches, 0 while tossing or once finished; each tick it sets the music's tension and a
+## chase plays the sting. Nothing in the room changes (audio only).
+func _test_room_drives_tension() -> void:
+	var name := "room_drives_tension"
+	var room: Room = await _load_room()
+	var guard := room.guard
+	guard.suspicion = 0.3
+	_check(is_equal_approx(room.peak_suspicion(), 0.3) and is_equal_approx(room.danger(), 0.3), name, "danger %.2f does not follow the peak suspicion 0.3" % room.danger())
+	guard.active = false
+	_check(room.peak_suspicion() == 0.0, name, "an inactive guard counts")
+	guard.active = true
+	guard.intent = GuardBrain.Intent.SEARCH
+	_check(room.danger() == 1.0 and not room.chasing(), name, "a search is not full danger, or counts as a chase")
+	guard.intent = GuardBrain.Intent.CHASE
+	_check(room.danger() == 1.0 and room.chasing(), name, "a chase is not full danger")
+	room.tossing = true
+	_check(room.danger() == 0.0 and not room.chasing(), name, "tossing is not calm")
+	room.tossing = false
+	var before := _game.audio.stings
+	_game.audio.set_chase(false)
+	await physics_frame
+	_check(_game.audio.tension_target == 1.0 and _game.audio.stings == before + 1, name, "the room's chase did not set full tension and play the sting")
+	room.finished = true
+	await physics_frame
+	_check(_game.audio.tension_target == 0.0, name, "a finished room did not calm the music")
+	room.finished = false
+	_game.audio.set_chase(false)
+
+
+## A double tap on the floor (within Room.DOUBLE_TAP and DOUBLE_TAP_REACH) dashes there at
+## Mime.DASH_SPEED with the rig running, until it arrives; a first tap walks at once, and taps
+## apart in time or space only walk. A double tap on a door dashes to it.
+func _test_dash_double_tap() -> void:
+	var name := "dash_double_tap"
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.active = false
+	room.mime.place_at(Vector2(200, 450))
+	await _tap_at(Vector2(600, 480))
+	_check(room.mime.walking and not room.mime.dashing and room.mime.speed() == Mime.SPEED, name, "a first tap does not walk at once at SPEED")
+	await _tap_at(Vector2(615, 480))
+	_check(room.mime.dashing and room.mime.speed() == Mime.DASH_SPEED, name, "a second tap 15 away at once does not dash (speed %.0f)" % room.mime.speed())
+	await physics_frame
+	await physics_frame
+	_check(room.mime.rig.running, name, "the dashing mime's rig does not run")
+	var from := room.mime.position
+	for i in 30:
+		await physics_frame
+	var moved := room.mime.position.distance_to(from)
+	_check(absf(moved - Mime.DASH_SPEED * 0.5) < 8.0, name, "the dash covered %.0f in 0.5 s, not %.0f" % [moved, Mime.DASH_SPEED * 0.5])
+	await _wait_until(func() -> bool: return not room.mime.walking, 240)
+	await physics_frame
+	_check(not room.mime.dashing and not room.mime.rig.running, name, "the dash goes on after arriving")
+	await _tap_at(Vector2(300, 480))
+	for i in ceili(Room.DOUBLE_TAP * 60.0) + 2:
+		await physics_frame
+	await _tap_at(Vector2(305, 480))
+	_check(room.mime.walking and not room.mime.dashing, name, "a second tap after DOUBLE_TAP dashes")
+	await _tap_at(Vector2(305 + Room.DOUBLE_TAP_REACH + 20.0, 480))
+	_check(room.mime.walking and not room.mime.dashing, name, "a second tap beyond DOUBLE_TAP_REACH dashes")
+	_check(Mime.DASH_SPEED > Mime.SPEED * 1.4 and Mime.DASH_SPEED < Mime.SPEED * 1.8, name, "DASH_SPEED %.0f is not about 1.6 times SPEED" % Mime.DASH_SPEED)
+	# A double tap on a door dashes to it (and through it); a single one walks.
+	_check(not room.doors.is_empty(), name, "the test room has no door")
+	if room.doors.is_empty():
+		return
+	var door := room.doors[0]
+	room.mime.place_at(Vector2(480, 330))
+	await _tap_at(door.position)
+	_check(room.mime.walking and not room.mime.dashing, name, "a single tap on a door does not walk to it")
+	await _tap_at(door.position)
+	_check(room.mime.dashing, name, "a double tap on a door does not dash to it")
+
+
+## Shift held with the arrows runs the mime at DASH_SPEED; let go, it walks again.
+func _test_dash_shift() -> void:
+	var name := "dash_shift"
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.active = false
+	room.mime.place_at(Vector2(200, 480))
+	await _key(KEY_SHIFT, true)
+	var from := room.mime.position
+	Input.action_press("ui_right")
+	for i in 30:
+		await physics_frame
+	_check(room.mime.dashing and room.mime.rig.running, name, "Shift with an arrow does not run")
+	Input.action_release("ui_right")
+	var moved := room.mime.position - from
+	_check(absf(moved.x - Mime.DASH_SPEED * 0.5) < 6.0, name, "Shift and right for 0.5 s moved the mime %s, not %.0f right" % [moved, Mime.DASH_SPEED * 0.5])
+	await physics_frame
+	await physics_frame
+	_check(not room.mime.dashing, name, "the run goes on with no key held")
+	await _key(KEY_SHIFT, false)
+	from = room.mime.position
+	Input.action_press("ui_right")
+	for i in 30:
+		await physics_frame
+	Input.action_release("ui_right")
+	_check(absf(room.mime.position.x - from.x - Mime.SPEED * 0.5) < 6.0, name, "without Shift the arrow does not walk at SPEED")
+
+
+## The DustPuff children of the room's Actors now.
+func _dust_puffs(room: Room) -> int:
+	return room.get_node("Actors").get_children().filter(func(child: Node) -> bool: return child is DustPuff).size()
+
+
+## Every dashed footfall is a noise (the dash sound and a dust puff) the guard within
+## Mime.DASH_NOISE of hearing range hears; the same walk tiptoed is heard by nobody, and
+## Reduce Motion kicks up no dust.
+func _test_dash_footfalls_heard() -> void:
+	var name := "dash_footfalls_heard"
+	var room := await _load_room()
+	if room == null:
+		return
+	var guard := room.guard
+	guard.target = null
+	_game.audio.played.clear()
+	for dash: bool in [false, true]:
+		guard.reset()
+		guard.position = Vector2(720, 480)
+		room.mime.place_at(Vector2(420, 480))
+		await _tap_at(Vector2(560, 480))
+		if dash:
+			await _tap_at(Vector2(560, 480))
+		var puffs := 0
+		for i in 120:
+			guard.position = Vector2(720, 480)
+			puffs = maxi(puffs, _dust_puffs(room))
+			await physics_frame
+		var kind := "dash" if dash else "tiptoe"
+		_check(guard.senses.noise_heard == dash, name, "a %s near the guard was heard: %s" % [kind, guard.senses.noise_heard])
+		_check((puffs > 0) == dash, name, "a %s kicked up %d dust puff(s)" % [kind, puffs])
+		# The double tap's first tap sets off walking: one tiptoe before the dash.
+		var sounds := _game.audio.played
+		_check((sounds.count(&"dash") >= 2 and sounds.count(&"tiptoe") <= 1) if dash else (sounds.count(&"dash") == 0 and sounds.count(&"tiptoe") >= 2), name, "a %s played %s" % [kind, sounds])
+		_game.audio.played.clear()
+	_check(Mime.DASH_NOISE > 0.0 and Mime.DASH_NOISE < 1.0, name, "DASH_NOISE %.2f is not a share of hearing range" % Mime.DASH_NOISE)
+	_game.set_setting("reduce_motion", true)
+	room.mime.place_at(Vector2(420, 480))
+	await _tap_at(Vector2(560, 480))
+	await _tap_at(Vector2(560, 480))
+	var stilled := 0
+	for i in 60:
+		stilled += _dust_puffs(room)
+		await physics_frame
+	_game.set_setting("reduce_motion", false)
+	_check(stilled == 0, name, "a dash under Reduce Motion kicked up dust")
+
+
+## Between CloseCall.CLOSE_CALL and full suspicion (no chase) a heartbeat beats, faster as it
+## rises but under 2 Hz, and the edges darken with it (under the HUD); a chase or a calm
+## stops both, and Reduce Motion keeps the edges clear.
+func _test_close_call_heartbeat() -> void:
+	var name := "close_call_heartbeat"
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.active = false
+	var close := room.close_call
+	_check(close != null and close.z_index < room.hud.z_index and close.z_index < (room.get_node("PauseButton") as CanvasItem).z_index, name, "the close call is missing or not under the HUD")
+	close.set_physics_process(false)
+	_check(CloseCall.beat_hz(CloseCall.CLOSE_CALL) < CloseCall.beat_hz(0.7) and CloseCall.beat_hz(0.7) < CloseCall.beat_hz(0.999) and CloseCall.beat_hz(0.999) < 2.0, name, "the heartbeat does not quicken under 2 Hz")
+	_check(CloseCall.strength(0.2) == 0.0 and CloseCall.strength(0.5) < CloseCall.strength(0.9) and CloseCall.strength(1.0) == 0.0, name, "the edge strength does not follow suspicion between CLOSE_CALL and full")
+	_game.audio.played.clear()
+	for i in 30:
+		close.step(0.2, false, 1.0 / 60.0)
+	_check(not &"heartbeat" in _game.audio.played and close.edge_alpha() == 0.0, name, "suspicion under CLOSE_CALL beats or darkens")
+	var beats := 0
+	for i in 120:
+		var before := _game.audio.played.count(&"heartbeat")
+		close.step(0.9, false, 1.0 / 60.0)
+		beats += _game.audio.played.count(&"heartbeat") - before
+	_check(beats >= 2 and beats <= 4, name, "2 s at suspicion 0.9 beat %d times (expected 2 to 4, under 2 Hz)" % beats)
+	_check(is_equal_approx(close.shown, CloseCall.strength(0.9)) and close.edge_alpha() > 0.0, name, "the edges did not darken to the suspicion (shown %.2f)" % close.shown)
+	var alphas: Array[float] = []
+	for i in 60:
+		close.step(0.9, false, 1.0 / 60.0)
+		alphas.append(close.edge_alpha())
+	_check(alphas.max() - alphas.min() <= CloseCall.EDGE_ALPHA * CloseCall.BEAT_SWELL + 0.01, name, "the beat swings the edges by %.2f (a flash, not a swell)" % (alphas.max() - alphas.min()))
+	_game.set_setting("reduce_motion", true)
+	_check(close.edge_alpha() == 0.0, name, "Reduce Motion leaves the edges dark")
+	_game.set_setting("reduce_motion", false)
+	_game.audio.played.clear()
+	for i in 60:
+		close.step(1.0, true, 1.0 / 60.0)
+	_check(not &"heartbeat" in _game.audio.played and close.shown == 0.0, name, "a chase beats or keeps the edges dark (shown %.2f)" % close.shown)
+
+
+## Suspicion that peaks at NEAR_MISS or more and drains to nothing unseen plays the relief
+## sting and the mime wipes its brow; a lower peak, or a guard spotting it meanwhile, does not.
+func _test_near_miss() -> void:
+	var name := "near_miss"
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.active = false
+	var close := room.close_call
+	close.set_physics_process(false)
+	_game.audio.played.clear()
+	close.step(CloseCall.NEAR_MISS + 0.05, false, 0.1)
+	close.step(0.2, false, 0.1)
+	_check(close.near_misses == 0, name, "a near miss before the suspicion drained")
+	close.step(0.0, false, 0.1)
+	_check(close.near_misses == 1 and &"relief" in _game.audio.played and room.mime.rig.fidget == CharacterRig.Fidget.BROW, name, "a drained near miss played no relief or brow wipe (fidget %s)" % room.mime.rig.fidget)
+	for i in ceili(CloseCall.BROW_TIME * 60.0) + 2:
+		await physics_frame
+	_check(room.mime.rig.fidget == CharacterRig.Fidget.NONE, name, "the brow wipe does not end")
+	close.step(CloseCall.NEAR_MISS - 0.05, false, 0.1)
+	close.step(0.0, false, 0.1)
+	_check(close.near_misses == 1, name, "a peak under NEAR_MISS counted as a near miss")
+	close.step(CloseCall.NEAR_MISS + 0.05, false, 0.1)
+	room.guard.spotted.emit()
+	close.step(0.0, false, 0.1)
+	_check(close.near_misses == 1 and not close.spoiled, name, "a close call the guard spotted counted as a near miss")
+	close.step(CloseCall.NEAR_MISS + 0.05, false, 0.1)
+	close.step(0.0, false, 0.1)
+	_check(close.near_misses == 2, name, "the close call after a spotted one is no near miss")
+
+
+## No recorded bot route (main, sketch, speed, or a trick ablation skipping its tap at any
+## wait) can make a double tap by accident: two taps in one room visit within
+## Room.DOUBLE_TAP_REACH, the second within Room.DOUBLE_TAP (a wait under it). A dash would
+## change a recorded run. A DASH action's own two taps are meant; a ball or rope tap aims
+## the power (the room forgets the last walk tap) and the box has no tap.
+func _test_routes_never_double_tap() -> void:
+	var name := "routes_never_double_tap"
+	var paths: Array[String] = []
+	paths.assign(Content.WINGS)
+	paths.append("res://scenes/test/slice_wing.tres")
+	var pairs := 0
+	for path in paths:
+		var wing := load(path) as WingData
+		# Each room's doors, as [tap rect, room it leads to].
+		var doors: Array[Array] = []
+		for room_path in wing.rooms:
+			var room := (load(room_path) as PackedScene).instantiate()
+			var room_doors: Array = []
+			for child in room.get_node("Doors").get_children():
+				if child is Door:
+					room_doors.append([(child as Door).rect(), (child as Door).to_room])
+			doors.append(room_doors)
+			room.free()
+		var runs: Array[Array] = [[wing.bot_route, wing.bot_waits, wing.bot_actions, -1], [wing.sketch_route, wing.sketch_waits, wing.sketch_actions, -1], [wing.speed_route, wing.speed_waits, wing.speed_actions, -1]]
+		for trick in wing.bot_tricks:
+			runs.append([wing.bot_route, wing.bot_waits, wing.bot_actions, trick])
+		for run in runs:
+			var route: PackedVector2Array = run[0]
+			var waits: PackedFloat32Array = run[1]
+			var actions: PackedInt32Array = run[2]
+			var skip: int = run[3]
+			_check(waits.size() == route.size(), name, "%s: %d waits for %d taps (run --record)" % [path, waits.size(), route.size()])
+			if waits.size() != route.size():
+				continue
+			var at_room := 0
+			var previous := -1
+			for i in route.size():
+				var action := actions[i] if not actions.is_empty() else WingData.BotAction.TAP
+				if i == skip or action == WingData.BotAction.BOX:
+					continue
+				if action == WingData.BotAction.BALL or action == WingData.BotAction.ROPE:
+					previous = -1
+					continue
+				# Ablating a trick tries every wait of the leg after it, 0 included.
+				var any_wait := skip >= 0 and i == skip + 1
+				if previous >= 0:
+					pairs += 1
+					var close := route[i].distance_to(route[previous]) <= Room.DOUBLE_TAP_REACH
+					_check(not close or (waits[i] >= Room.DOUBLE_TAP and not any_wait), name, "%s: taps %d and %d (%s, %s) could double tap%s" % [path, previous, i, route[previous], route[i], " (ablating tap %d)" % skip if skip >= 0 else ""])
+				previous = i
+				for door: Array in doors[at_room]:
+					if (door[0] as Rect2).has_point(route[i]):
+						# Through a door: a new room visit, a fresh tap memory.
+						previous = -1
+						at_room = door[1]
+						break
+				if at_room < 0:
+					break
+	_check(pairs > 100, name, "only %d tap pairs checked" % pairs)
+
+
+## A save with `count` wings finished (Content.WINGS order).
+func _save_finished(count: int) -> Dictionary:
+	var save := Save.defaults()
+	var ids := Content.wing_ids()
+	for i in count:
+		Save.record(save, ids[i], [true, true, false] as Array[bool], 300.0)
+	return save
+
+
+func _reset_finale_state() -> void:
+	_game.run = null
+	_game.save = Save.defaults()
+	_game.just_unlocked = -1
+	_game.ending_due = false
+	_game.finale_return = GameState.Flow.HUB
+	DirAccess.remove_absolute(_game.save_path)
+
+
+## The finale is due only on the escape that finishes the last unfinished wing: not on an
+## escape before it, not on a later escape once every wing is finished.
+func _test_finale_due_once() -> void:
+	var name := "finale_due_once"
+	var stars: Array[bool] = [true, true, true]
+	_reset_finale_state()
+	_game.save = _save_finished(4)
+	_game.run = WingRun.new(load(Content.WINGS[4]) as WingData)
+	_game.record_escape(stars, 100.0, Challenges.none())
+	_check(not _game.ending_due and not _game.all_wings_finished(), name, "the finale is due with wing 6 unfinished")
+	_game.run = WingRun.new(load(Content.WINGS[5]) as WingData)
+	_game.record_escape(stars, 100.0, Challenges.none())
+	_check(_game.ending_due and _game.all_wings_finished(), name, "the escape that finished every wing did not make the finale due")
+	_game.ending_due = false
+	_game.record_escape(stars, 90.0, Challenges.none())
+	_check(not _game.ending_due, name, "a later escape with every wing finished made the finale due again")
+	# Out of order: the last wing to finish need not be wing 6.
+	_game.save = _save_finished(6)
+	(_game.save["wings"] as Dictionary).erase("wing_02")
+	_game.run = WingRun.new(load(Content.WINGS[1]) as WingData)
+	_game.record_escape(stars, 100.0, Challenges.none())
+	_check(_game.ending_due, name, "finishing wing 2 last did not make the finale due")
+	_reset_finale_state()
+
+
+## The results' home plays the due finale once (then the hub), or goes to the hub when none
+## is due; the finale skips on a tap, E, Space and ui_accept (its focused skip button), and
+## unskipped it plays to its end, each time going to finale_return.
+func _test_finale_skips_and_returns() -> void:
+	var name := "finale_skips_and_returns"
+	_reset_finale_state()
+	_game.ending_due = true
+	_game.leave_results()
+	var arrived := await _wait_until(func() -> bool: return current_scene is Finale and not _game.is_transitioning(), 300)
+	_check(arrived and _game.state == GameState.Flow.FINALE and not _game.ending_due and _game.finale_return == GameState.Flow.HUB, name, "the results' home with the finale due did not play it once, back to the hub")
+	if not arrived:
+		_reset_finale_state()
+		return
+	var skip := current_scene.get_node("SkipButton") as Button
+	_check(skip.has_focus(true) and skip.size.x >= 44.0 and skip.size.y >= 44.0 and not skip.accessibility_name.is_empty(), name, "the skip button is not a focused, named 44x44 button")
+	_check(_game.music_for(GameState.Flow.FINALE) == "results", name, "the finale does not play the results' fanfare")
+	await _tap_at(Vector2(480, 400))
+	var back := await _wait_until(func() -> bool: return current_scene is Hub and not _game.is_transitioning(), 300)
+	_check(back, name, "a tap did not skip the finale to the hub")
+	_game.leave_results()
+	await _wait_until(func() -> bool: return not _game.is_transitioning() and current_scene is Hub, 300)
+	_check(_game.state == GameState.Flow.HUB, name, "the results' home with no finale due did not go to the hub")
+	for key: Key in [KEY_E, KEY_SPACE, KEY_ENTER]:
+		_game.play_finale(GameState.Flow.HIDEOUT)
+		await _wait_until(func() -> bool: return current_scene is Finale and not _game.is_transitioning(), 300)
+		await _press_key(key)
+		back = await _wait_until(func() -> bool: return current_scene is Hideout and not _game.is_transitioning(), 300)
+		_check(back, name, "%s did not skip the finale to the hideout" % OS.get_keycode_string(key))
+	_game.play_finale(GameState.Flow.HUB)
+	await _wait_until(func() -> bool: return current_scene is Finale and not _game.is_transitioning(), 300)
+	var finale := current_scene as Finale
+	var frames := ceili(Finale.LENGTH * 60.0)
+	await _wait_until(func() -> bool: return finale.beat == 2, frames)
+	_check(finale.beat == 2 and finale.thumbs.size() == 6 and finale.fakes.size() == 6 and finale.originals.size() == 6, name, "the finale did not reach its credits with six paintings in each beat")
+	back = await _wait_until(func() -> bool: return current_scene is Hub and not _game.is_transitioning(), frames)
+	_check(back, name, "the finale did not end in the hub on its own")
+	_reset_finale_state()
+
+
+## The hideout offers the finale again (a named 44x44 button) only once every wing is
+## finished; it plays the finale and comes back to the hideout.
+func _test_hideout_replays_finale() -> void:
+	var name := "hideout_replays_finale"
+	_reset_finale_state()
+	_game.save = _save_finished(5)
+	change_scene_to_file("res://scenes/hideout.tscn")
+	await process_frame
+	await process_frame
+	_check(current_scene.get_node_or_null("FinaleButton") == null, name, "the hideout offers the finale with a wing unfinished")
+	_game.save = _save_finished(6)
+	change_scene_to_file("res://scenes/hideout.tscn")
+	await process_frame
+	await process_frame
+	var button := current_scene.get_node_or_null("FinaleButton") as Button
+	_check(button != null and button.size.x >= 44.0 and button.size.y >= 44.0 and not button.accessibility_name.is_empty() and button.focus_mode == Control.FOCUS_ALL, name, "with every wing finished the hideout has no focusable, named 44x44 finale button")
+	if button == null:
+		_reset_finale_state()
+		return
+	await _tap_control(button)
+	var arrived := await _wait_until(func() -> bool: return current_scene is Finale and not _game.is_transitioning(), 300)
+	_check(arrived and _game.finale_return == GameState.Flow.HIDEOUT, name, "the hideout's button did not play the finale back to the hideout")
+	await _tap_at(Vector2(480, 400))
+	var back := await _wait_until(func() -> bool: return current_scene is Hideout and not _game.is_transitioning(), 300)
+	_check(back, name, "the finale from the hideout did not return there")
+	_reset_finale_state()
+
+
+## Each challenge is judged on its own: no power used, a PERFECT fake (Good is not), never
+## caught (being seen is allowed), and under the speed target, which is half of par unless
+## the wing sets one; a negative target is refused.
+func _test_challenges_judged() -> void:
+	var name := "challenges_judged"
+	_check(Challenges.earned(0, 0.9, 0, 20.0, 30.0) == [true, true, true, true], name, "a clean, perfect, quick run did not complete all four")
+	_check(Challenges.earned(1, 0.9, 0, 20.0, 30.0) == [false, true, true, true], name, "a power used still completed NO_POWERS")
+	_check(Challenges.earned(0, Forgery.ASSIST_QUALITY, 0, 20.0, 30.0) == [true, false, true, true], name, "a Good fake completed PERFECT")
+	_check(Challenges.earned(0, Forgery.PERFECT_QUALITY, 0, 20.0, 30.0)[Challenges.Challenge.PERFECT], name, "a fake at the PERFECT threshold did not complete PERFECT")
+	_check(Challenges.earned(0, 0.9, 2, 20.0, 30.0) == [true, true, false, true], name, "a caught run completed NEVER_CAUGHT")
+	_check(Challenges.earned(0, 0.9, 0, 30.0, 30.0)[Challenges.Challenge.SPEED] and not Challenges.earned(0, 0.9, 0, 30.5, 30.0)[Challenges.Challenge.SPEED], name, "SPEED is not 'within the target'")
+	var wing := _test_wing()
+	wing.par_time = 90.0
+	_check(is_equal_approx(Challenges.speed_target(wing), 45.0), name, "the default speed target is %.1f, not half of par 90" % Challenges.speed_target(wing))
+	wing.speed_target = 60.0
+	_check(is_equal_approx(Challenges.speed_target(wing), 60.0) and Content.validate(wing, "w.tres").is_empty(), name, "a wing's own speed target is not used or is refused")
+	wing.speed_target = -1.0
+	var problems := Content.validate(wing, "w.tres")
+	_check(problems.size() == 1 and "speed_target" in problems[0], name, "a negative speed target is not refused with one problem: %s" % [problems])
+	_check(Challenges.ICONS.size() == Challenges.Challenge.size() and Challenges.ICONS.all(func(each: Texture2D) -> bool: return each != null), name, "not every challenge has its badge")
+
+
+## Save version 3 keeps each wing's challenges ever completed (a completed one stays so),
+## reports those first completed, reads back as written and refuses a bad entry; version 1
+## and 2 saves upgrade with every best, sketch and setting kept and no challenge yet.
+func _test_save_challenges() -> void:
+	var name := "save_challenges"
+	var problems: Array[String] = []
+	var data := Save.defaults()
+	_check(Save.VERSION == 3 and Save.READS == ([1, 2, 3] as Array[int]), name, "the save is version %d reading %s" % [Save.VERSION, Save.READS])
+	_check(Save.challenges_of(data, "wing_01") == Challenges.none(), name, "a wing never escaped from has challenges")
+	_check(Save.record_challenges(data, "wing_01", [true, false, true, false] as Array[bool]) == [true, false, true, false], name, "first completions are not all reported")
+	_check(Save.record_challenges(data, "wing_01", [false, true, true, false] as Array[bool]) == [false, true, false, false], name, "a challenge completed before is reported again")
+	_check(Save.challenges_of(data, "wing_01") == [true, true, true, false], name, "a completed challenge did not stay completed: %s" % [Save.challenges_of(data, "wing_01")])
+	_check(Save.record_challenges(data, "wing_01", Challenges.none()) == Challenges.none() and Save.challenges_of(data, "wing_01") == [true, true, true, false], name, "a run completing none lost or reported challenges")
+	Save.record(data, "wing_01", [true, true, false] as Array[bool], 70.0)
+	Save.record_sketch(data, "wing_01")
+	var back := Save.parse(Save.to_json(data), problems)
+	_check(problems.is_empty() and back == data, name, "a save with challenges does not read back as written: %s, %s" % [back, problems])
+	var v2 := Save.parse('{"version": 2, "wings": {"wing_01": {"stars": 2, "time": 70.5}}, "sketches": {"wing_01": true}, "settings": {"music": false, "sound": true, "reduce_motion": true, "assist": true}}', problems)
+	_check(problems.is_empty() and v2["version"] == 3 and v2["wings"] == {"wing_01": {"stars": 2, "time": 70.5}} and v2["sketches"] == {"wing_01": true}
+			and v2["challenges"] == {} and v2["settings"] == {"music": false, "sound": true, "reduce_motion": true, "assist": true}, name, "a version 2 save does not upgrade with its bests, sketches and settings: %s, %s" % [v2, problems])
+	var v1 := Save.parse('{"version": 1, "wings": {"wing_02": {"stars": 3, "time": 99}}, "settings": {"music": true, "sound": false, "reduce_motion": false, "assist": false}}', problems)
+	_check(problems.is_empty() and v1["version"] == 3 and v1["wings"] == {"wing_02": {"stars": 3, "time": 99.0}} and v1["sketches"] == {} and v1["challenges"] == {}
+			and v1["settings"]["sound"] == false and Save.challenges_of(v1, "wing_02") == Challenges.none(), name, "a version 1 save does not upgrade with its bests and settings: %s, %s" % [v1, problems])
+	for bad: String in ['{"version": 3, "wings": {}, "challenges": []}', '{"version": 3, "wings": {}, "challenges": {"wing_01": [true, false, true]}}',
+			'{"version": 3, "wings": {}, "challenges": {"wing_01": [true, false, true, 1]}}', '{"version": 3, "wings": {}, "challenges": {"wing_01": true}}']:
+		problems.clear()
+		_check(Save.parse(bad, problems).is_empty() and problems.size() == 1, name, "save '%s' is not refused with one problem: %s" % [bad, problems])
+
+
+## Game.record_escape keeps the run's challenges in the save (written) and returns those first
+## completed under "challenges"; a room loaded on its own records none.
+func _test_record_escape_challenges() -> void:
+	var name := "record_escape_challenges"
+	_game.save = Save.defaults()
+	_game.run = WingRun.new(load(Content.WINGS[0]) as WingData)
+	var beaten := _game.record_escape([true, true, true] as Array[bool], 40.0, [true, false, true, false] as Array[bool])
+	_check(beaten["challenges"] == [true, false, true, false] and Save.challenges_of(_game.save, "wing_01") == [true, false, true, false], name, "a first escape's challenges are not kept and reported: %s" % [beaten])
+	beaten = _game.record_escape([true, true, false] as Array[bool], 90.0, [true, true, false, false] as Array[bool])
+	_check(beaten["challenges"] == [false, true, false, false] and Save.challenges_of(_game.save, "wing_01") == [true, true, true, false], name, "a worse escape completing a new challenge did not keep and report only it: %s" % [beaten])
+	var problems: Array[String] = []
+	_check(Save.parse(FileAccess.get_file_as_string(_game.save_path), problems) == _game.save, name, "the new challenge was not written to the save")
+	_game.run = WingRun.new(WingData.new())
+	_check(_game.record_escape([true, true, true] as Array[bool], 1.0, [true, true, true, true] as Array[bool])["challenges"] == Challenges.none(), name, "a run without a wing file recorded challenges")
+	_game.run = null
+	_game.save = Save.defaults()
+	DirAccess.remove_absolute(_game.save_path)
+
+
+## The results pop the four challenge badges after the stars: completed ones bright (with the
+## `challenge` sound), the rest dim, a first completion with its rosette; the row sits on the
+## panel clear of the stars, legends, rosettes, sketch, buttons and mime. No challenges given: none show.
+func _test_results_challenge_badges() -> void:
+	var name := "results_challenge_badges"
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.active = false
+	var results := room.get_node("ResultsLayer/Results") as Results
+	var wait := (Results.STAR_GAP + Results.POP_TIME) * 3.0 + Results.STAR_GAP * 8.0 + Results.POP_TIME + 0.2
+	results.present([true, true, true] as Array[bool], {"stars": true, "time": true, "challenges": [false, true, false, false]}, Paintings.SKETCHES.get(&"pearl_earring"), [true, true, false, true] as Array[bool])
+	await create_timer(wait).timeout
+	_check(results.badges.all(func(each: TextureRect) -> bool: return each.visible and each.scale.is_equal_approx(Vector2.ONE)), name, "not every challenge badge popped in")
+	_check(results.badges[0].modulate == Color.WHITE and results.badges[2].modulate == Results.BADGE_DIM and _game.audio.played.has(&"challenge"), name, "completed badges are not bright with their sound and missed ones dim")
+	_check(results.badge_rosettes[1].visible and not results.badge_rosettes[0].visible and not results.badge_rosettes[3].visible and _game.audio.played.has(&"challenge_new"), name, "only the first completion should pin its rosette")
+	var inner := (results.get_node("Panel/Inner") as Control).get_rect()
+	var others: Array[Rect2] = [Rect2(results.mime.position - Vector2(30, 90), Vector2(60, 95))]
+	for path: String in ["Star0", "Star1", "Star2", "Legend0", "Legend1", "Legend2", "StarsBest", "TimeBest", "Sketch", "ReplayButton", "HomeButton"]:
+		others.append((results.get_node("Panel/" + path) as Control).get_rect().grow(4.0))
+	var rects: Array[Rect2] = []
+	for i in results.badges.size():
+		for each: TextureRect in [results.badges[i], results.badge_rosettes[i]]:
+			rects.append(each.get_rect())
+	for rect in rects:
+		_check(inner.encloses(rect), name, "a badge at %s leaves the panel %s" % [rect, inner])
+		for other in others:
+			_check(not rect.intersects(other), name, "a badge at %s covers %s" % [rect, other])
+	for i in results.badges.size() - 1:
+		_check(not results.badges[i].get_rect().intersects(results.badges[i + 1].get_rect()), name, "badges %d and %d overlap" % [i, i + 1])
+	results.present([true, false, false] as Array[bool])
+	await create_timer(wait).timeout
+	_check(not (results.badges + results.badge_rosettes).any(func(each: TextureRect) -> bool: return each.visible), name, "badges showed with no challenges given")
+
+
+## A hub door shows a pip for each challenge its wing ever completed, from the save; the pips
+## stay clear of the stars, the sketch, the painting, the archway and the neighbouring door.
+func _test_hub_challenge_pips() -> void:
+	var name := "hub_challenge_pips"
+	_game.run = null
+	_game.save = Save.defaults()
+	Save.record(_game.save, "wing_01", [true, true, true] as Array[bool], 60.0)
+	Save.record_challenges(_game.save, "wing_01", [true, false, true, true] as Array[bool])
+	var hub := await _load_hub()
+	_check(hub.wing_doors[0].challenges == [true, false, true, true] and hub.wing_doors[1].challenges == Challenges.none(), name, "the doors do not carry their wings' challenges")
+	var keep_out: Array[Rect2] = [WingDoor.SKETCH_RECT, Rect2(WingDoor.PICTURE_CENTER - WingDoor.PICTURE_SIZE / 2.0, WingDoor.PICTURE_SIZE), WingDoor.OPENING.grow(5.0),
+		Rect2(-WingDoor.OPENING.size.x / 2.0 - 5.0, WingDoor.OPENING.position.y - WingDoor.OPENING.size.x / 2.0 - 5.0, WingDoor.OPENING.size.x + 10.0, WingDoor.OPENING.size.x + 10.0)]
+	for i in 3:
+		keep_out.append(Rect2(Vector2((i - 1) * (WingDoor.STAR_SIZE + 4.0) - WingDoor.STAR_SIZE / 2.0, WingDoor.STAR_ROW_Y - WingDoor.STAR_SIZE / 2.0), Vector2.ONE * WingDoor.STAR_SIZE))
+	for i in Challenges.Challenge.size():
+		var pip := WingDoor.pip_rect(i)
+		_check(absf(pip.position.x) < Hub.DOOR_GAP / 2.0 and absf(pip.end.x) < Hub.DOOR_GAP / 2.0, name, "pip %d at %s reaches the next door" % [i, pip])
+		for j in i:
+			_check(not pip.intersects(WingDoor.pip_rect(j)), name, "pips %d and %d overlap" % [i, j])
+		for other in keep_out:
+			_check(not pip.intersects(other), name, "pip %d at %s covers %s" % [i, pip, other])
+	_game.save = Save.defaults()
+
+
+## A stolen original's plaque carries its wing's four challenge badges round the replay
+## button, never under it, all on the plaque.
+func _test_hideout_challenge_badges() -> void:
+	var name := "hideout_challenge_badges"
+	_game.run = null
+	_game.save = Save.defaults()
+	Save.record(_game.save, "wing_02", [true, false, false] as Array[bool], 200.0)
+	Save.record_challenges(_game.save, "wing_02", [false, true, false, true] as Array[bool])
+	change_scene_to_file("res://scenes/hideout.tscn")
+	for i in 3:
+		await process_frame
+	var hideout := current_scene as Hideout
+	if hideout == null:
+		_check(false, name, "the hideout did not load")
+		return
+	var decor := hideout.get_node("Decor") as HideoutDecor
+	_check(decor.challenges.size() == Content.WINGS.size() and decor.challenges[1] == [false, true, false, true] and decor.challenges[0] == Challenges.none(), name, "the plaques do not carry their wings' challenges: %s" % [decor.challenges])
+	for index in Content.WINGS.size():
+		var plate := HideoutDecor.plaque_rect(index)
+		var replay := Rect2(plate.get_center() - Vector2.ONE * Hideout.REPLAY_SIZE / 2.0, Vector2.ONE * Hideout.REPLAY_SIZE)
+		for i in Challenges.Challenge.size():
+			var badge := HideoutDecor.badge_rect(index, i)
+			_check(plate.encloses(badge) and not badge.intersects(replay), name, "frame %d's badge %d at %s is off its plaque %s or under the replay button" % [index, i, badge, plate])
+			for j in i:
+				_check(not badge.intersects(HideoutDecor.badge_rect(index, j)), name, "frame %d's badges %d and %d overlap" % [index, i, j])
+		if index + 1 < Content.WINGS.size():
+			_check(not plate.intersects(HideoutDecor.plaque_rect(index + 1)), name, "plaques %d and %d overlap" % [index, index + 1])
+	var button := hideout.get_node("Replay2") as Button
+	_check(button != null and button.get_rect().is_equal_approx(Rect2(HideoutDecor.plaque_rect(1).get_center() - button.size / 2.0, button.size)), name, "the replay button is not centred on its plaque")
+	_game.save = Save.defaults()
+
+
+## The faces' moods: a guard is smug dusting its hands, alarmed chasing, searching or at
+## ALARM_AT suspicion, else calm; the mime is alarmed tossed or with a guard at ALARM_AT,
+## smug tipping its beret or bowing (even with a guard alarmed), else calm.
+func _test_mood_rules() -> void:
+	var name := "mood_rules"
+	var calm := CharacterRig.Mood.CALM
+	var alarmed := CharacterRig.Mood.ALARMED
+	var smug := CharacterRig.Mood.SMUG
+	var none := CharacterRig.Fidget.NONE
+	var at := CharacterRig.ALARM_AT
+	_check(at == Detection.SEEN_AT, name, "faces turn alarmed at %.2f, not where a guard spots the mime (%.2f)" % [at, Detection.SEEN_AT])
+	var guard_cases: Array[Array] = [
+		[0.0, false, none, calm], [at - 0.01, false, none, calm], [at, false, none, alarmed],
+		[0.0, true, none, alarmed], [1.0, true, CharacterRig.Fidget.DUST, smug],
+		[0.0, false, CharacterRig.Fidget.YAWN, calm], [0.9, false, CharacterRig.Fidget.STRETCH, alarmed],
+	]
+	for each in guard_cases:
+		var mood := CharacterRig.guard_mood(each[0], each[1], each[2])
+		_check(mood == each[3], name, "a guard at suspicion %.2f, alert %s, fidget %s is %s, not %s" % [each[0], each[1], CharacterRig.Fidget.keys()[each[2]], CharacterRig.Mood.keys()[mood], CharacterRig.Mood.keys()[each[3]]])
+	var mime_cases: Array[Array] = [
+		[0.0, false, none, calm], [at - 0.01, false, none, calm], [at, false, none, alarmed],
+		[0.0, true, none, alarmed], [0.0, true, CharacterRig.Fidget.TIP, alarmed],
+		[0.0, false, CharacterRig.Fidget.TIP, smug], [0.9, false, CharacterRig.Fidget.BOW, smug],
+	]
+	for each in mime_cases:
+		var mood := CharacterRig.mime_mood(each[0], each[1], each[2])
+		_check(mood == each[3], name, "the mime with peak suspicion %.2f, tossed %s, fidget %s is %s, not %s" % [each[0], each[1], CharacterRig.Fidget.keys()[each[2]], CharacterRig.Mood.keys()[mood], CharacterRig.Mood.keys()[each[3]]])
+
+
+## Every guard voice has a look (and every look a voice), each naming only rig properties;
+## a guard wears its voice's look (set before or after it is ready), drawn at once, and an
+## unknown voice is reported, keeping the look it had.
+func _test_guard_looks() -> void:
+	var name := "guard_looks"
+	var voices: Array[StringName] = []
+	voices.assign(Guard.LOOKS.keys())
+	voices.sort()
+	var expected := Audio.GUARD_VOICES.duplicate()
+	expected.sort()
+	_check(voices == expected, name, "Guard.LOOKS has %s, Audio.GUARD_VOICES %s" % [voices, expected])
+	var rig := (load("res://scenes/rig_guard.tscn") as PackedScene).instantiate() as CharacterRig
+	for voice in Guard.LOOKS:
+		for key: String in Guard.LOOKS[voice]:
+			_check(key in rig, name, "look '%s' sets '%s', not a CharacterRig property" % [voice, key])
+	rig.free()
+	var guard := (load("res://scenes/guard.tscn") as PackedScene).instantiate() as Guard
+	guard.route = PackedVector2Array([Vector2(100, 100), Vector2(200, 100)])
+	guard.voice = &"rookie"
+	root.add_child(guard)
+	var body := guard.rig.get_node("Body") as Sprite2D
+	_check(guard.rig.body_front == Guard.LOOKS[&"rookie"]["body_front"] and body.texture == guard.rig.body_front, name, "a rookie set before it was ready does not wear the rookie's look")
+	guard.voice = &"watchman"
+	_check(body.texture == Guard.LOOKS[&"watchman"]["body_front"] and guard.rig.mouth_front == Guard.LOOKS[&"watchman"]["mouth_front"], name, "a guard turned watchman does not wear the watchman's look")
+	var errors_before := _game.errors.size()
+	_game.quiet_errors = true
+	guard.voice = &"nobody"
+	_game.quiet_errors = false
+	_check(_game.errors.size() == errors_before + 1 and "nobody" in _game.errors[-1], name, "an unknown voice was not reported (errors: %s)" % [_game.errors.slice(errors_before)])
+	_check(body.texture == Guard.LOOKS[&"watchman"]["body_front"], name, "an unknown voice changed the look")
+	_game.errors.resize(errors_before)
+	(_game.get_node("ErrorLayer/ErrorBadge") as TextureRect).visible = false
+	guard.queue_free()
+	await process_frame
+
+
+## In a room the faces follow the state: a guard's high suspicion alarms it and the mime
+## (Room.peak_suspicion, active guards only), a catching guard dusting its hands is smug, and
+## both calm down again.
+func _test_room_drives_moods() -> void:
+	var name := "room_drives_moods"
+	var room := await _load_room()
+	var guard := room.guard
+	_check(room.peak_suspicion() == 0.0, name, "a fresh room's peak suspicion is %.2f, not 0" % room.peak_suspicion())
+	guard.suspicion = 0.9
+	_check(is_equal_approx(room.peak_suspicion(), 0.9), name, "the peak suspicion is %.2f with the guard at 0.9" % room.peak_suspicion())
+	await physics_frame
+	_check(guard.rig.mood == CharacterRig.Mood.ALARMED, name, "a guard at suspicion 0.9 is %s, not alarmed" % CharacterRig.Mood.keys()[guard.rig.mood])
+	_check(room.mime.rig.mood == CharacterRig.Mood.ALARMED, name, "the mime with a guard at 0.9 is %s, not alarmed" % CharacterRig.Mood.keys()[room.mime.rig.mood])
+	guard.active = false
+	_check(room.peak_suspicion() == 0.0, name, "an inactive guard's suspicion counts toward the peak")
+	guard.rig.start_fidget(CharacterRig.Fidget.DUST, Guard.DUST_TIME)
+	await physics_frame
+	_check(guard.rig.mood == CharacterRig.Mood.SMUG, name, "a guard dusting its hands is %s, not smug" % CharacterRig.Mood.keys()[guard.rig.mood])
+	_check(room.mime.rig.mood == CharacterRig.Mood.CALM, name, "the mime with no active guard suspicious is %s, not calm" % CharacterRig.Mood.keys()[room.mime.rig.mood])
+	guard.reset()
+	await physics_frame
+	_check(guard.rig.mood == CharacterRig.Mood.CALM, name, "a reset guard is %s, not calm" % CharacterRig.Mood.keys()[guard.rig.mood])
+
+
+## Each power unlocks with its wing (the ball from wing 2, the rope from 3, the box from 4; a
+## wing outside Content.WINGS, such as a room on its own, has all three); a room's bar shows
+## only its wing's powers (none: no bar), and a locked power's key does nothing.
+func _test_powers_locked_per_wing() -> void:
+	var name := "powers_locked_per_wing"
+	var expected: Array[Array] = [[], [Powers.Power.BALL], [Powers.Power.BALL, Powers.Power.ROPE], Powers.Power.values(), Powers.Power.values(), Powers.Power.values()]
+	_check(Powers.unlocked("") == Powers.Power.values() and Powers.unlocked("res://scenes/test/slice_wing.tres") == Powers.Power.values(), name, "a wing outside the play order does not have every power")
+	_check(Powers.unlocked_by(Content.WINGS[0]) == -1 and Powers.unlocked_by(Content.WINGS[1]) == Powers.Power.BALL and Powers.unlocked_by(Content.WINGS[2]) == Powers.Power.ROPE
+			and Powers.unlocked_by(Content.WINGS[3]) == Powers.Power.BOX and Powers.unlocked_by(Content.WINGS[4]) == -1 and Powers.unlocked_by("") == -1, name, "the unlocking wings are not 2, 3 and 4")
+	var saved := _game.save.duplicate(true)
+	_game.save = Save.defaults()
+	for i in Content.WINGS.size():
+		_check(Powers.unlocked(Content.WINGS[i]) == expected[i], name, "wing %d has powers %s, not %s" % [i + 1, Powers.unlocked(Content.WINGS[i]), expected[i]])
+		var wing := load(Content.WINGS[i]) as WingData
+		_game.run = WingRun.new(wing)
+		change_scene_to_file(wing.rooms[0])
+		var room := await _wait_for_room(wing.rooms[0], 120)
+		if room == null:
+			_check(false, name, "wing %d's first room did not load" % (i + 1))
+			continue
+		for guard in room.guards:
+			guard.active = false
+		var shown: Array = []
+		for power in room.power_bar.buttons.size():
+			if room.power_bar.buttons[power].visible:
+				shown.append(power)
+		_check(shown == expected[i] and room.power_bar.visible == not expected[i].is_empty(), name, "wing %d's bar shows %s (bar shown: %s), not %s" % [i + 1, shown, room.power_bar.visible, expected[i]])
+		if i == 1:
+			await _press_key(KEY_2)
+			await _press_key(KEY_3)
+			_check(room.chosen_power == -1 and room.box == null, name, "a locked power's key chose it in wing 2")
+	_game.save = saved
+	_game.run = null
+
+
+## The bar: a 44x44 (or larger) icon button per power with an accessibility name and its key
+## label art, inside the world (so the safe area), clear of the pause button and the HUD; in
+## every wing room clear of the paintings and doors, and of every recorded bot tap (main and
+## sketch routes), so recorded runs never press it.
+func _test_power_bar_placement() -> void:
+	var name := "power_bar_placement"
+	_game.run = null
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.active = false
+	var bar := room.power_bar
+	var area := bar.get_rect()
+	var world := Rect2(Vector2.ZERO, Vector2(960, 540))
+	var hud: Array[Rect2] = [RoomHud.clock_rect(), RoomHud.plate_rect(), RoomHud.sketch_rect(), (room.get_node("PauseButton") as Control).get_rect()]
+	for button in bar.buttons:
+		var rect := button.get_global_rect()
+		_check(button.visible and rect.size.x >= 44.0 and rect.size.y >= 44.0 and world.encloses(rect) and area.encloses(rect), name, "%s is hidden, under 44x44 or off the world: %s" % [button.name, rect])
+		_check(button.accessibility_name != "" and button.icon != null and (button.get_node("Key") as TextureRect).texture != null, name, "%s has no accessibility name, icon or key label" % button.name)
+		_check(not hud.any(func(each: Rect2) -> bool: return each.intersects(rect)), name, "%s is over the HUD or the pause button" % button.name)
+	for wing_path in Content.WINGS:
+		var wing := load(wing_path) as WingData
+		for tap: Vector2 in wing.bot_route + wing.sketch_route + wing.speed_route:
+			_check(not area.grow(4.0).has_point(tap), name, "%s: the bot taps %s, under the power bar" % [wing_path, tap])
+		for room_path: String in wing.rooms:
+			var scene := (load(room_path) as PackedScene).instantiate()
+			var covered: Dictionary[String, Rect2] = {}
+			for frame: TiltFrame in scene.get_node("Frames").get_children():
+				covered["frame " + frame.name] = frame.rect()
+			for portrait: HidingPortrait in scene.get_node("Portraits").get_children():
+				covered["portrait " + portrait.name] = portrait.rect()
+			for door: Door in scene.get_node("Doors").get_children():
+				covered["door " + door.name] = door.rect()
+			var picture := scene.get_node_or_null("Masterpiece") as FramedPainting
+			if picture != null:
+				covered["the masterpiece"] = Rect2(picture.position - picture.size / 2.0, picture.size)
+			for what in covered:
+				_check(not area.intersects(covered[what]), name, "%s: the power bar covers %s" % [room_path, what])
+			scene.free()
+
+
+## The ball: key 1 chooses it (its reach ringed round the mime); out of reach the mime shrugs
+## and it stays ready; in reach the mime throws it (the THROW gesture, counted, spent) and
+## where it lands the guard hears it, as he would a tilted frame; spent, it cannot be chosen.
+func _test_power_ball() -> void:
+	var name := "power_ball"
+	_game.run = null
+	var room := await _load_room()
+	if room == null:
+		return
+	_stand(room.guard, Vector2(600, 430), Vector2.RIGHT)
+	room.mime.place_at(Vector2(200, 260))
+	var played := _game.audio.played
+	await _press_key(KEY_1)
+	_check(room.chosen_power == Powers.Power.BALL and room.power_bar.chosen == Powers.Power.BALL and room._reach_ring.visible and room._reach_ring.radius == Powers.BALL_RANGE, name, "key 1 did not choose the ball and ring its reach")
+	played.clear()
+	await _tap_at(room.mime.position + Vector2(Powers.BALL_RANGE + 20.0, 0.0))
+	_check(&"shrug" in played and room.chosen_power == -1 and not room.powers_spent[Powers.Power.BALL] and room.run.powers_used == 0 and not room.mime.walking, name, "a throw out of reach did not shrug with the ball still ready (sounds %s)" % [played])
+	var spot := Vector2(380, 420)
+	await _tap_control(room.power_bar.buttons[Powers.Power.BALL])
+	await _tap_at(spot)
+	_check(room.powers_spent[Powers.Power.BALL] and room.run.powers_used == 1 and room.power_bar.buttons[Powers.Power.BALL].disabled and not room._reach_ring.visible, name, "the throw did not spend the ball and count it")
+	_check(room.mime.rig.fidget == CharacterRig.Fidget.THROW and &"ball_throw" in played and room.mime.position == Vector2(200, 260) and not room.mime.walking, name, "the mime did not throw from where it stood")
+	_check(room.guard.noise_point != spot, name, "the guard heard the ball before it landed")
+	var landed := await _wait_until(func() -> bool: return room.guard.noise_point == spot, ceili(PowerFx.BALL_FLIGHT * 60.0) + 5)
+	_check(landed and &"ball_land" in played, name, "the guard did not hear the ball land at %s (sounds %s)" % [spot, played])
+	await _press_key(KEY_1)
+	_check(room.chosen_power == -1, name, "a spent ball was chosen again")
+
+
+## The rope: key 2 chooses it; a frame out of reach or already tilted gets a shrug, the rope
+## still ready; a straight frame in reach tilts from afar (the PULL gesture, spent, counted),
+## and the nearest guard hears the frame as for a tilt.
+func _test_power_rope() -> void:
+	var name := "power_rope"
+	_game.run = null
+	var room := await _load_room()
+	if room == null:
+		return
+	_stand(room.guard, Vector2(300, 430), Vector2.DOWN)
+	var near := room.get_node("Frames/FrameA") as TiltFrame
+	var crooked := room.get_node("Frames/FrameB") as TiltFrame
+	room.mime.place_at(Vector2(700, 300))
+	var played := _game.audio.played
+	await _press_key(KEY_2)
+	_check(room.chosen_power == Powers.Power.ROPE and room._reach_ring.radius == Powers.ROPE_RANGE, name, "key 2 did not choose the rope and ring its reach")
+	played.clear()
+	await _tap_at(near.position)
+	_check(&"shrug" in played and not near.tilted and not room.powers_spent[Powers.Power.ROPE], name, "a frame out of reach did not get a shrug with the rope still ready")
+	room.mime.place_at(Vector2(450, 260))
+	crooked.tilt()
+	await _press_key(KEY_2)
+	played.clear()
+	await _tap_at(crooked.position)
+	_check(&"shrug" in played and not room.powers_spent[Powers.Power.ROPE], name, "a tilted frame did not get a shrug with the rope still ready")
+	await _press_key(KEY_2)
+	await _tap_at(near.position)
+	_check(near.tilted and room.powers_spent[Powers.Power.ROPE] and room.run.powers_used == 1 and &"rope_pull" in played and &"tilt" in played, name, "the rope did not tilt the frame in reach (sounds %s)" % [played])
+	_check(room.mime.rig.fidget == CharacterRig.Fidget.PULL and room.mime.position == Vector2(450, 260) and not room.mime.walking, name, "the mime did not pull from where it stood")
+	_check(room.guard.noise_point == near.view_point(), name, "the guard did not hear the frame the rope tilted")
+
+
+## The box: key 3 hides the mime where it stands (spent, counted); a guard looking straight at
+## it then sees nothing; the next tap steps it out and walks on; BOX_TIME steps it out by
+## itself; a guard who sees it step in chases it there, and the catch steps it out.
+func _test_power_box() -> void:
+	var name := "power_box"
+	_game.run = null
+	var room := await _load_room()
+	if room == null:
+		return
+	_stand(room.guard, Vector2(700, 430), Vector2.RIGHT)
+	room.mime.place_at(Vector2(200, 300))
+	var played := _game.audio.played
+	played.clear()
+	await _press_key(KEY_3)
+	_check(room.box != null and room.is_hidden() and not room.mime.visible and room.powers_spent[Powers.Power.BOX] and room.run.powers_used == 1 and &"box_up" in played and not room.ever_seen, name, "key 3 did not hide the mime in the box unseen")
+	_stand(room.guard, Vector2(290, 300), Vector2.LEFT)
+	for i in 30:
+		await physics_frame
+	_check(room.guard.suspicion == 0.0 and not room.guard.senses.chasing and not room.ever_seen, name, "a guard looking at the box saw the mime")
+	_stand(room.guard, Vector2(700, 430), Vector2.RIGHT)
+	await _tap_at(Vector2(260, 420))
+	_check(room.box == null and room.mime.visible and room.mime.walking and &"unhide" in played, name, "the next tap did not step out of the box and walk on")
+	# A new visit (the run kept): the box is ready again, and BOX_TIME steps out by itself.
+	room = await _load_room()
+	_stand(room.guard, Vector2(700, 430), Vector2.RIGHT)
+	room.mime.place_at(Vector2(200, 300))
+	await _press_key(KEY_3)
+	_check(room.box != null and room.run.powers_used == 2, name, "the box was not ready on the next visit")
+	var out := await _wait_until(func() -> bool: return room.box == null, ceili(Powers.BOX_TIME * 60.0) + 10)
+	_check(out and room.mime.visible, name, "BOX_TIME did not step the mime out")
+	# Seen stepping in: chased there, and the catch steps it out.
+	room = await _load_room()
+	room.mime.place_at(Vector2(200, 300))
+	_stand(room.guard, Vector2(300, 300), Vector2.LEFT)
+	room._on_power_picked(Powers.Power.BOX)
+	_check(room.box != null and room.guard.senses.chasing and room.ever_seen, name, "a guard who saw the mime step into the box does not chase it")
+	room.guard.patrolling = true
+	var caught := await _wait_until(func() -> bool: return room.tossing, 180)
+	_check(caught and room.box == null and room.mime.visible, name, "the chase did not catch the boxed mime and step it out")
+
+
+## A power is spent for the visit: a toss does not refill it, entering the room again does
+## (the run counts every use across visits).
+func _test_power_refill() -> void:
+	var name := "power_refill"
+	_game.run = null
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.active = false
+	room.mime.place_at(Vector2(200, 300))
+	await _press_key(KEY_1)
+	await _tap_at(Vector2(300, 300))
+	_check(room.powers_spent[Powers.Power.BALL] and room.run.powers_used == 1, name, "the ball was not spent")
+	room._on_caught()
+	await _wait_until(func() -> bool: return not room.tossing, 180)
+	_check(room.powers_spent[Powers.Power.BALL] and room.power_bar.buttons[Powers.Power.BALL].disabled, name, "a toss refilled the ball")
+	await _press_key(KEY_1)
+	_check(room.chosen_power == -1, name, "the spent ball could be chosen after the toss")
+	var run := room.run
+	var again := await _load_room()
+	_check(again.run == run and again.powers_spent == [false, false, false] and not again.power_bar.buttons[Powers.Power.BALL].disabled and run.powers_used == 1, name, "entering the room again did not refill the powers (spent %s, used %d)" % [again.powers_spent, run.powers_used])
+
+
+## Cancelling a chosen power: the same button again, Escape, or a rope tap on no frame (the
+## mime stays put, nothing spent); another power's key switches to it.
+func _test_power_cancel() -> void:
+	var name := "power_cancel"
+	_game.run = null
+	var room := await _load_room()
+	if room == null:
+		return
+	room.guard.active = false
+	room.mime.place_at(Vector2(200, 300))
+	var ball := room.power_bar.buttons[Powers.Power.BALL]
+	await _tap_control(ball)
+	_check(room.chosen_power == Powers.Power.BALL, name, "the ball button did not choose the ball")
+	await _tap_control(ball)
+	_check(room.chosen_power == -1 and room.power_bar.chosen == -1 and not room._reach_ring.visible, name, "the same button again did not cancel the ball")
+	await _press_key(KEY_1)
+	await _press_key(KEY_ESCAPE)
+	_check(room.chosen_power == -1, name, "Escape did not cancel the ball")
+	await _press_key(KEY_1)
+	await _press_key(KEY_2)
+	_check(room.chosen_power == Powers.Power.ROPE, name, "key 2 did not switch from the ball to the rope")
+	await _tap_at(Vector2(300, 420))
+	_check(room.chosen_power == -1 and not room.mime.walking and not room.powers_spent.has(true) and room.run.powers_used == 0, name, "a rope tap on no frame did not just cancel it")
+	await _tap_at(Vector2(300, 420))
+	_check(room.mime.walking, name, "after a cancel a tap does not walk the mime")
+
+
+## The unlock beat: the first entry of a play of the wing that unlocks a power, never escaped
+## from, pops it into the bar with its sound, once; not in the next room, nor once the wing
+## has been escaped from.
+func _test_power_unlock_beat() -> void:
+	var name := "power_unlock_beat"
+	var saved := _game.save.duplicate(true)
+	_game.save = Save.defaults()
+	var played := _game.audio.played
+	played.clear()
+	var wing := load(Content.WINGS[1]) as WingData
+	_game.play_wing_file(Content.WINGS[1])
+	var room := await _wait_for_room(wing.rooms[0], 300)
+	if room == null:
+		_check(false, name, "wing 2 did not start")
+		_game.save = saved
+		return
+	for guard in room.guards:
+		guard.active = false
+	await create_timer(PowerBar.POP_DELAY + PowerBar.POP_TIME + PowerBar.GLINT_TIME).timeout
+	_check(played.count(&"power_unlock") == 1 and room.power_bar.buttons[Powers.Power.BALL].scale == Vector2.ONE, name, "wing 2's first entry did not pop the ball in once (sounds %s)" % [played])
+	_game.enter_room(1)
+	room = await _wait_for_room(wing.rooms[1], 300)
+	for guard in room.guards:
+		guard.active = false
+	await create_timer(PowerBar.POP_DELAY + PowerBar.POP_TIME).timeout
+	_check(played.count(&"power_unlock") == 1 and room.power_bar.buttons[Powers.Power.BALL].visible, name, "the next room popped the ball in again")
+	Save.record(_game.save, Content.wing_id(Content.WINGS[1]), [true, false, false] as Array[bool], 99.0)
+	_game.replay()
+	await _wait_until(func() -> bool: return current_scene != room, 120)
+	room = await _wait_for_room(wing.rooms[0], 300)
+	for guard in room.guards:
+		guard.active = false
+	await create_timer(PowerBar.POP_DELAY + PowerBar.POP_TIME).timeout
+	_check(played.count(&"power_unlock") == 1, name, "the ball popped in after the wing was escaped from")
+	_game.save = saved
+	_game.run = null

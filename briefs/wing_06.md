@@ -1,5 +1,13 @@
 # Wing 6 brief: Mona Lisa (Leonardo), the finale
 
+## Fun pass (feat/fun-polish)
+- All three powers are available; the recorded route keeps its lures and hides (every earlier trick
+  returns, the finale's idea) and uses none, which the NO_POWERS challenge rewards.
+- Speed route: the doors dashed. Dashing the salon's floor walks too saved nothing (84.57 s against
+  84.50 s). Best 84.50 s against half par 72.5 (five rooms there and back): `speed_target` 85.
+- Bot result: 172 plays; 102.73 s, par 145; tricks 1, 4, 6, 9, 12, 16, 20, 23, 26, 29 and 31 proved needed;
+  the sketch route escapes with the sketch in 109.62 s; the speed route escapes in 84.50 s (target 85).
+
 ## Constraints
 - Five rooms, the longest wing; 12 guards; 6 to 9 minutes; every star reachable (bot-proved).
 - Its own look: the Louvre after dark (marble and damask walls, gilt trim, the glass case), not wing 4's

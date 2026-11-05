@@ -7,12 +7,20 @@ extends Node2D
 ## uses) and keeps its last facing standing still; the rig's high-stepping walk cycle runs on
 ## the distance moved, and every footfall is a quiet tiptoe (not on noisy floor, where the
 ## room plays the gimmick's loud step).
+## A dash (walk_to or nudge with `dash`: a double tap, or Shift with the keys) runs at
+## DASH_SPEED until it stops: the rig runs, and every footfall slaps (the dash sound), kicks up
+## a dust puff (none under Reduce Motion) and emits dash_stepped, a noise the room lets the
+## nearest guard within DASH_NOISE of hearing range hear.
 ## While swapping it draws a ring beside its head (clear of the painting above it) that
 ## fills (swap_progress 0..1); while it carries the fake (paler, unframed-looking) or the
 ## original, the little painting shows at its side.
 
 ## Walking speed in base units per second.
 const SPEED := 170.0
+## Running speed (a dash), slowed by the gimmick like walking.
+const DASH_SPEED := 272.0
+## A dashed footfall carries this share of GuardBrain.HEARING_RANGE.
+const DASH_NOISE := 0.5
 ## How much longer than straight a keyboard step's path may be (rounding where it crosses
 ## navmesh polygon edges); longer goes round a wall and is refused.
 const STRAIGHT_SLACK := 0.5
@@ -42,8 +50,13 @@ const FAKE_TINT := Color(1.0, 0.95, 0.85, 0.75)
 
 ## Emitted once when the mime reaches the end of its path.
 signal arrived(at: Vector2)
+## Emitted at each dashed footfall (a noise guards may hear).
+signal dash_stepped
+
 
 var walking := false
+## Running (a dash) rather than tiptoeing.
+var dashing := false
 ## Busy using something (painting, swapping, tossed): it stands without the idle gag.
 var busy := false
 ## The room's gimmick (null for none): how fast it walks where it stands.
@@ -100,19 +113,22 @@ func _ready() -> void:
 	rig.gag_started.connect(_on_gag)
 
 
-## Walks to the navmesh point closest to `point`.
-func walk_to(point: Vector2) -> void:
+## Walks (or, with `dash`, runs) to the navmesh point closest to `point`.
+func walk_to(point: Vector2, dash := false) -> void:
 	_agent.target_position = point
 	walking = true
-	print("[Mime] Walking from %s to %s" % [position.round(), point.round()])
+	dashing = dash
+	print("[Mime] %s from %s to %s" % ["Dashing" if dash else "Walking", position.round(), point.round()])
 
 
-## Steps along `direction` (length at most 1) for `delta` seconds at SPEED, kept on the
+## Steps along `direction` (length at most 1) for `delta` seconds at its speed (running with
+## `dash`), kept on the
 ## navmesh so it slides along walls (keyboard walking); a path walk stops. Until the
 ## map holds the room's navmesh (no region owns a closest point; its queries answer
 ## (0, 0) then) it stays put.
-func nudge(direction: Vector2, delta: float) -> void:
+func nudge(direction: Vector2, delta: float, dash := false) -> void:
 	walking = false
+	dashing = dash
 	var map := _agent.get_navigation_map()
 	var step := position + direction * speed() * delta
 	if not NavigationServer2D.map_get_closest_point_owner(map, step).is_valid():
@@ -138,9 +154,9 @@ func nudge(direction: Vector2, delta: float) -> void:
 	_agent.target_position = position
 
 
-## Walking speed where it stands: SPEED, slowed by the gimmick.
+## Speed where it stands: SPEED (DASH_SPEED dashing), slowed by the gimmick.
 func speed() -> float:
-	return SPEED * (gimmick.slow_at(position) if gimmick != null else 1.0)
+	return (DASH_SPEED if dashing else SPEED) * (gimmick.slow_at(position) if gimmick != null else 1.0)
 
 
 ## Stops at once and stands at `point` (a reset, a toss).
@@ -148,6 +164,7 @@ func place_at(point: Vector2) -> void:
 	position = point
 	_agent.target_position = point
 	walking = false
+	dashing = false
 
 
 ## Turns toward `heading` (the rig picks its view); a zero heading keeps the facing.
@@ -174,6 +191,7 @@ func shrug() -> void:
 ## navmesh): the walk cycle runs on the distance as on a path walk. Returns its tween.
 func glide(point: Vector2, time: float) -> Tween:
 	walking = false
+	dashing = false
 	face_toward(point)
 	var tween := create_tween()
 	tween.tween_method(_glide_step.bind(position, point), 0.0, 1.0, time)
@@ -232,6 +250,10 @@ func _physics_process(delta: float) -> void:
 			_moved += position.distance_to(to)
 			face(to - position)
 			position = to
+	# A dash lasts while it moves: it ends on arriving or once the keys stop nudging.
+	if not walking and not _nudged:
+		dashing = false
+	rig.running = dashing
 	rig.walk(_moved, delta, not busy)
 	if dizzy_left > 0.0:
 		dizzy_left = maxf(dizzy_left - delta, 0.0)
@@ -241,9 +263,16 @@ func _physics_process(delta: float) -> void:
 	_nudged = false
 
 
-## A footfall: a quiet tiptoe (pitched up and down in turn), or on noisy floor the floor's
+## A footfall: a dash's slap with its dust and noise, a quiet tiptoe (pitched up and down in turn), or on noisy floor the floor's
 ## sound for a keyboard step (a path walk's loud step is the room's, with the noise guards hear).
 func _on_step() -> void:
+	if dashing:
+		_tiptoes += 1
+		Audio.play_for(self, &"dash", 0.94 if _tiptoes % 2 == 0 else 1.06)
+		if not rig.reduce_motion():
+			DustPuff.spawn(get_parent(), position)
+		dash_stepped.emit()
+		return
 	if gimmick != null and gimmick.noise_at(position) > 0.0:
 		if _nudged:
 			Audio.play_for(self, gimmick.noise_sound(position))

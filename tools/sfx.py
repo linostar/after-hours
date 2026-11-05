@@ -38,7 +38,7 @@ OUT_DIR = ROOT / "afterhours" / "audio" / "sfx"
 RATE = 22050
 PEAK = 0.9
 # The sound effects together must stay under this (the web build stays small).
-MAX_TOTAL_BYTES = 1024 * 1024
+MAX_TOTAL_BYTES = 1536 * 1024
 
 
 class SfxError(Exception):
@@ -461,6 +461,61 @@ def fx_error(rng):
     return mix((knock(rng, 110.0, 0.1), 0, 1.0), (highpassed(noise(0.12, rng, [(0, 6000), (1, 2500)], decay=30.0)), 0.01, 0.6))
 
 
+def fx_dash(rng):
+    """A dashed footfall: a slapped heel, a low knock with a scuff of grit under it."""
+    return mix((knock(rng, 140.0, 0.08), 0, 1.0),
+               (noise(0.09, rng, [(0, 3000), (1, 900)], decay=35.0), 0.005, 0.6))
+
+
+def fx_heartbeat(rng):
+    """A close call's heartbeat: lub-dub, two soft low thumps, the second a little quieter."""
+    return mix((thump(62.0, 0.14, 0.5, 22.0), 0, 1.0), (thump(56.0, 0.14, 0.5, 24.0), 0.16, 0.75))
+
+
+def fx_relief(rng):
+    """A near miss's relief: a vibraphone sigh down a fourth and back to rest, under a breath."""
+    return mix((arpeggio([F5, C5, Eb5], 0.13, 0.5, 7.0, VIBES), 0, 0.9),
+               (bandpass(noise(0.35, rng, [(0, 2000), (1, 600)], attack=0.08, release=0.2), 900.0, 1.2), 0.0, 0.25))
+
+
+def fx_challenge(rng):
+    """A challenge badge completed on the results: a wood block and a vibraphone ping (played higher badge by badge)."""
+    return mix((ping(note_hz(C6), 0.06, 60.0, WOOD), 0, 0.7), (ping(note_hz(C6 - 5), 0.5, 8.0, VIBES), 0.03, 0.8))
+
+
+def fx_challenge_new(rng):
+    """A challenge completed for the first time: its rosette's little bell flourish up the C minor triad."""
+    return mix((arpeggio([C6, Eb6, C6 + 7], 0.06, 0.35, 10.0, BELL), 0, 0.7), (ping(note_hz(C6 + 12), 0.5, 7.0, VIBES), 0.18, 0.5))
+
+
+def fx_ball_throw(rng):
+    """The mime's invisible ball thrown: a quick airy whoosh rising, a little slide whistle over it."""
+    whoosh = bandpass(noise(0.22, rng, [(0, 1500), (1, 4500)], attack=0.05, release=0.08), 2200.0, 1.2)
+    return mix((whoosh, 0, 1.0), (sweep(700.0, 1300.0, 0.2, sine, 0.02, 0.08), 0.02, 0.35))
+
+
+def fx_ball_land(rng):
+    """The invisible ball landing (the noise a guard hears): a rubbery bounce and two smaller ones."""
+    return mix((thump(220.0, 0.12, 0.8, 26.0), 0, 1.0), (thump(260.0, 0.09, 0.8, 32.0), 0.16, 0.55),
+               (thump(300.0, 0.07, 0.8, 40.0), 0.27, 0.3))
+
+
+def fx_rope_pull(rng):
+    """The invisible rope pulled: two hand-over-hand creaks, then a taut pizzicato twang."""
+    creak = lambda centre: bandpass(noise(0.08, rng, [(0, 1200), (1, 900)], attack=0.01, release=0.03), centre, 3.0)
+    return mix((creak(700.0), 0, 0.8), (creak(600.0), 0.12, 0.8), (ping(note_hz(C4), 0.3, 9.0, PIZZ), 0.22, 1.0))
+
+
+def fx_box_up(rng):
+    """The invisible box mimed: four light glassy taps of palms on panes, rising."""
+    return arpeggio([C6, Eb6, F6, C6 + 7], 0.07, 0.18, 22.0, GLASS)
+
+
+def fx_power_unlock(rng):
+    """A new power popping into the bar: a sparkle of vibraphone up to a bell."""
+    return mix((arpeggio([C5, Eb5, F5, C6], 0.06, 0.35, 9.0, VIBES), 0, 0.8), (ping(note_hz(F6), 0.6, 6.0, BELL), 0.22, 0.5))
+
+
 # How loud each kind of sound may be as heard (loudness_of: K-weighted, the loudest 0.1 s,
 # LUFS), (floor, ceiling): a peak level alone does not set loudness (a sustained buzz is far
 # louder than a click of the same peak), so --check holds every file to its kind's band.
@@ -512,6 +567,16 @@ EFFECTS = {
     "pause": (fx_pause, 0.21, "ui"),
     "resume": (fx_resume, 0.21, "ui"),
     "error": (fx_error, 0.54, "event"),
+    "dash": (fx_dash, 0.3, "quiet"),
+    "heartbeat": (fx_heartbeat, 0.25, "quiet"),
+    "relief": (fx_relief, 0.4, "stinger"),
+    "challenge": (fx_challenge, 0.42, "stinger"),
+    "challenge_new": (fx_challenge_new, 0.4, "stinger"),
+    "ball_throw": (fx_ball_throw, 0.3, "event"),
+    "ball_land": (fx_ball_land, 0.4, "event"),
+    "rope_pull": (fx_rope_pull, 0.4, "event"),
+    "box_up": (fx_box_up, 0.3, "event"),
+    "power_unlock": (fx_power_unlock, 0.4, "stinger"),
 }
 
 

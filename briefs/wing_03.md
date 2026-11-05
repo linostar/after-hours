@@ -1,5 +1,18 @@
 # Wing 3 brief: A Sunday on La Grande Jatte (Seurat)
 
+## Fun pass (feat/fun-polish)
+- The rope's wing: the gallery's lure is now pulled from afar. The step-aside parasol at (860, 365) was
+  removed, so walking up to the far frame (840, 75) to tilt it leaves footprints the sentry follows from
+  the frame straight to the mime; from (760, 380), never near the frame, the rope tilts it (`ROPE`, the
+  trick tap, hint unchanged: the frame) and the sentry walks over to straighten it while the mime swaps.
+- What the bot taught: the sketch route's old wait at (620, 400) after the pickup lay on the swap
+  trail the sentry follows; the mime now waits in the sketch portrait's own parasol shade (690, 219) and
+  goes straight to the door.
+- Speed route: the doors and the lawn's floor walks dashed; the gallery stays tiptoed. Best 58.42 s
+  against half par 55: `speed_target` 60.
+- Bot result: 204 plays; 75.38 s, par 110; tricks 1, 3, 6 (the rope), 9 and 11 proved needed; the sketch
+  route escapes with the sketch in 77.08 s; the speed route escapes in 58.42 s (target 60).
+
 ## Constraints
 - Three rooms; 6 guards (the ramp: 3, 5, 6, 8, 9, 12 across the wings); 3 to 6 minutes; every star reachable (bot-proved).
 - Every room past the first teaches nothing new in words: each needs one trick, proved by the bot's ablation.

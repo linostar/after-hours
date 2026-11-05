@@ -15,7 +15,11 @@ extends Node2D
 ## (BREATH_HZ, stilled under Reduce Motion), the eyes blink (BLINK_HZ, lids drawn over the
 ## face's eyes_front / eyes_side), a rig with gag_after does the mime's invisible wall once it
 ## has stood idle that long (gagging; it stops the moment it walks or is busy), and
-## start_fidget plays a guard's waypoint fidget (Fidget) over a given time.
+## start_fidget plays a guard's waypoint fidget (Fidget) over a given time. While `running`
+## (the mime's dash) the gait blends into a run: steps run_step times longer, the legs and
+## arms swing run_swing times wider and the body leans run_lean into it. The face wears a
+## Mood (calm, alarmed or smug; guard_mood and mime_mood pick it from the state), drawn with
+## the lids over the front and side faces; wear() dresses the rig in a look (a guard's).
 
 ## Emitted at each footfall while walking.
 signal stepped
@@ -25,8 +29,12 @@ signal gag_started
 enum View { FRONT, BACK, RIGHT, LEFT }
 ## A gesture played over a time: a guard's fidget at a waypoint (STRETCH, WATCH, YAWN),
 ## dusting off its hands after a catch (DUST), the mime tipping its beret (TIP, the escape)
-## and bowing (BOW, a three-star result).
-enum Fidget { NONE, STRETCH, WATCH, YAWN, DUST, TIP, BOW }
+## and bowing (BOW, a three-star result), wiping its brow (BROW, a near miss), and its powers'
+## pantomime (Powers): throwing the invisible ball (THROW) and hauling on the invisible rope (PULL).
+enum Fidget { NONE, STRETCH, WATCH, YAWN, DUST, TIP, BOW, BROW, THROW, PULL }
+## The face's expression (none from behind): calm brows and a smile; alarmed, brows up and
+## knitted, mouth open and a drop of sweat; smug, one brow up, eyes half shut and a smirk.
+enum Mood { CALM, ALARMED, SMUG }
 
 ## A front or back view turns to the side once the heading's across exceeds this share of
 ## its along (about 35 degrees off vertical), so a diagonal walks side on; a side view turns
@@ -67,6 +75,12 @@ const DUST_SWING := 0.3
 ## A yawn stretches the body this much more at its height; a bow dips it this much.
 const YAWN_STRETCH := 0.04
 const BOW_DIP := 0.14
+## Suspicion from which a face turns alarmed: the guard's eye half full, where it has
+## spotted the mime (Detection.SEEN_AT).
+const ALARM_AT := Detection.SEEN_AT
+## The alarmed face's drop of sweat.
+const SWEAT := Color(0.66, 0.86, 1.0)
+const SWEAT_LINE := Color(0.2, 0.32, 0.5)
 
 @export var body_front: Texture2D
 @export var body_back: Texture2D
@@ -91,6 +105,11 @@ const BOW_DIP := 0.14
 @export var side_spread := 3.0
 ## Base units walked per step (two steps a cycle).
 @export var step_length := 50.0
+## Running: the step this many times longer, the legs and arms swinging this many times
+## wider, the body leaning this far (radians) at full stride.
+@export var run_step := 1.4
+@export var run_swing := 1.35
+@export var run_lean := 0.16
 ## At full stride (side view): how far the legs reach fore and aft at a footfall (radians
 ## off vertical) and the arms swing; how high the swinging foot clears the floor (side) or
 ## the lifted foot rises (front and back); how far the body sinks at each footfall (lowest
@@ -115,14 +134,31 @@ const BOW_DIP := 0.14
 @export var eyes_side: PackedVector2Array
 @export var eye_radius := Vector2(1.8, 2.4)
 @export var lid_color := Color.WHITE
+## The mood's brows (each centred brow_lift above its eye, brow_half wide either side) and
+## mouth (centred at mouth_front or mouth_side, mouth_half wide either side in the front
+## view, half that in profile), in SVG units.
+@export var brow_lift := 3.5
+@export var brow_half := 2.4
+@export var brow_width := 0.9
+@export var brow_color := Color.BLACK
+@export var mouth_front := Vector2.ZERO
+@export var mouth_side := Vector2.ZERO
+@export var mouth_half := 2.4
+@export var mouth_color := Color.BLACK
 ## Seconds standing idle before the invisible-wall gag starts (0: never).
 @export var gag_after := 0.0
 
 var view := View.FRONT
+## Running (the mime's dash) rather than walking; the gait blends between them.
+var running := false
+## How far into a run the gait is: 0 walking, 1 running.
+var run := 0.0
 ## Whether it is doing the invisible-wall gag now.
 var gagging := false
 ## The fidget it is playing (NONE for none).
 var fidget := Fidget.NONE
+## The face's expression now (set by its owner from guard_mood or mime_mood).
+var mood := Mood.CALM
 ## The rig's own clock (seconds of walk() calls) and how long it has stood idle.
 var clock := 0.0
 var rest := 0.0
@@ -148,6 +184,29 @@ var _legs: Array[Sprite2D] = []
 var _arms: Array[Sprite2D] = []
 var _shins: Array[Sprite2D] = []
 var _forearms: Array[Sprite2D] = []
+
+
+## A guard's mood: smug dusting off its hands after a catch (`gesture` DUST), alarmed while
+## `alert` (chasing or searching) or with `suspicion` at ALARM_AT or more, else calm.
+static func guard_mood(suspicion: float, alert: bool, gesture: Fidget) -> Mood:
+	if gesture == Fidget.DUST:
+		return Mood.SMUG
+	if alert or suspicion >= ALARM_AT:
+		return Mood.ALARMED
+	return Mood.CALM
+
+
+## The mime's mood: alarmed while `tossed`, smug tipping its beret or bowing (`gesture` TIP
+## or BOW), alarmed while the most suspicious guard's suspicion (`peak`) is at ALARM_AT or
+## more, else calm.
+static func mime_mood(peak: float, tossed: bool, gesture: Fidget) -> Mood:
+	if tossed:
+		return Mood.ALARMED
+	if gesture == Fidget.TIP or gesture == Fidget.BOW:
+		return Mood.SMUG
+	if peak >= ALARM_AT:
+		return Mood.ALARMED
+	return Mood.CALM
 
 
 ## The view for `heading`, staying `current` for a zero heading and across the band
@@ -179,12 +238,12 @@ func _ready() -> void:
 	_body.scale = Vector2.ONE / ART_SCALE
 	_body.use_parent_material = true
 	add_child(_body)
-	# The lids, over the body's face (body-local units are SVG units at ART_SCALE).
+	# The face (mood and lids), over the body's (body-local units are SVG units at ART_SCALE).
 	_lids = Node2D.new()
 	_lids.name = "Lids"
 	_lids.position = -feet_at * ART_SCALE
 	_lids.use_parent_material = true
-	_lids.draw.connect(_draw_lids)
+	_lids.draw.connect(_draw_face)
 	_body.add_child(_lids)
 	# Characters made together blink apart: each starts its blink cycle by its owner's name.
 	var owner_name := String(get_parent().name) if get_parent() != null else String(name)
@@ -230,6 +289,15 @@ func hold(item: Node2D, i := 1) -> void:
 	forearm.add_child(item)
 
 
+## Dresses the rig in `look` (rig property names to values: bodies, face and colours; a
+## guard's look, Guard.LOOKS), the joints unchanged.
+func wear(look: Dictionary) -> void:
+	for key: String in look:
+		set(key, look[key])
+	if is_node_ready():
+		_apply()
+
+
 ## Turns the drawing toward `heading` (view_for).
 func face(heading: Vector2) -> void:
 	var next := view_for(heading, view)
@@ -243,9 +311,10 @@ func face(heading: Vector2) -> void:
 ## something) stands without the gag.
 func walk(distance: float, delta: float, idle := true) -> void:
 	clock += delta
+	run = move_toward(run, 1.0 if running else 0.0, SETTLE_RATE * delta)
 	if distance > 0.0:
 		var before := phase
-		phase = fmod(phase + distance / (2.0 * step_length), 1.0)
+		phase = fmod(phase + distance / (2.0 * step_length * lerpf(1.0, run_step, run)), 1.0)
 		# The first foot leaving the floor is a footfall too, then one every step.
 		if stride == 0.0 or floori(before * 2.0) != floori(phase * 2.0):
 			stepped.emit()
@@ -400,10 +469,25 @@ func _gesture(i: int) -> void:
 		else:
 			target = Vector2(0.9, 0.2) if side else Vector2(out * 1.1, out * 0.3)
 		weight = _fidget_weight()
+	elif fidget == Fidget.BROW and i == 1:
+		# The near hand up to the brow, swept across it once (the forearm turning) and down.
+		var across := clampf(_fidget_time / _fidget_length, 0.0, 1.0)
+		target = Vector2(-2.5, lerpf(-1.3, -0.5, across)) if side else Vector2(out * 2.3, -out * lerpf(1.1, 1.9, across))
+		weight = minf(_fidget_weight() * 2.0, 1.0)
 	elif fidget == Fidget.TIP and i == 1:
 		# The near hand up to the beret's brim and back down.
 		target = Vector2(-2.6, -0.8) if side else Vector2(out * 2.4, -out * 1.3)
 		weight = _fidget_weight()
+	elif fidget == Fidget.THROW and i == 1:
+		# The near arm winds back, then swings up and over to let the ball go.
+		var release := smoothstep(0.3, 0.65, _fidget_time / _fidget_length)
+		target = Vector2(lerpf(1.0, -2.6, release), -0.6) if side else Vector2(out * lerpf(0.5, 2.7, release), -out * lerpf(1.6, 0.2, release))
+		weight = minf(_fidget_weight() * 2.0, 1.0)
+	elif fidget == Fidget.PULL:
+		# Both hands reach out along the rope, then haul it in to the chest.
+		var haul := smoothstep(0.2, 0.7, _fidget_time / _fidget_length)
+		target = Vector2(lerpf(-1.6, -0.5, haul), lerpf(-0.3, -1.8, haul)) if side else Vector2(-out * lerpf(0.1, 0.3, haul), -out * lerpf(1.0, 1.95, haul))
+		weight = minf(_fidget_weight() * 2.0, 1.0)
 	elif fidget == Fidget.STRETCH:
 		target = Vector2(-2.9, -0.2) if side else Vector2(out * 2.75, out * 0.25)
 		weight = _fidget_weight()
@@ -424,11 +508,12 @@ func _gesture(i: int) -> void:
 
 
 func _pose_side(p: float, drop: float) -> void:
-	var tilt := lean * stride
+	var tilt := lerpf(lean, run_lean, run) * stride
+	var swing := lerpf(1.0, run_swing, run)
 	_body.rotation = tilt
 	_body.position = Vector2(0.0, drop)
 	var leg := -hip.y
-	var reach := leg * sin(leg_swing) * stride
+	var reach := leg * sin(leg_swing * swing) * stride
 	for i in 2:
 		var near := i == 1
 		var at := Vector2(side_spread * (1.0 if near else -1.0) / 2.0, hip.y).rotated(tilt) + Vector2(0.0, drop)
@@ -445,7 +530,7 @@ func _pose_side(p: float, drop: float) -> void:
 			foot = Vector2(reach * (2.0 * s * s * (3.0 - 2.0 * s) - 1.0), -lift * stride * sin(PI * pow(s, 0.8)))
 		_reach(_legs[i], _shins[i], foot + Vector2(at.x, 0.0) - at)
 		# The near arm swings against the near leg: back as it reaches forward.
-		var arm := (1.0 if near else -1.0) * arm_swing * stride
+		var arm := (1.0 if near else -1.0) * arm_swing * swing * stride
 		_arms[i].position = Vector2(0.0, shoulder.y).rotated(tilt) + Vector2(0.0, drop)
 		_arms[i].rotation = arm * cos(p)
 		_arms[i].scale = Vector2.ONE / ART_SCALE
@@ -507,17 +592,86 @@ func _draw() -> void:
 	draw_circle(Vector2.ZERO, shadow_radius, SHADOW)
 
 
-## The closed lids during a blink: each eye covered in the skin colour with a crease across.
-func _draw_lids() -> void:
-	if not blinking():
+## The face over the front and side views (none from behind), in SVG units: the mood's
+## brows and mouth (and the alarmed face's drop of sweat), then the lids, closed in a blink
+## (the skin colour with a crease across) or, smug, half shut.
+func _draw_face() -> void:
+	if view == View.BACK:
 		return
-	var radius := eye_radius * ART_SCALE * 1.3
-	for eye in eyes_side if is_side() else eyes_front:
-		var centre := eye * ART_SCALE
-		_lids.draw_set_transform(centre, 0.0, Vector2(1.0, radius.y / radius.x))
-		_lids.draw_circle(Vector2.ZERO, radius.x, lid_color)
-		_lids.draw_set_transform(Vector2.ZERO)
-		_lids.draw_line(centre - Vector2(radius.x, 0.0), centre + Vector2(radius.x, 0.0), LID_LINE, 0.9 * ART_SCALE, true)
+	var side := is_side()
+	var eyes := eyes_side if side else eyes_front
+	_lids.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * ART_SCALE)
+	var middle := 0.0
+	for eye in eyes:
+		middle += eye.x / eyes.size()
+	for i in eyes.size():
+		# +x toward the nose: the far side of the face for the front view's left eye, ahead in profile.
+		var inward := 1.0 if side or eyes[i].x < middle else -1.0
+		_draw_brow(eyes[i] + Vector2(0.0, -brow_lift), inward, i == eyes.size() - 1)
+	_draw_mouth(mouth_side if side else mouth_front, mouth_half * (0.5 if side else 1.0))
+	if mood == Mood.ALARMED and not eyes.is_empty():
+		var temple := eyes[eyes.size() - 1] + (Vector2(-3.6, -2.4) if side else Vector2(3.8, -2.4))
+		var drop := _ellipse(temple, Vector2(0.9, 1.0), -PI / 6.0, PI * 7.0 / 6.0)
+		drop.append(temple + Vector2(0.0, -2.2))
+		_lids.draw_colored_polygon(drop, SWEAT)
+		_lids.draw_polyline(drop + PackedVector2Array([drop[0]]), SWEAT_LINE, 0.35, true)
+	var lid := eye_radius * 1.3
+	for eye in eyes:
+		if blinking():
+			_lids.draw_colored_polygon(_ellipse(eye, lid, 0.0, TAU), lid_color)
+			_lids.draw_line(eye - Vector2(lid.x, 0.0), eye + Vector2(lid.x, 0.0), LID_LINE, 0.9, true)
+		elif mood == Mood.SMUG:
+			_lids.draw_colored_polygon(_ellipse(eye, lid, PI, TAU), lid_color)
+			_lids.draw_line(eye - Vector2(lid.x, -0.2), eye + Vector2(lid.x, 0.2), LID_LINE, 0.7, true)
+	_lids.draw_set_transform(Vector2.ZERO)
+
+
+## One brow at `at` for the mood, `inward` (+1 or -1) the way to the nose; `lead` is the
+## brow the smug face raises (the right one, the only one in profile).
+func _draw_brow(at: Vector2, inward: float, lead: bool) -> void:
+	# Outer end, middle, inner end (x toward the nose), through which the brow curves.
+	var points: Array[Vector2] = [Vector2(-1.0, 0.5), Vector2(0.0, -0.7), Vector2(1.0, 0.3)]
+	if mood == Mood.ALARMED:
+		points = [Vector2(-1.0, -1.1), Vector2(0.0, -2.1), Vector2(1.0, -2.5)]
+	elif mood == Mood.SMUG and lead:
+		points = [Vector2(-1.0, -0.6), Vector2(0.0, -2.2), Vector2(1.0, -0.9)]
+	elif mood == Mood.SMUG:
+		points = [Vector2(-1.0, 0.0), Vector2(0.0, 0.2), Vector2(1.0, 0.9)]
+	var scale_x := Vector2(brow_half * inward, 1.0)
+	_lids.draw_polyline(_curve(at + points[0] * scale_x, at + points[1] * scale_x, at + points[2] * scale_x), brow_color, brow_width, true)
+
+
+## The mouth at `at`, `half` wide either side: a smile (calm), an open O (alarmed), a
+## lopsided smirk (smug).
+func _draw_mouth(at: Vector2, half: float) -> void:
+	match mood:
+		Mood.ALARMED:
+			var open := _ellipse(at + Vector2(0.0, 0.3), Vector2(maxf(half * 0.55, 0.8), 1.4), 0.0, TAU)
+			_lids.draw_colored_polygon(open, mouth_color.darkened(0.55))
+			_lids.draw_polyline(open + PackedVector2Array([open[0]]), mouth_color, 0.7, true)
+		Mood.SMUG:
+			_lids.draw_polyline(_curve(at + Vector2(-half, 0.3), at + Vector2(0.2 * half, 0.5), at + Vector2(half, -0.9)), mouth_color, 1.0, true)
+		_:
+			_lids.draw_polyline(_curve(at + Vector2(-half, -0.3), at + Vector2(0.0, 0.6), at + Vector2(half, -0.3)), mouth_color, 1.0, true)
+
+
+## A smooth curve from `a` through `mid` to `b` (a quadratic Bezier).
+static func _curve(a: Vector2, mid: Vector2, b: Vector2) -> PackedVector2Array:
+	var control := 2.0 * mid - (a + b) / 2.0
+	var points := PackedVector2Array()
+	for i in 7:
+		var t := i / 6.0
+		points.append(a.lerp(control, t).lerp(control.lerp(b, t), t))
+	return points
+
+
+## The outline of an ellipse at `centre` with `radii`, from angle `from` to `to` (a whole
+## turn without its end repeating the start, so it fills as a polygon).
+static func _ellipse(centre: Vector2, radii: Vector2, from: float, to: float) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	for i in 12 if is_equal_approx(to - from, TAU) else 13:
+		points.append(centre + Vector2.from_angle(lerpf(from, to, i / 12.0)) * radii)
+	return points
 
 
 ## Whether Reduce Motion is on (no Game outside the tree: a test's loose rig moves); the

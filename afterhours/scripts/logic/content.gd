@@ -48,6 +48,8 @@ static func validate(wing: WingData, path: String) -> Array[String]:
 			problems.append("%s: rooms[%d] '%s' is not a scene that exists" % [path, i, room])
 	if wing.par_time <= 0.0:
 		problems.append("%s: par_time %.1f is not above 0" % [path, wing.par_time])
+	if wing.speed_target < 0.0:
+		problems.append("%s: speed_target %.1f is below 0" % [path, wing.speed_target])
 	if wing.ghosts.is_empty():
 		problems.append("%s: ghosts is empty" % path)
 	for i in wing.ghosts.size():
@@ -74,7 +76,43 @@ static func validate(wing: WingData, path: String) -> Array[String]:
 		if point.x < 0.0 or point.y < 0.0 or point.x > BASE.x or point.y > BASE.y:
 			problems.append("%s: sketch_route tap %s is off the %s screen" % [path, point, BASE])
 			break
+	for point in wing.speed_route:
+		if point.x < 0.0 or point.y < 0.0 or point.x > BASE.x or point.y > BASE.y:
+			problems.append("%s: speed_route tap %s is off the %s screen" % [path, point, BASE])
+			break
+	_validate_actions(path, "bot", wing.bot_route, wing.bot_actions, problems)
+	_validate_actions(path, "sketch", wing.sketch_route, wing.sketch_actions, problems)
+	_validate_actions(path, "speed", wing.speed_route, wing.speed_actions, problems)
 	return problems
+
+
+## Adds to `problems` what is wrong with a route's actions (`prefix`_actions for its
+## `prefix`_route `route`): empty (every tap plain) or one per tap, each a WingData.BotAction,
+## a power one only of a power the wing at `path` has (Powers.unlocked).
+static func _validate_actions(path: String, prefix: String, route: PackedVector2Array, actions: PackedInt32Array, problems: Array[String]) -> void:
+	if not actions.is_empty() and actions.size() != route.size():
+		problems.append("%s: %s_actions has %d actions for %d %s_route taps" % [path, prefix, actions.size(), route.size(), prefix])
+	var powers := Powers.unlocked(path)
+	for i in actions.size():
+		var action := actions[i]
+		if action < 0 or action >= WingData.BotAction.size():
+			problems.append("%s: %s_actions[%d] %d is not a BotAction" % [path, prefix, i, action])
+			continue
+		var power := power_of(action)
+		if power >= 0 and not powers.has(power):
+			problems.append("%s: %s_actions[%d] uses the %s power, not unlocked in this wing" % [path, prefix, i, Powers.Power.keys()[power]])
+
+
+## The power a bot action (WingData.BotAction) uses, or -1.
+static func power_of(action: int) -> int:
+	match action:
+		WingData.BotAction.BALL:
+			return Powers.Power.BALL
+		WingData.BotAction.ROPE:
+			return Powers.Power.ROPE
+		WingData.BotAction.BOX:
+			return Powers.Power.BOX
+	return -1
 
 
 ## The wing at `path`, or null with its problems (validate, or a failed load) in `problems`.
