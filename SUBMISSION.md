@@ -14,7 +14,7 @@ Everything between the two rules below is the public page; paste it as is.
 - **Classification:** Game. Genre: Puzzle. Tags: stealth, heist, art, museum, painting, mime, no-text, mobile, touch, godot.
 - **Cover image:** `submission/cover.png` (630 x 500).
 - **Screenshots:** `submission/1-title.png` to `submission/13-sketch.png`, in that order (1920 x 1080, landscape).
-- **Trailer / gameplay video:** `build/afterhours_demo.mp4` (27.8 s; itch takes a YouTube or Vimeo link, so upload it there first, or attach it to the jam post).
+- **Trailer / gameplay video:** `build/afterhours_demo.mp4` (32.5 s; itch takes a YouTube or Vimeo link, so upload it there first, or attach it to the jam post).
 - **Jam:** submit the page to the jam; it uses the optional theme "Great Works of Art" and the mandatory restriction "No Text".
 
 ---
@@ -76,7 +76,7 @@ After Hours was made with Claude (Anthropic), used through Claude Code, and the 
 - **Voices:** Claude wrote the guards' lines and described two voices (a weary watchman and a jumpy rookie); OmniVoice designed the voices from those descriptions (no cloned voices) and rendered the 32 lines. A script checks each line by transcribing it back with VoiceStudio's built-in speech recogniser, retrying any take that doesn't say its text.
 - **Level design with a playtest bot:** Claude designed each wing from a written brief, and a bot plays it through simulated touches like a player would, painting included. When it can't get through unseen, the log shows who spotted it where; the layout is fixed and the bot runs again. The bot also proves every room's trick is needed: it replays the run without the trick, waiting any time from 0 to 16 seconds, and the run must get the mime seen or caught. Every wing is proven beatable with all three stars, its sketch reachable, and the bot's runs become the ghost-mime tutorial and the hideout replays.
 - **Guard AI (no language model):** a utility-scoring brain picks each guard's intent (patrol, investigate, straighten, inspect, search, chase) from what it sees and hears. It's deterministic and runs offline.
-- **Quality:** 114 automated gameplay tests (about 1,960 checks), the playtest bot on every wing, a project checker that enforces the No Text rule, touch-first input and the no-flashing rule (with 18 test projects proving each check fires), and browser tests of the web build on desktop and an emulated phone. The cover, screenshots and gameplay video were captured from the real game by scripts.
+- **Quality:** 118 automated gameplay tests (about 2,080 checks), the playtest bot on every wing, a project checker that enforces the No Text rule, touch-first input and the no-flashing rule (with 18 test projects proving each check fires), and browser tests of the web build on desktop and an emulated phone. The cover, screenshots and gameplay video were captured from the real game by scripts.
 
 ## Content
 
