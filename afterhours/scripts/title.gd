@@ -22,7 +22,9 @@ var _sway := 0.0
 
 func _ready() -> void:
 	_play.pressed.connect(_game.goto.bind(GameState.Flow.HUB))
-	_play.grab_focus()
+	# Focused for Enter / Space, but hidden: the ring shows only once the keys move focus (on
+	# the title it sat over the museum door's play frame and looked heavy).
+	_play.grab_focus(true)
 	_game.arrive(GameState.Flow.TITLE)
 	_log_layout.call_deferred()
 	var args := OS.get_cmdline_user_args()
