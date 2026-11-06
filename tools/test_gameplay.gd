@@ -2665,7 +2665,7 @@ func _test_title_play_opens_hub() -> void:
 	await process_frame
 	await process_frame
 	var play := current_scene.get_node("PlayButton") as Button
-	_check(play.has_focus(true), name, "the play button does not have visible keyboard focus (hidden focus shows no ring)")
+	_check(play.has_focus() and not play.has_focus(true), name, "the play button is not focused for the keys, or shows its focus ring before the keys move")
 	await _tap_control(play)
 	_check(_game.is_transitioning(), name, "tapping play did not start a screen change")
 	_game.goto(GameState.Flow.TITLE)
