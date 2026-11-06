@@ -2,6 +2,7 @@
 
 The page text for the itch.io page and the jam entry for
 **Jamference: AI Game Jam Hack 3** (https://itch.io/jam/jamference-ai-game-jam-hack-3).
+The game's page: https://linostar.itch.io/after-hours.
 Everything between the two rules below is the public page; paste it as is.
 
 ## Upload settings
@@ -104,7 +105,7 @@ Mild cartoon theft, no flashing, no gore. Alarm and danger effects pulse slowly 
 
 - Upload `build/afterhours.zip` from a fresh `tools/build_web.sh` run on the final commit.
 - Play the uploaded page in a private window on desktop: the game is framed with no odd letterbox bars, fullscreen works, and the music starts by your first click.
-- On a real **iPhone (Safari)** and a real **Android phone (Chrome)**, play the itch page through wing 1 (jam plan, criterion 40):
+- On a real **iPhone (Safari)** and a real **Android phone (Chrome)**, play the itch page through wing 1 (jam plan, criterion 40; done by the developer on 2026-11-06):
   - The sound is on by your first tap (the iPhone's silent switch can mute it).
   - Turning the phone to portrait shows the rotate-phone icon and pauses; landscape resumes.
   - Tapping, tracing the forgery and the pause button all follow your finger; pull-to-refresh, double-tap zoom, text selection and long-press menus never trigger.

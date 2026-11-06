@@ -4,7 +4,7 @@ A silent mime sneaks into a museum after dark, paints a forgery of each of six p
 masterpieces, swaps it for the original and escapes. Jam entry for Jamference: AI Game Jam Hack 3
 (theme "Great Works of Art", restriction "No Text"). Godot 4.7.1, web (desktop and mobile, landscape).
 
-**Play:** <!-- TODO: itch.io page link -->
+**Play:** https://linostar.itch.io/after-hours
 
 ## Controls
 
