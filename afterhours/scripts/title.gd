@@ -3,7 +3,7 @@ extends Control
 ## its columned front, the mime sneaking past), the logo (drawn art, the jam's allowed
 ## exception to No Text) swaying gently on its nail, still under Reduce Motion, above the
 ## museum's door, a gilded frame holding the play button, which opens the hub (the lobby).
-## Every button's focus ring is Game's gilt glow (Game.FOCUS_RING). Run with
+## Every button's focus ring is Game's gilt glow (ButtonFeel.FOCUS_RING). Run with
 ## `-- --wing N` (N from 1) to start wing N at once (development, locked or not; an N out
 ## of range, or a wing whose data is broken, is reported).
 
