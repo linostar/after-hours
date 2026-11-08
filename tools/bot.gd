@@ -453,9 +453,9 @@ func _act(room: Room, at: Vector2, action: int) -> bool:
 		room.power_bar.picked.emit(power)
 		if power == Powers.Power.BOX:
 			await _tick()
-			return room.box != null
+			return room.powers.box != null
 		await _tap(at)
-		return room.powers_spent[power]
+		return room.powers.spent[power]
 	await _tap(at)
 	if action == WingData.BotAction.DASH:
 		await _tap(at)
@@ -477,7 +477,7 @@ func _settle(room: Room, play: Play) -> bool:
 		if canvas.visible and not canvas.is_finished():
 			await _paint(canvas)
 			continue
-		var busy := room.mime.walking or _ball_flying(room) or room.swap_intent or room.paint_intent or room.hide_target != null or room.tilt_target != null or room.sketch_intent or canvas.visible or room.tossing
+		var busy := room.mime.walking or _ball_flying(room) or room.pending != Room.Pending.NONE or canvas.visible or room.tossing
 		if not busy and not _game.is_transitioning():
 			return true
 		await _tick(room)
