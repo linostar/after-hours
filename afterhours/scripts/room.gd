@@ -52,19 +52,8 @@ extends Node2D
 ## keys; each dashed footfall is a noise the nearest guard within Mime.DASH_NOISE of hearing
 ## range hears. Its CloseCall beats a heartbeat and darkens the screen edges while a guard
 ## grows suspicious, and lets the mime wipe its brow after a near miss.
-
-
-## The mime's powers (Powers, those its wing has unlocked) sit on the PowerBar, each usable
-## once per visit (refilled on entering a room, not by a toss; WingRun.powers_used counts
-## every use): a press (or key 1, 2, 3) chooses the ball or the rope, showing its reach round
-## the mime, and the next tap is its target (the same button, Escape or a tap on no target
-## cancels it): the ball is thrown at a floor spot within Powers.BALL_RANGE (a noise there,
-## heard like a tilt), the rope tilts a straight frame within Powers.ROPE_RANGE from afar
-## (its noise and sketch as a tilt); out of reach (or a frame already tilted) the mime shrugs
-## and the power stays ready. The box needs no target: the mime hides in it where it stands,
-## as in a portrait (a guard who sees it step in chases it there), until the next tap, a key
-## walk, E, a catch or Powers.BOX_TIME steps it out. On the first entry of a play of the wing
-## that unlocks a power, while it was never escaped from, the power pops into the bar.
+## The mime's powers (ball, rope, box) are its RoomPowers; the escape's curtain call is its
+## EscapeBeat.
 
 ## Where the mime stands to swap the masterpiece (below it), and where a guard looks to
 ## inspect the hung fake: the floor at the painting's foot (sight rays to the painting
@@ -149,19 +138,17 @@ var elapsed := 0.0
 var ever_seen := false
 var catches := 0
 var tossing := false
-## Whether the mime is heading to (or standing at) the swap spot to swap.
-var swap_intent := false
-## Whether the mime is heading to the easel to paint.
-var paint_intent := false
-## The frame the mime is heading to tilt, if any.
-var tilt_target: TiltFrame
-## The portrait the mime is heading to hide in, and the one it hides in.
-var hide_target: HidingPortrait
-## The wing's hidden sketch in this room (null in a room without it), the frame or portrait
-## it is tucked in, and whether the mime is heading to pick it up.
+## What the mime is heading to do, and does once it stands there (_act_on_arrival): nothing,
+## paint at the easel, tilt a frame, hide in a portrait, pick up the sketch, or swap the
+## masterpiece (standing at the swap spot for SWAP_TIME).
+enum Pending { NONE, PAINT, TILT, HIDE, SKETCH, SWAP }
+var pending := Pending.NONE
+## The frame (TILT) or portrait (HIDE) the mime is heading for; null otherwise.
+var pending_target: Node2D
+## The wing's hidden sketch in this room (null in a room without it) and the frame or portrait
+## it is tucked in.
 var sketch: Sketch
 var sketch_source: Node2D
-var sketch_intent := false
 ## The trick's hint for each way through the room ([in, out]; null where the room has none
 ## that way): the one for the mime's way shows once it has been caught HINT_AFTER times here.
 var hints: Array[RoomHint] = [null, null]
@@ -174,8 +161,8 @@ var fake_hung := false
 var inspections := 0
 var found_out := false
 var finished := false
-## Whether the escape beat plays (finished, the results not shown yet).
-var escaping := false
+## The escape's curtain call (playing: finished, the results not shown yet).
+var escape_beat: EscapeBeat
 var stars: Array[bool] = []
 ## The bests the escape beat (Save.improvement), for the results' rosettes.
 var beaten := {}
@@ -199,11 +186,8 @@ var gimmick: Gimmick
 var ghost: GhostMime
 ## In a replay (WingRun.replaying), the room the bot went to after this stay (-1: the end).
 var _replay_next := -1
-var _escape_beat: Tween
 ## The characters' night material (RIG_NIGHT), shared by every rig in the room.
 var _rig_night: ShaderMaterial
-## The tweens the escape beat started (the slip, the fade, the door's swing).
-var _escape_parts: Array[Tween] = []
 ## Seconds until the mime's next footstep on noisy floor can make a noise.
 var _step_noise_wait := 0.0
 ## The last plain floor tap (a walk) and when it came (room time), for the double tap.
@@ -211,18 +195,8 @@ var _walk_tap := Vector2.INF
 var _walk_tap_time := -INF
 ## The heartbeat and edge darkening of a guard's growing suspicion (CloseCall).
 var close_call: CloseCall
-
-
-## The powers this room's wing has unlocked (Powers.unlocked), which are spent this visit (in
-## Powers.Power order), and the one chosen and waiting for its target (-1: none).
-var powers: Array[Powers.Power] = []
-var powers_spent: Array[bool] = [false, false, false]
-var chosen_power := -1
-## While the mime hides in its invisible box: the box (null otherwise) and its seconds left.
-var box: PowerFx
-var _box_left := 0.0
-## The chosen power's reach, round the mime's feet.
-var _reach_ring: PowerFx
+## The mime's powers this visit (the ball, the rope, the box).
+var powers: RoomPowers
 
 @onready var mime: Mime = $Actors/Mime
 ## The room's guards (the Guard children of Actors), and the first of them.
@@ -245,6 +219,9 @@ var _portraits: Array[HidingPortrait] = []
 
 
 func _ready() -> void:
+	powers = RoomPowers.new(self)
+	escape_beat = EscapeBeat.new(self)
+	escape_beat.ended.connect(_show_results)
 	# The navmesh: the floor outline less every partition (the nav_obstacles group), baked
 	# now so each room scene only places its partitions.
 	($Navigation as NavigationRegion2D).bake_navigation_polygon(false)
@@ -350,7 +327,7 @@ func _ready() -> void:
 		mime.visible = false
 		for each in guards:
 			each.active = false
-	_set_up_powers(visit)
+	powers.set_up(visit)
 	if DebugOverlay.wanted():
 		add_debug_overlay()
 	_game.arrive(GameState.Flow.ROOM)
@@ -544,34 +521,13 @@ func _physics_process(delta: float) -> void:
 	if walk != Vector2.ZERO and _accepts_input():
 		if is_hidden():
 			_step_out()
-		_cancel_swap()
-		paint_intent = false
-		tilt_target = null
-		hide_target = null
-		sketch_intent = false
+		_drop_pending()
 		mime.nudge(walk, delta, _keys.running())
-	_reach_ring.position = mime.position
-	if box != null:
-		_box_left -= delta
-		if _box_left <= 0.0:
-			_step_out()
-	if paint_intent and not tossing and not mime.walking and mime.position.distance_to(easel.spot()) <= SWAP_REACH:
-		paint_intent = false
-		mime.face_toward(easel.position)
-		_canvas.open()
-	if tilt_target != null and not tossing and not mime.walking and mime.position.distance_to(tilt_target.spot()) <= SWAP_REACH:
-		_tilt(tilt_target)
-	if hide_target != null and not tossing and not mime.walking and mime.position.distance_to(hide_target.spot()) <= SWAP_REACH:
-		_hide_in(hide_target)
-	if sketch_intent and not tossing and not mime.walking and mime.position.distance_to(sketch.position) <= SKETCH_REACH and sketch.state == Sketch.State.LYING:
-		_take_sketch()
+	powers.tick(delta)
+	# Before the pending action: none of them changes what the icon reads (an inspection).
 	if fake_hung and not found_out:
 		_fake_icon.visible = guards.any(func(each: Guard) -> bool: return each.inspecting)
-	if swap_intent and not tossing and not mime.walking and mime.position.distance_to(swap_spot()) <= SWAP_REACH:
-		mime.face_toward(masterpiece.position)
-		mime.swap_progress = minf(mime.swap_progress + delta / SWAP_TIME, 1.0)
-		if mime.swap_progress >= 1.0:
-			_swap()
+	_act_on_arrival(delta)
 	mime.busy = tossing or is_hidden() or _canvas.visible or mime.swap_progress > 0.0
 	if mime.carrying and not tossing and exit_door != null and mime.position.distance_to(exit_door.position) <= Door.REACH:
 		_escape()
@@ -657,8 +613,8 @@ func _leave(door: Door) -> void:
 
 
 func _on_floor_tapped(at: Vector2) -> void:
-	if escaping:
-		_skip_escape()
+	if escape_beat.playing:
+		escape_beat.skip()
 		return
 	if tossing or finished or leaving:
 		return
@@ -667,9 +623,9 @@ func _on_floor_tapped(at: Vector2) -> void:
 		_end_replay()
 		return
 	TapRipple.spawn(self, at)
-	if chosen_power >= 0:
+	if powers.chosen >= 0:
 		_walk_tap_time = -INF
-		_aim_power(at)
+		powers.aim(at)
 		return
 	var double := elapsed - _walk_tap_time <= DOUBLE_TAP and at.distance_to(_walk_tap) <= DOUBLE_TAP_REACH
 	_walk_tap_time = -INF
@@ -678,34 +634,30 @@ func _on_floor_tapped(at: Vector2) -> void:
 	if is_hidden():
 		_step_out()
 	var on_painting := painting_rect().has_point(at) and mime.has_fake
-	if on_painting and swap_intent:
+	if on_painting and pending == Pending.SWAP:
 		# Already heading there or swapping: a second tap keeps the progress.
 		return
-	_cancel_swap()
-	paint_intent = false
-	tilt_target = null
-	hide_target = null
-	sketch_intent = false
+	_drop_pending()
 	if sketch != null and (sketch.state == Sketch.State.FALLING or sketch.state == Sketch.State.LYING) and sketch.rect().has_point(at):
-		sketch_intent = true
+		_head_for(Pending.SKETCH)
 		mime.walk_to(sketch.position)
 		return
 	for portrait in _portraits:
 		if portrait.rect().has_point(at):
-			hide_target = portrait
+			_head_for(Pending.HIDE, portrait)
 			mime.walk_to(portrait.spot())
 			return
 	for frame in _frames:
 		if frame.rect().has_point(at) and not frame.tilted:
-			tilt_target = frame
+			_head_for(Pending.TILT, frame)
 			mime.walk_to(frame.spot())
 			return
 	if easel != null and easel.rect().has_point(at) and not mime.carrying:
-		paint_intent = true
+		_head_for(Pending.PAINT)
 		mime.walk_to(easel.spot())
 		return
 	if on_painting:
-		swap_intent = true
+		_head_for(Pending.SWAP)
 		mime.walk_to(swap_spot())
 		return
 	for door in doors:
@@ -727,8 +679,8 @@ func _accepts_input() -> bool:
 ## E: steps out of a portrait, or taps the nearest usable thing within INTERACT_REACH of
 ## where the mime would stand for it; with nothing in reach the mime shrugs.
 func _on_interacted() -> void:
-	if escaping:
-		_skip_escape()
+	if escape_beat.playing:
+		escape_beat.skip()
 		return
 	if not _accepts_input():
 		return
@@ -768,15 +720,67 @@ func _usables() -> Array[Array]:
 	return usables
 
 
-func _cancel_swap() -> void:
-	if swap_intent and mime.swap_progress > 0.0:
+## Does the pending action once the mime stands at its spot (within SWAP_REACH, the sketch's
+## within SKETCH_REACH) and is not tossed: paints (facing the easel), tilts, hides, picks up
+## the sketch once it lies still, or swaps (standing there for SWAP_TIME, facing the painting).
+func _act_on_arrival(delta: float) -> void:
+	if pending == Pending.NONE or tossing or mime.walking:
+		return
+	var spot := swap_spot()
+	var reach := SWAP_REACH
+	match pending:
+		Pending.PAINT:
+			spot = easel.spot()
+		Pending.TILT:
+			spot = (pending_target as TiltFrame).spot()
+		Pending.HIDE:
+			spot = (pending_target as HidingPortrait).spot()
+		Pending.SKETCH:
+			spot = sketch.position
+			reach = SKETCH_REACH
+	if mime.position.distance_to(spot) > reach:
+		return
+	match pending:
+		Pending.PAINT:
+			_done(Pending.PAINT)
+			mime.face_toward(easel.position)
+			_canvas.open()
+		Pending.TILT:
+			_tilt(pending_target as TiltFrame)
+		Pending.HIDE:
+			_hide_in(pending_target as HidingPortrait)
+		Pending.SKETCH:
+			if sketch.state == Sketch.State.LYING:
+				_take_sketch()
+		Pending.SWAP:
+			mime.face_toward(masterpiece.position)
+			mime.swap_progress = minf(mime.swap_progress + delta / SWAP_TIME, 1.0)
+			if mime.swap_progress >= 1.0:
+				_swap()
+
+
+## The mime heads to do `kind` (at `target`, the frame or portrait, for TILT and HIDE).
+func _head_for(kind: Pending, target: Node2D = null) -> void:
+	pending = kind
+	pending_target = target
+
+
+## The pending action is done, if it is `kind`.
+func _done(kind: Pending) -> void:
+	if pending == kind:
+		_head_for(Pending.NONE)
+
+
+## The mime gives up whatever it was heading to do; a swap under way is cancelled (logged).
+func _drop_pending() -> void:
+	if pending == Pending.SWAP and mime.swap_progress > 0.0:
 		print("[Room] Swap cancelled at %d%%" % roundi(mime.swap_progress * 100.0))
-	swap_intent = false
+	_head_for(Pending.NONE)
 	mime.swap_progress = 0.0
 
 
 func _hide_in(portrait: HidingPortrait) -> void:
-	hide_target = null
+	_done(Pending.HIDE)
 	mime.face_toward(portrait.position)
 	var seen := _seen_stepping_in()
 	hidden_in = portrait
@@ -808,16 +812,12 @@ func _seen_stepping_in() -> bool:
 
 ## Whether the mime is hidden (in a portrait or its invisible box).
 func is_hidden() -> bool:
-	return hidden_in != null or box != null
+	return hidden_in != null or powers.box != null
 
 
 func _step_out() -> void:
-	if box != null:
-		print("[Room] Stepped out of the box at %s at t %.2f" % [mime.position.round(), elapsed])
-		_game.audio.play(&"unhide")
-		box.queue_free()
-		box = null
-		mime.visible = true
+	if powers.box != null:
+		powers.leave_box()
 		return
 	print("[Room] Stepped out of the portrait at %s at t %.2f" % [hidden_in.position.round(), elapsed])
 	_game.audio.play(&"unhide")
@@ -828,7 +828,7 @@ func _step_out() -> void:
 
 
 func _tilt(frame: TiltFrame) -> void:
-	tilt_target = null
+	_done(Pending.TILT)
 	mime.face_toward(frame.position)
 	frame.tilt()
 	_game.audio.play(&"tilt")
@@ -889,7 +889,7 @@ func _reveal_sketch(source: Node2D) -> void:
 
 ## The mime picks the sketch up: kept by the run and saved at once (Game.record_sketch).
 func _take_sketch() -> void:
-	sketch_intent = false
+	_done(Pending.SKETCH)
 	run.has_sketch = true
 	sketch.take()
 	_game.audio.play(&"sketch_found")
@@ -988,7 +988,7 @@ func _on_painted(quality: float) -> void:
 
 
 func _swap() -> void:
-	swap_intent = false
+	_done(Pending.SWAP)
 	mime.swap_progress = 0.0
 	mime.has_fake = false
 	mime.carrying = true
@@ -1033,51 +1033,16 @@ func _escape() -> void:
 	print("[Room] Escaped with the original at t %.2f (par %.0f, seen %s, challenges %s)" % [elapsed, par_time, ever_seen, challenges])
 	_game.audio.play(&"escape")
 	beaten = _game.record_escape(stars, elapsed, challenges)
-	_play_escape_beat()
+	escape_beat.play()
 
 
-## The escape's curtain call before the results: the mime turns to the room and tips its
-## beret (ESCAPE_TIP), slips into the exit's doorway fading out (ESCAPE_SLIP), the door
-## swings shut, and after ESCAPE_HOLD the results show. A tap (or E) skips to them.
-func _play_escape_beat() -> void:
-	escaping = true
-	mime.face(Vector2.DOWN)
-	mime.rig.start_fidget(CharacterRig.Fidget.TIP, ESCAPE_TIP)
-	var doorway := exit_door.position + exit_door.opening.get_center()
-	_escape_beat = create_tween()
-	_escape_beat.tween_interval(ESCAPE_TIP)
-	_escape_beat.tween_callback(func() -> void: _escape_parts.append_array([mime.glide(doorway, ESCAPE_SLIP), mime.fade_out(ESCAPE_SLIP)]))
-	_escape_beat.tween_interval(ESCAPE_SLIP)
-	_escape_beat.tween_callback(func() -> void: _escape_parts.append(exit_door.swing_shut()))
-	_escape_beat.tween_interval(Door.SHUT_TIME + ESCAPE_HOLD)
-	_escape_beat.tween_callback(_end_escape)
-	print("[Room] Escape beat")
-
-
-## How long the escape beat runs before the results show.
+## How long the escape beat (EscapeBeat) runs before the results show.
 static func escape_beat_time() -> float:
 	return ESCAPE_TIP + ESCAPE_SLIP + Door.SHUT_TIME + ESCAPE_HOLD
 
 
-## Skips the rest of the escape beat (its slip, fade and swing too): the mime gone, the door
-## shut (its thud, unless it already sounded), the results now.
-func _skip_escape() -> void:
-	_escape_beat.kill()
-	for part in _escape_parts:
-		part.kill()
-	mime.rig.modulate.a = 0.0
-	if exit_door.shut < 1.0:
-		_game.audio.play(&"door")
-	exit_door.shut = 1.0
-	exit_door.glowing = false
-	print("[Room] Escape beat skipped")
-	_end_escape()
-
-
-func _end_escape() -> void:
-	if not escaping:
-		return
-	escaping = false
+## The escape beat is over: the results.
+func _show_results() -> void:
 	_results.present(stars, beaten, Paintings.SKETCHES.get(StringName(run.wing.painting)) if run.has_sketch else null, challenges)
 
 
@@ -1090,12 +1055,8 @@ func _on_caught() -> void:
 	run.room_catches[run.room] = run.room_catches.get(run.room, 0) + 1
 	_show_hint()
 	tossing = true
-	_cancel_swap()
-	_cancel_power()
-	paint_intent = false
-	tilt_target = null
-	hide_target = null
-	sketch_intent = false
+	_drop_pending()
+	powers.cancel()
 	if is_hidden():
 		_step_out()
 	_canvas.close()
@@ -1137,146 +1098,3 @@ func _end_toss() -> void:
 	mime.splat()
 	_game.audio.play(&"splat")
 	print("[Room] The mime is back at the entrance at t %.2f" % elapsed)
-
-
-## The powers of this room's wing on the bar (none in a replay), all ready: a room is a new
-## visit. On the play's first entry (`visit` 0 of the room it starts in) of the wing that
-## unlocks a power, while it was never escaped from, that power pops in (PowerBar.pop).
-func _set_up_powers(visit: int) -> void:
-	var wing_path := run.wing.resource_path
-	powers = Powers.unlocked(wing_path)
-	if run.replaying:
-		powers.clear()
-	power_bar.material = GLOW
-	power_bar.show_powers(powers)
-	power_bar.picked.connect(_on_power_picked)
-	power_bar.cancelled.connect(_cancel_power)
-	_reach_ring = PowerFx.spawn(self, PowerFx.Kind.RING, GLOW)
-	_reach_ring.hide()
-	var new_power := Powers.unlocked_by(wing_path)
-	if new_power >= 0 and powers.has(new_power) and run.came_from == WingRun.START and visit == 0 and not Save.finished(_game.save, Content.wing_id(wing_path)):
-		power_bar.pop(new_power)
-		print("[Room] Unlock beat: the %s power pops into the bar" % Powers.Power.keys()[new_power])
-
-
-## A power's button or key: chooses it (the box is used at once), or, chosen already,
-## cancels it; not while the mime cannot act or hides, nor once spent.
-func _on_power_picked(power: int) -> void:
-	if not powers.has(power) or powers_spent[power] or not _accepts_input() or is_hidden():
-		return
-	if chosen_power == power:
-		_cancel_power()
-		return
-	if power == Powers.Power.BOX:
-		_cancel_power()
-		_use_box()
-		return
-	chosen_power = power
-	power_bar.chosen = power
-	_reach_ring.radius = Powers.BALL_RANGE if power == Powers.Power.BALL else Powers.ROPE_RANGE
-	_reach_ring.position = mime.position
-	_reach_ring.show()
-	print("[Room] Chose the %s power" % Powers.Power.keys()[power])
-
-
-## Drops the chosen power (logged as a cancel unless `used`).
-func _cancel_power(used := false) -> void:
-	if chosen_power >= 0 and not used:
-		print("[Room] Power cancelled")
-	chosen_power = -1
-	power_bar.chosen = -1
-	_reach_ring.hide()
-
-
-## The chosen power's target tap at `at`: the ball thrown there, the rope on the straight
-## frame there; out of reach (or a tilted frame) a shrug, the power still ready; a rope tap
-## on no frame just cancels it.
-func _aim_power(at: Vector2) -> void:
-	var power := chosen_power
-	_cancel_power(true)
-	if power == Powers.Power.BALL:
-		if mime.position.distance_to(at) > Powers.BALL_RANGE:
-			mime.shrug()
-			return
-		_throw_ball(at)
-		return
-	for frame in _frames:
-		if frame.rect().has_point(at):
-			if frame.tilted or mime.position.distance_to(frame.spot()) > Powers.ROPE_RANGE:
-				mime.shrug()
-			else:
-				_pull_rope(frame)
-			return
-	print("[Room] Power cancelled: the rope tapped on no frame")
-
-
-## Spends `power` for this visit (counted in the run).
-func _spend(power: Powers.Power) -> void:
-	powers_spent[power] = true
-	power_bar.set_spent(power, true)
-	run.powers_used += 1
-
-
-## The mime stops what it was about to do and stands where it is (to use a power).
-func _stand_still() -> void:
-	_cancel_swap()
-	paint_intent = false
-	tilt_target = null
-	hide_target = null
-	sketch_intent = false
-	mime.place_at(mime.position)
-
-
-## Throws the invisible ball at `at`: where it lands, the nearest active guard in earshot
-## hears it as he would a tilted frame.
-func _throw_ball(at: Vector2) -> void:
-	_spend(Powers.Power.BALL)
-	_stand_still()
-	mime.face_toward(at)
-	mime.rig.start_fidget(CharacterRig.Fidget.THROW, PowerFx.THROW_TIME)
-	_game.audio.play(&"ball_throw")
-	var ball := PowerFx.spawn(self, PowerFx.Kind.BALL, GLOW)
-	ball.from = mime.position + PowerFx.HAND
-	ball.to = at
-	ball.landed.connect(_on_ball_landed.bind(at))
-	print("[Room] Threw the ball from %s to %s at t %.2f" % [mime.position.round(), at.round(), elapsed])
-
-
-func _on_ball_landed(at: Vector2) -> void:
-	if finished or leaving:
-		return
-	_game.audio.play(&"ball_land")
-	var heard := nearest_in_earshot(at)
-	if heard != null:
-		heard.hear(at)
-	print("[Room] The ball landed at %s at t %.2f (heard by: %s)" % [at.round(), elapsed, str(heard.name) if heard != null else "nobody"])
-
-
-## Pulls `frame` crooked with the invisible rope: a tilt from afar (its noise and sketch).
-func _pull_rope(frame: TiltFrame) -> void:
-	_spend(Powers.Power.ROPE)
-	_stand_still()
-	mime.face_toward(frame.position)
-	mime.rig.start_fidget(CharacterRig.Fidget.PULL, PowerFx.PULL_TIME)
-	_game.audio.play(&"rope_pull")
-	var rope := PowerFx.spawn(self, PowerFx.Kind.ROPE, GLOW)
-	rope.from = mime.position + PowerFx.HAND
-	rope.to = frame.position + Vector2(0.0, TiltFrame.SIZE.y / 2.0)
-	print("[Room] Pulled the frame at %s with the rope from %s" % [frame.position.round(), mime.position.round()])
-	_tilt(frame)
-
-
-## The mime mimes the invisible box where it stands and hides in it (seen stepping in, it is
-## chased there as in a portrait) for at most Powers.BOX_TIME.
-func _use_box() -> void:
-	_spend(Powers.Power.BOX)
-	_stand_still()
-	var seen := _seen_stepping_in()
-	# Among the actors, y-sorted with the guards walking past it.
-	box = PowerFx.spawn($Actors, PowerFx.Kind.BOX, GLOW)
-	box.z_index = 0
-	box.position = mime.position
-	_box_left = Powers.BOX_TIME
-	mime.visible = false
-	_game.audio.play(&"box_up")
-	print("[Room] Hid in the box at %s at t %.2f (seen going in: %s)" % [mime.position.round(), elapsed, seen])

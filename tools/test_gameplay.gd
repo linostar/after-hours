@@ -1039,7 +1039,7 @@ func _test_sketch_found() -> void:
 	var sketch := room.sketch
 	_check(sketch != null and sketch.state == Sketch.State.HIDDEN and sketch.texture == Paintings.SKETCHES[StringName(room.run.wing.painting)], name, "the sketch is not tucked away unseen with its wing's drawing")
 	await _tap_at(sketch.position)
-	_check(not room.sketch_intent, name, "a tap on a hidden sketch's spot heads for it")
+	_check(room.pending != Room.Pending.SKETCH, name, "a tap on a hidden sketch's spot heads for it")
 	room._tilt(room.get_node("Frames/FrameA") as TiltFrame)
 	_check(sketch.state == Sketch.State.FALLING and room.run.sketch_dropped and _game.audio.played.has(&"sketch_drop"), name, "tilting its frame did not let the sketch fall")
 	await create_timer(Sketch.FALL_TIME + 0.1).timeout
@@ -1047,7 +1047,7 @@ func _test_sketch_found() -> void:
 	var map := room.get_world_2d().navigation_map
 	_check(NavigationServer2D.map_get_closest_point(map, sketch.position).distance_to(sketch.position) < 1.0, name, "the sketch lies off the walkable floor at %s" % sketch.position)
 	await _tap_at(sketch.position)
-	_check(room.sketch_intent, name, "a tap on the sketch does not walk the mime to it")
+	_check(room.pending == Room.Pending.SKETCH, name, "a tap on the sketch does not walk the mime to it")
 	_check(await _wait_until(func() -> bool: return room.run.has_sketch, 900), name, "the mime never picked the sketch up")
 	_check(sketch.state == Sketch.State.TAKEN and _game.audio.played.has(&"sketch_found"), name, "picking it up did not take it with its sound")
 	await process_frame
@@ -1055,7 +1055,7 @@ func _test_sketch_found() -> void:
 	_check(room.hud.has_sketch, name, "the HUD does not show the sketch")
 	room.mime.carrying = true
 	room._escape()
-	room._skip_escape()
+	room.escape_beat.skip()
 	var results := room.get_node("ResultsLayer/Results") as Results
 	await create_timer(Results.STAR_GAP * 6.0 + Results.POP_TIME + 0.2).timeout
 	_check(results.sketch.visible and results.sketch.texture == sketch.texture, name, "the results do not show the sketch")
@@ -1069,7 +1069,7 @@ func _test_sketch_found() -> void:
 	await create_timer(Sketch.FALL_TIME + 0.1).timeout
 	portrait_room.mime.place_at(portrait_room.sketch.position + Vector2(20, 0))
 	portrait_room._keys.interacted.emit()
-	_check(portrait_room.sketch_intent, name, "E beside the sketch does not head for it")
+	_check(portrait_room.pending == Room.Pending.SKETCH, name, "E beside the sketch does not head for it")
 	_check(await _wait_until(func() -> bool: return portrait_room.run.has_sketch, 600), name, "E never picked the sketch up")
 	var revisit := (load(ROOM_PATH) as PackedScene).instantiate() as Room
 	revisit.sketch_in = ^"Frames/FrameB"
@@ -1440,16 +1440,16 @@ func _test_catches_during_swap_and_while_carrying() -> void:
 	await _tap_at(room.painting_rect().get_center())
 	await _wait_until(func() -> bool: return room.mime.swap_progress > 0.3, 900)
 	await _tap_at(room.painting_rect().get_center())
-	_check(room.mime.swap_progress > 0.3 and room.swap_intent, name, "a second tap on the painting restarted the swap")
+	_check(room.mime.swap_progress > 0.3 and room.pending == Room.Pending.SWAP, name, "a second tap on the painting restarted the swap")
 	room.guard.active = true
 	_stage_guard(room, room.mime.position + Vector2(-80, 0), Vector2.RIGHT, room.mime.position)
 	await _wait_until(func() -> bool: return room.tossing, 120)
-	_check(room.tossing and room.mime.swap_progress == 0.0 and not room.swap_intent, name, "a catch mid-swap did not cancel it")
+	_check(room.tossing and room.mime.swap_progress == 0.0 and room.pending != Room.Pending.SWAP, name, "a catch mid-swap did not cancel it")
 	await _wait_until(func() -> bool: return not room.tossing, 180)
 	room.guard.active = false
 	room.mime.place_at(room.swap_spot())
 	room._on_painted(Forgery.ASSIST_QUALITY)
-	room.swap_intent = true
+	room.pending = Room.Pending.SWAP
 	await _wait_until(func() -> bool: return room.mime.carrying, 180)
 	room.guard.active = true
 	_stage_guard(room, Vector2(700, 330), Vector2.RIGHT, Vector2(780, 330))
@@ -1517,11 +1517,11 @@ func _test_tilt_decoy_investigated() -> void:
 	_stage_guard(room, Vector2(660, 430), Vector2.LEFT, room.entrance)
 	var frame := room.get_node("Frames/FrameB") as TiltFrame
 	await _tap_at(frame.position)
-	_check(room.tilt_target == frame, name, "a tap on the frame did not make it the tilt target")
+	_check(room.pending == Room.Pending.TILT and room.pending_target == frame, name, "a tap on the frame did not make it the tilt target")
 	_check(await _wait_until(func() -> bool: return frame.tilted, 600), name, "the mime never tilted the frame (at %s)" % room.mime.position)
 	_check(await _wait_until(func() -> bool: return room.guard.intent == GuardBrain.Intent.INVESTIGATE, 10), name, "the guard in earshot did not investigate (intent %s)" % _intent_name(room.guard.intent))
 	await _tap_at(frame.position)
-	_check(room.tilt_target == null, name, "a tilted frame became a tilt target")
+	_check(room.pending != Room.Pending.TILT, name, "a tilted frame became a tilt target")
 	_check(await _wait_until(func() -> bool: return room.guard.intent == GuardBrain.Intent.STRAIGHTEN, 900), name, "the guard never went to straighten the frame (intent %s, at %s)" % [_intent_name(room.guard.intent), room.guard.position])
 	var straighten_frames := 0
 	while frame.tilted and straighten_frames < 600:
@@ -1575,7 +1575,7 @@ func _test_hiding_checks_every_guard() -> void:
 	_stand(watching, Vector2(240, 230), Vector2.LEFT)
 	var portrait := room.get_node("Portraits/PortraitA") as HidingPortrait
 	room.mime.place_at(portrait.spot())
-	room.hide_target = portrait
+	room._head_for(Room.Pending.HIDE, portrait)
 	await physics_frame
 	_check(room.hidden_in == portrait, name, "the mime did not step into the portrait")
 	_check(room.ever_seen and watching.senses.chasing, name, "the second guard saw the mime step in but does not chase (seen %s)" % room.ever_seen)
@@ -2927,7 +2927,7 @@ func _test_room_swap_and_escape() -> void:
 	room.guard.active = false
 	room._on_painted(Forgery.ASSIST_QUALITY)
 	await _tap_at(room.painting_rect().get_center())
-	_check(room.swap_intent, name, "a tap on the masterpiece did not mean swap")
+	_check(room.pending == Room.Pending.SWAP, name, "a tap on the masterpiece did not mean swap")
 	var swapped := await _wait_until(func() -> bool: return room.mime.carrying, 900)
 	_check(swapped, name, "the mime never swapped the painting (at %s, progress %.2f)" % [room.mime.position, room.mime.swap_progress])
 	_check(room.exit_door.glowing, name, "the exit door does not glow while carrying the original")
@@ -2938,9 +2938,9 @@ func _test_room_swap_and_escape() -> void:
 	var results := room.get_node("ResultsLayer/Results") as Results
 	# The escape beat first: the beret tipped, the slip out, the door shut; then the results.
 	await physics_frame
-	_check(room.escaping and not results.visible and room.mime.rig.fidget == CharacterRig.Fidget.TIP, name, "the escape went straight to the results without its beat (escaping %s, fidget %s)" % [room.escaping, room.mime.rig.fidget])
+	_check(room.escape_beat.playing and not results.visible and room.mime.rig.fidget == CharacterRig.Fidget.TIP, name, "the escape went straight to the results without its beat (escaping %s, fidget %s)" % [room.escape_beat.playing, room.mime.rig.fidget])
 	var shown := await _wait_until(func() -> bool: return results.visible, ceili(Room.escape_beat_time() * 60.0) + 10)
-	_check(shown and not room.escaping and room.exit_door.shut == 1.0 and not room.exit_door.glowing and room.mime.rig.modulate.a == 0.0, name, "after the beat the results are not shown over a shut door with the mime gone (shown %s, shut %.2f, mime alpha %.2f)" % [shown, room.exit_door.shut, room.mime.rig.modulate.a])
+	_check(shown and not room.escape_beat.playing and room.exit_door.shut == 1.0 and not room.exit_door.glowing and room.mime.rig.modulate.a == 0.0, name, "after the beat the results are not shown over a shut door with the mime gone (shown %s, shut %.2f, mime alpha %.2f)" % [shown, room.exit_door.shut, room.mime.rig.modulate.a])
 	# Every star has popped in by 3 x (STAR_GAP + POP_TIME), each gold as earned.
 	for i in ceili(3.0 * (Results.STAR_GAP + Results.POP_TIME) * 60.0) + 6:
 		await physics_frame
@@ -2967,12 +2967,12 @@ func _test_escape_beat_skips() -> void:
 		room._escape()
 		var results := room.get_node("ResultsLayer/Results") as Results
 		await physics_frame
-		_check(room.escaping and not results.visible, name, "the escape beat did not start")
+		_check(room.escape_beat.playing and not results.visible, name, "the escape beat did not start")
 		if by_key:
 			room._keys.interacted.emit()
 		else:
 			await _tap_at(Vector2(480, 400))
-		_check(not room.escaping and results.visible and room.exit_door.shut == 1.0 and room.mime.rig.modulate.a == 0.0, name, "a %s did not skip the escape beat to the results" % ("key" if by_key else "tap"))
+		_check(not room.escape_beat.playing and results.visible and room.exit_door.shut == 1.0 and room.mime.rig.modulate.a == 0.0, name, "a %s did not skip the escape beat to the results" % ("key" if by_key else "tap"))
 		_check(room.stars.size() == 3, name, "the skipped escape has no stars")
 	# Skipped mid-swing: the door's thud sounds once, then nothing of the beat plays late.
 	var swinging := await _load_room()
@@ -3120,7 +3120,7 @@ func _test_room_swap_cancel_and_locked_exit() -> void:
 	var swapping := await _wait_until(func() -> bool: return room.mime.swap_progress > 0.3, 900)
 	_check(swapping, name, "the swap never got going")
 	await _tap_at(Vector2(950, 330))
-	_check(room.mime.swap_progress == 0.0 and not room.swap_intent, name, "tapping away did not cancel the swap")
+	_check(room.mime.swap_progress == 0.0 and room.pending != Room.Pending.SWAP, name, "tapping away did not cancel the swap")
 	await _walk_trace(room.mime, 900)
 	_check(room.mime.position.distance_to(room.exit_door.position) <= Door.REACH, name, "the mime did not reach the exit (at %s)" % room.mime.position)
 	for i in 10:
@@ -3154,7 +3154,7 @@ func _test_room_easel_paints_fake() -> void:
 	var glow := room.easel.get_node("Glow") as Polygon2D
 	_check(glow.visible and not room.mime.has_fake, name, "the easel does not glow at the start, or the mime starts with a fake")
 	await _tap_at(room.painting_rect().get_center())
-	_check(not room.swap_intent, name, "a tap on the masterpiece without a fake meant swap")
+	_check(room.pending != Room.Pending.SWAP, name, "a tap on the masterpiece without a fake meant swap")
 	var canvas := await _open_easel(room)
 	_check(canvas.visible and room.mime.position.distance_to(room.easel.spot()) <= Room.SWAP_REACH, name, "tapping the easel did not open the canvas with the mime at the easel (at %s)" % room.mime.position)
 	await _tap_at(Vector2(100, 480))
@@ -3169,7 +3169,7 @@ func _test_room_easel_paints_fake() -> void:
 	_check(await _wait_until(func() -> bool: return room.mime.carrying, 900), name, "the fake never swapped for the original")
 	_check(not room.mime.has_fake and carried.modulate.is_equal_approx(room.mime.carried_light), name, "after the swap the mime still has the fake, or the original shows tinted")
 	await _tap_at(room.easel.rect().get_center())
-	_check(not room.paint_intent, name, "carrying the original, a tap on the easel meant paint")
+	_check(room.pending != Room.Pending.PAINT, name, "carrying the original, a tap on the easel meant paint")
 
 
 ## A catch while painting closes the canvas and keeps its finished strokes; after the toss
@@ -3484,10 +3484,10 @@ func _test_room_layout_optional_and_checked() -> void:
 	await _wait_until(func() -> bool: return NavigationServer2D.map_get_closest_point_owner(map, room.mime.position).is_valid(), 60)
 	room.guard.active = false
 	room._on_floor_tapped(Vector2(182, 330))
-	_check(room.mime.walking and not room.paint_intent, name, "a tap where an easel would be did not just walk the mime")
+	_check(room.mime.walking and room.pending != Room.Pending.PAINT, name, "a tap where an easel would be did not just walk the mime")
 	room.mime.place_at(Vector2(230, 372))
 	room._on_interacted()
-	_check(not room.paint_intent and not room.swap_intent, name, "E found something to use in an empty room")
+	_check(room.pending != Room.Pending.PAINT and room.pending != Room.Pending.SWAP, name, "E found something to use in an empty room")
 
 
 ## The room bakes its navmesh from the floor outline less its partitions: the walkable
@@ -4796,7 +4796,7 @@ func _test_powers_locked_per_wing() -> void:
 		if i == 1:
 			await _press_key(KEY_2)
 			await _press_key(KEY_3)
-			_check(room.chosen_power == -1 and room.box == null, name, "a locked power's key chose it in wing 2")
+			_check(room.powers.chosen == -1 and room.powers.box == null, name, "a locked power's key chose it in wing 2")
 	_game.save = saved
 	_game.run = null
 
@@ -4855,20 +4855,20 @@ func _test_power_ball() -> void:
 	room.mime.place_at(Vector2(200, 260))
 	var played := _game.audio.played
 	await _press_key(KEY_1)
-	_check(room.chosen_power == Powers.Power.BALL and room.power_bar.chosen == Powers.Power.BALL and room._reach_ring.visible and room._reach_ring.radius == Powers.BALL_RANGE, name, "key 1 did not choose the ball and ring its reach")
+	_check(room.powers.chosen == Powers.Power.BALL and room.power_bar.chosen == Powers.Power.BALL and room.powers.reach_ring.visible and room.powers.reach_ring.radius == Powers.BALL_RANGE, name, "key 1 did not choose the ball and ring its reach")
 	played.clear()
 	await _tap_at(room.mime.position + Vector2(Powers.BALL_RANGE + 20.0, 0.0))
-	_check(&"shrug" in played and room.chosen_power == -1 and not room.powers_spent[Powers.Power.BALL] and room.run.powers_used == 0 and not room.mime.walking, name, "a throw out of reach did not shrug with the ball still ready (sounds %s)" % [played])
+	_check(&"shrug" in played and room.powers.chosen == -1 and not room.powers.spent[Powers.Power.BALL] and room.run.powers_used == 0 and not room.mime.walking, name, "a throw out of reach did not shrug with the ball still ready (sounds %s)" % [played])
 	var spot := Vector2(380, 420)
 	await _tap_control(room.power_bar.buttons[Powers.Power.BALL])
 	await _tap_at(spot)
-	_check(room.powers_spent[Powers.Power.BALL] and room.run.powers_used == 1 and room.power_bar.buttons[Powers.Power.BALL].disabled and not room._reach_ring.visible, name, "the throw did not spend the ball and count it")
+	_check(room.powers.spent[Powers.Power.BALL] and room.run.powers_used == 1 and room.power_bar.buttons[Powers.Power.BALL].disabled and not room.powers.reach_ring.visible, name, "the throw did not spend the ball and count it")
 	_check(room.mime.rig.fidget == CharacterRig.Fidget.THROW and &"ball_throw" in played and room.mime.position == Vector2(200, 260) and not room.mime.walking, name, "the mime did not throw from where it stood")
 	_check(room.guard.noise_point != spot, name, "the guard heard the ball before it landed")
 	var landed := await _wait_until(func() -> bool: return room.guard.noise_point == spot, ceili(PowerFx.BALL_FLIGHT * 60.0) + 5)
 	_check(landed and &"ball_land" in played, name, "the guard did not hear the ball land at %s (sounds %s)" % [spot, played])
 	await _press_key(KEY_1)
-	_check(room.chosen_power == -1, name, "a spent ball was chosen again")
+	_check(room.powers.chosen == -1, name, "a spent ball was chosen again")
 
 
 ## The rope: key 2 chooses it; a frame out of reach or already tilted gets a shrug, the rope
@@ -4886,19 +4886,19 @@ func _test_power_rope() -> void:
 	room.mime.place_at(Vector2(700, 300))
 	var played := _game.audio.played
 	await _press_key(KEY_2)
-	_check(room.chosen_power == Powers.Power.ROPE and room._reach_ring.radius == Powers.ROPE_RANGE, name, "key 2 did not choose the rope and ring its reach")
+	_check(room.powers.chosen == Powers.Power.ROPE and room.powers.reach_ring.radius == Powers.ROPE_RANGE, name, "key 2 did not choose the rope and ring its reach")
 	played.clear()
 	await _tap_at(near.position)
-	_check(&"shrug" in played and not near.tilted and not room.powers_spent[Powers.Power.ROPE], name, "a frame out of reach did not get a shrug with the rope still ready")
+	_check(&"shrug" in played and not near.tilted and not room.powers.spent[Powers.Power.ROPE], name, "a frame out of reach did not get a shrug with the rope still ready")
 	room.mime.place_at(Vector2(450, 260))
 	crooked.tilt()
 	await _press_key(KEY_2)
 	played.clear()
 	await _tap_at(crooked.position)
-	_check(&"shrug" in played and not room.powers_spent[Powers.Power.ROPE], name, "a tilted frame did not get a shrug with the rope still ready")
+	_check(&"shrug" in played and not room.powers.spent[Powers.Power.ROPE], name, "a tilted frame did not get a shrug with the rope still ready")
 	await _press_key(KEY_2)
 	await _tap_at(near.position)
-	_check(near.tilted and room.powers_spent[Powers.Power.ROPE] and room.run.powers_used == 1 and &"rope_pull" in played and &"tilt" in played, name, "the rope did not tilt the frame in reach (sounds %s)" % [played])
+	_check(near.tilted and room.powers.spent[Powers.Power.ROPE] and room.run.powers_used == 1 and &"rope_pull" in played and &"tilt" in played, name, "the rope did not tilt the frame in reach (sounds %s)" % [played])
 	_check(room.mime.rig.fidget == CharacterRig.Fidget.PULL and room.mime.position == Vector2(450, 260) and not room.mime.walking, name, "the mime did not pull from where it stood")
 	_check(room.guard.noise_point == near.view_point(), name, "the guard did not hear the frame the rope tilted")
 
@@ -4917,31 +4917,31 @@ func _test_power_box() -> void:
 	var played := _game.audio.played
 	played.clear()
 	await _press_key(KEY_3)
-	_check(room.box != null and room.is_hidden() and not room.mime.visible and room.powers_spent[Powers.Power.BOX] and room.run.powers_used == 1 and &"box_up" in played and not room.ever_seen, name, "key 3 did not hide the mime in the box unseen")
+	_check(room.powers.box != null and room.is_hidden() and not room.mime.visible and room.powers.spent[Powers.Power.BOX] and room.run.powers_used == 1 and &"box_up" in played and not room.ever_seen, name, "key 3 did not hide the mime in the box unseen")
 	_stand(room.guard, Vector2(290, 300), Vector2.LEFT)
 	for i in 30:
 		await physics_frame
 	_check(room.guard.suspicion == 0.0 and not room.guard.senses.chasing and not room.ever_seen, name, "a guard looking at the box saw the mime")
 	_stand(room.guard, Vector2(700, 430), Vector2.RIGHT)
 	await _tap_at(Vector2(260, 420))
-	_check(room.box == null and room.mime.visible and room.mime.walking and &"unhide" in played, name, "the next tap did not step out of the box and walk on")
+	_check(room.powers.box == null and room.mime.visible and room.mime.walking and &"unhide" in played, name, "the next tap did not step out of the box and walk on")
 	# A new visit (the run kept): the box is ready again, and BOX_TIME steps out by itself.
 	room = await _load_room()
 	_stand(room.guard, Vector2(700, 430), Vector2.RIGHT)
 	room.mime.place_at(Vector2(200, 300))
 	await _press_key(KEY_3)
-	_check(room.box != null and room.run.powers_used == 2, name, "the box was not ready on the next visit")
-	var out := await _wait_until(func() -> bool: return room.box == null, ceili(Powers.BOX_TIME * 60.0) + 10)
+	_check(room.powers.box != null and room.run.powers_used == 2, name, "the box was not ready on the next visit")
+	var out := await _wait_until(func() -> bool: return room.powers.box == null, ceili(Powers.BOX_TIME * 60.0) + 10)
 	_check(out and room.mime.visible, name, "BOX_TIME did not step the mime out")
 	# Seen stepping in: chased there, and the catch steps it out.
 	room = await _load_room()
 	room.mime.place_at(Vector2(200, 300))
 	_stand(room.guard, Vector2(300, 300), Vector2.LEFT)
-	room._on_power_picked(Powers.Power.BOX)
-	_check(room.box != null and room.guard.senses.chasing and room.ever_seen, name, "a guard who saw the mime step into the box does not chase it")
+	room.powers.pick(Powers.Power.BOX)
+	_check(room.powers.box != null and room.guard.senses.chasing and room.ever_seen, name, "a guard who saw the mime step into the box does not chase it")
 	room.guard.patrolling = true
 	var caught := await _wait_until(func() -> bool: return room.tossing, 180)
-	_check(caught and room.box == null and room.mime.visible, name, "the chase did not catch the boxed mime and step it out")
+	_check(caught and room.powers.box == null and room.mime.visible, name, "the chase did not catch the boxed mime and step it out")
 
 
 ## A power is spent for the visit: a toss does not refill it, entering the room again does
@@ -4956,15 +4956,15 @@ func _test_power_refill() -> void:
 	room.mime.place_at(Vector2(200, 300))
 	await _press_key(KEY_1)
 	await _tap_at(Vector2(300, 300))
-	_check(room.powers_spent[Powers.Power.BALL] and room.run.powers_used == 1, name, "the ball was not spent")
+	_check(room.powers.spent[Powers.Power.BALL] and room.run.powers_used == 1, name, "the ball was not spent")
 	room._on_caught()
 	await _wait_until(func() -> bool: return not room.tossing, 180)
-	_check(room.powers_spent[Powers.Power.BALL] and room.power_bar.buttons[Powers.Power.BALL].disabled, name, "a toss refilled the ball")
+	_check(room.powers.spent[Powers.Power.BALL] and room.power_bar.buttons[Powers.Power.BALL].disabled, name, "a toss refilled the ball")
 	await _press_key(KEY_1)
-	_check(room.chosen_power == -1, name, "the spent ball could be chosen after the toss")
+	_check(room.powers.chosen == -1, name, "the spent ball could be chosen after the toss")
 	var run := room.run
 	var again := await _load_room()
-	_check(again.run == run and again.powers_spent == [false, false, false] and not again.power_bar.buttons[Powers.Power.BALL].disabled and run.powers_used == 1, name, "entering the room again did not refill the powers (spent %s, used %d)" % [again.powers_spent, run.powers_used])
+	_check(again.run == run and again.powers.spent == [false, false, false] and not again.power_bar.buttons[Powers.Power.BALL].disabled and run.powers_used == 1, name, "entering the room again did not refill the powers (spent %s, used %d)" % [again.powers.spent, run.powers_used])
 
 
 ## Cancelling a chosen power: the same button again, Escape, or a rope tap on no frame (the
@@ -4979,17 +4979,17 @@ func _test_power_cancel() -> void:
 	room.mime.place_at(Vector2(200, 300))
 	var ball := room.power_bar.buttons[Powers.Power.BALL]
 	await _tap_control(ball)
-	_check(room.chosen_power == Powers.Power.BALL, name, "the ball button did not choose the ball")
+	_check(room.powers.chosen == Powers.Power.BALL, name, "the ball button did not choose the ball")
 	await _tap_control(ball)
-	_check(room.chosen_power == -1 and room.power_bar.chosen == -1 and not room._reach_ring.visible, name, "the same button again did not cancel the ball")
+	_check(room.powers.chosen == -1 and room.power_bar.chosen == -1 and not room.powers.reach_ring.visible, name, "the same button again did not cancel the ball")
 	await _press_key(KEY_1)
 	await _press_key(KEY_ESCAPE)
-	_check(room.chosen_power == -1, name, "Escape did not cancel the ball")
+	_check(room.powers.chosen == -1, name, "Escape did not cancel the ball")
 	await _press_key(KEY_1)
 	await _press_key(KEY_2)
-	_check(room.chosen_power == Powers.Power.ROPE, name, "key 2 did not switch from the ball to the rope")
+	_check(room.powers.chosen == Powers.Power.ROPE, name, "key 2 did not switch from the ball to the rope")
 	await _tap_at(Vector2(300, 420))
-	_check(room.chosen_power == -1 and not room.mime.walking and not room.powers_spent.has(true) and room.run.powers_used == 0, name, "a rope tap on no frame did not just cancel it")
+	_check(room.powers.chosen == -1 and not room.mime.walking and not room.powers.spent.has(true) and room.run.powers_used == 0, name, "a rope tap on no frame did not just cancel it")
 	await _tap_at(Vector2(300, 420))
 	_check(room.mime.walking, name, "after a cancel a tap does not walk the mime")
 
